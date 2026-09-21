@@ -94,9 +94,9 @@
         if (src && existing.getAttribute('src') !== src) existing.setAttribute('src', src);
         existing.removeAttribute('width');
         existing.style.width = 'auto';
-        existing.style.height = opts.height || 'auto';
-        existing.style.maxWidth = opts.maxWidth || '';
-        existing.style.maxHeight = opts.maxHeight || '';
+        existing.style.height = opts.height || '56px';
+        existing.style.maxWidth = opts.maxWidth || '280px';
+        existing.style.maxHeight = opts.height || opts.maxHeight || '56px';
         existing.style.objectFit = 'contain';
         return;
       }
@@ -118,8 +118,8 @@
     var emptyNodes = document.querySelectorAll('[data-brand-logo], .empty-logo');
     for (var i = 0; i < emptyNodes.length; i++) {
       if (!logo) break;
-      // Natural aspect ratio: keep height, never force width.
-      paint(emptyNodes[i], logo, { height: '56px', maxWidth: 'min(320px, 85vw)' });
+      // Keep fixed height; never force width (preserves aspect ratio).
+      paint(emptyNodes[i], logo, { height: '56px', maxWidth: '280px' });
     }
 
     var titleNodes = document.querySelectorAll('.app-titlebar-icon');
