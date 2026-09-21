@@ -118,8 +118,8 @@
     var emptyNodes = document.querySelectorAll('[data-brand-logo], .empty-logo');
     for (var i = 0; i < emptyNodes.length; i++) {
       if (!logo) break;
-      // Natural aspect ratio: constrain by max-height only (no forced width).
-      paint(emptyNodes[i], logo, { height: 'auto', maxHeight: '72px', maxWidth: 'min(320px, 85vw)' });
+      // Natural aspect ratio: keep height, never force width.
+      paint(emptyNodes[i], logo, { height: '56px', maxWidth: 'min(320px, 85vw)' });
     }
 
     var titleNodes = document.querySelectorAll('.app-titlebar-icon');
