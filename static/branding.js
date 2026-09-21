@@ -13,8 +13,8 @@
   var DEFAULTS = {
     appName: 'Matika AI Assistant',
     companyName: 'Matika',
-    logo: 'static/branding-logo.svg',
-    favicon: 'static/favicon.svg',
+    logo: 'static/matika-logo.png',
+    favicon: 'static/favicon-matika.png',
     primaryColor: '#006eb3',
     primaryColorDark: '#00908d',
     supportEmail: '',
@@ -69,39 +69,50 @@
     if (!links.length) {
       var link = document.createElement('link');
       link.rel = 'icon';
+      link.type = href.indexOf('.png') !== -1 ? 'image/png' : '';
       link.href = href;
       document.head.appendChild(link);
       return;
     }
     for (var i = 0; i < links.length; i++) {
-      // Keep typed PNG sizes; only rewrite the generic / svg / ico entries.
-      var sizes = links[i].getAttribute('sizes') || '';
-      var type = links[i].getAttribute('type') || '';
-      if (!sizes || type.indexOf('svg') !== -1 || (links[i].href || '').indexOf('favicon.ico') !== -1 || (links[i].href || '').indexOf('favicon.svg') !== -1) {
-        links[i].href = href;
+      links[i].href = href;
+      if (href.indexOf('.png') !== -1) {
+        links[i].type = 'image/png';
       }
     }
   }
 
   function setLogoImages() {
     var logo = branding.logo;
-    if (!logo) return;
-    var nodes = document.querySelectorAll('[data-brand-logo], .empty-logo, .app-titlebar-icon');
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
-      // Skip nodes that already contain a branded <img>
-      if (el.querySelector && el.querySelector('img[data-brand-img]')) continue;
+    var mark = branding.favicon || logo;
+    if (!logo && !mark) return;
+
+    function paint(el, src, opts) {
+      if (el.querySelector && el.querySelector('img[data-brand-img]')) return;
       var img = document.createElement('img');
-      img.src = logo;
+      img.src = src;
       img.alt = branding.appName || '';
       img.setAttribute('data-brand-img', '1');
-      img.width = el.classList && el.classList.contains('empty-logo') ? 80 : 16;
-      img.height = img.width;
       img.style.display = 'block';
-      img.style.borderRadius = el.classList && el.classList.contains('empty-logo') ? '16px' : '4px';
+      img.style.width = 'auto';
+      img.style.height = opts.height;
+      img.style.maxWidth = opts.maxWidth || '100%';
+      img.style.objectFit = 'contain';
+      if (opts.borderRadius) img.style.borderRadius = opts.borderRadius;
       el.innerHTML = '';
       el.appendChild(img);
       el.setAttribute('aria-label', branding.appName || 'logo');
+    }
+
+    var emptyNodes = document.querySelectorAll('[data-brand-logo], .empty-logo');
+    for (var i = 0; i < emptyNodes.length; i++) {
+      if (!logo) break;
+      paint(emptyNodes[i], logo, { height: '56px', maxWidth: 'min(280px, 80vw)' });
+    }
+
+    var titleNodes = document.querySelectorAll('.app-titlebar-icon');
+    for (var j = 0; j < titleNodes.length; j++) {
+      paint(titleNodes[j], mark || logo, { height: '18px', maxWidth: '48px' });
     }
   }
 

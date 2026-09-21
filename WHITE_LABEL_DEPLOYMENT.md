@@ -44,7 +44,7 @@ Any of these override `config/branding.json` (first non-empty wins):
 
 Logo/favicon may be:
 
-- a relative static path: `static/branding-logo.svg`
+- a relative static path: `static/matika-logo.png`
 - an absolute HTTPS URL: `https://cdn.example.com/logo.svg`
 
 ---
@@ -69,7 +69,8 @@ npm run build
 ```bash
 export NEXT_PUBLIC_APP_NAME="Profax AI Assistant"
 export NEXT_PUBLIC_COMPANY_NAME="Profax"
-export NEXT_PUBLIC_LOGO="static/branding-logo.svg"
+export NEXT_PUBLIC_LOGO="static/matika-logo.png"
+export NEXT_PUBLIC_FAVICON="static/favicon-matika.png"
 export NEXT_PUBLIC_PRIMARY_COLOR="#1B4F72"
 export NEXT_PUBLIC_PRIMARY_COLOR_DARK="#148F77"
 

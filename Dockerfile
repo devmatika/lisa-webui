@@ -148,8 +148,8 @@ ENV HERMES_WEBUI_PORT=8787
 # Aliases: NEXT_PUBLIC_* (docs) and WEBUI_* / HERMES_WEBUI_BOT_NAME also work.
 ARG NEXT_PUBLIC_APP_NAME="Matika AI Assistant"
 ARG NEXT_PUBLIC_COMPANY_NAME="Matika"
-ARG NEXT_PUBLIC_LOGO="static/branding-logo.svg"
-ARG NEXT_PUBLIC_FAVICON="static/favicon.svg"
+ARG NEXT_PUBLIC_LOGO="static/matika-logo.png"
+ARG NEXT_PUBLIC_FAVICON="static/favicon-matika.png"
 ARG NEXT_PUBLIC_PRIMARY_COLOR="#006eb3"
 ARG NEXT_PUBLIC_PRIMARY_COLOR_DARK="#00908d"
 ARG NEXT_PUBLIC_TAGLINE="Your self-hosted AI assistant"

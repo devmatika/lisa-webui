@@ -28,8 +28,8 @@ _HEX_COLOR_RE = re.compile(r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 _DEFAULTS: dict[str, str] = {
     "appName": "Matika AI Assistant",
     "companyName": "Matika",
-    "logo": "static/branding-logo.svg",
-    "favicon": "static/favicon.svg",
+    "logo": "static/matika-logo.png",
+    "favicon": "static/favicon-matika.png",
     "primaryColor": "#006eb3",
     "primaryColorDark": "#00908d",
     "supportEmail": "",

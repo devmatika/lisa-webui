@@ -11054,6 +11054,7 @@ def _resolve_login_locale_key(raw_lang: str | None) -> str:
 _LOGIN_PAGE_HTML = """<!doctype html>
 <html lang="{{LANG}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{BOT_NAME}} — {{LOGIN_TITLE}}</title>
+<link rel="icon" type="image/png" href="{{BOT_FAVICON}}">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#1a1a2e;color:#e8e8f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
@@ -11063,6 +11064,8 @@ body{background:#1a1a2e;color:#e8e8f0;font-family:-apple-system,BlinkMacSystemFo
 .logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(145deg,#e8a030,#e94560);
   display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;
   margin:0 auto 12px;box-shadow:0 2px 12px rgba(233,69,96,.3)}
+.logo.brand-img{width:auto;height:auto;max-width:220px;background:none;box-shadow:none;border-radius:0;padding:0}
+.logo.brand-img img{display:block;width:100%;height:auto;max-height:64px;object-fit:contain}
 h1{font-size:18px;font-weight:600;margin-bottom:4px}
 .sub{font-size:12px;color:#8888aa;margin-bottom:24px}
 input{width:100%;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.1);
@@ -11081,7 +11084,7 @@ button:hover{background:rgba(124,185,255,.25)}
 .err{color:#e94560;font-size:12px;margin-top:10px;display:none}
 </style></head><body>
 <div class="card">
-  <div class="logo">{{BOT_NAME_INITIAL}}</div>
+  {{BOT_LOGO_HTML}}
   <h1>{{BOT_NAME}}</h1>
   <p class="sub">{{LOGIN_SUBTITLE}}</p>
   <form id="login-form" data-invalid-pw="{{LOGIN_INVALID_PW}}" data-conn-failed="{{LOGIN_CONN_FAILED}}">
@@ -13646,9 +13649,20 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/login":
         _settings = load_settings()
-        from api.branding import default_bot_name
+        from api.branding import default_bot_name, get_branding
 
         _bn = _html.escape(_settings.get("bot_name") or default_bot_name())
+        _brand = get_branding()
+        _logo = str(_brand.get("logo") or "").strip()
+        _favicon = str(_brand.get("favicon") or "").strip() or "static/favicon-matika.png"
+        if _logo:
+            _logo_html = (
+                f'<div class="logo brand-img">'
+                f'<img src="{_html.escape(_logo)}" alt="{_bn}">'
+                f"</div>"
+            )
+        else:
+            _logo_html = f'<div class="logo">{_bn[0].upper()}</div>'
         _lang = _settings.get("language", "en")
         _login_strings = _LOGIN_LOCALE[
             _resolve_login_locale_key(_lang)
@@ -13658,7 +13672,8 @@ def handle_get(handler, parsed) -> bool:
         version_token = quote(WEBUI_VERSION, safe="")
         _page = (
             _LOGIN_PAGE_HTML.replace("{{BOT_NAME}}", _bn)
-            .replace("{{BOT_NAME_INITIAL}}", _bn[0].upper())
+            .replace("{{BOT_LOGO_HTML}}", _logo_html)
+            .replace("{{BOT_FAVICON}}", _html.escape(_favicon))
             .replace("{{WEBUI_VERSION}}", version_token)
             .replace("{{LANG}}", _html.escape(_login_strings["lang"]))
             .replace("{{LOGIN_TITLE}}", _html.escape(_login_strings["title"]))

@@ -31,8 +31,8 @@ export interface Branding {
 export const branding: Branding = {
   appName: "Matika AI Assistant",
   companyName: "Matika",
-  logo: "static/branding-logo.svg",
-  favicon: "static/favicon.svg",
+  logo: "static/matika-logo.png",
+  favicon: "static/favicon-matika.png",
   primaryColor: "#006eb3",
   primaryColorDark: "#00908d",
   supportEmail: "",
