@@ -88,17 +88,28 @@
     if (!logo && !mark) return;
 
     function paint(el, src, opts) {
-      if (el.querySelector && el.querySelector('img[data-brand-img]')) return;
+      var existing = el.querySelector && el.querySelector('img[data-brand-img]');
+      if (existing) {
+        // Already branded in HTML — only refresh src if needed; never force width.
+        if (src && existing.getAttribute('src') !== src) existing.setAttribute('src', src);
+        existing.removeAttribute('width');
+        existing.style.width = 'auto';
+        existing.style.height = opts.height || 'auto';
+        existing.style.maxWidth = opts.maxWidth || '';
+        existing.style.maxHeight = opts.maxHeight || '';
+        existing.style.objectFit = 'contain';
+        return;
+      }
       var img = document.createElement('img');
       img.src = src;
       img.alt = branding.appName || '';
       img.setAttribute('data-brand-img', '1');
       img.style.display = 'block';
       img.style.width = 'auto';
-      img.style.height = opts.height;
+      img.style.height = opts.height || 'auto';
       img.style.maxWidth = opts.maxWidth || '100%';
+      if (opts.maxHeight) img.style.maxHeight = opts.maxHeight;
       img.style.objectFit = 'contain';
-      if (opts.borderRadius) img.style.borderRadius = opts.borderRadius;
       el.innerHTML = '';
       el.appendChild(img);
       el.setAttribute('aria-label', branding.appName || 'logo');
@@ -107,12 +118,13 @@
     var emptyNodes = document.querySelectorAll('[data-brand-logo], .empty-logo');
     for (var i = 0; i < emptyNodes.length; i++) {
       if (!logo) break;
-      paint(emptyNodes[i], logo, { height: '56px', maxWidth: 'min(280px, 80vw)' });
+      // Natural aspect ratio: constrain by max-height only (no forced width).
+      paint(emptyNodes[i], logo, { height: 'auto', maxHeight: '72px', maxWidth: 'min(320px, 85vw)' });
     }
 
     var titleNodes = document.querySelectorAll('.app-titlebar-icon');
     for (var j = 0; j < titleNodes.length; j++) {
-      paint(titleNodes[j], mark || logo, { height: '18px', maxWidth: '48px' });
+      paint(titleNodes[j], mark || logo, { height: '18px', maxWidth: '36px' });
     }
   }
 
