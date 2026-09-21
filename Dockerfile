@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
-LABEL maintainer="nesquena"
-LABEL description="Hermes Web UI — browser interface for Hermes Agent"
+LABEL maintainer="matika"
+LABEL description="White-label Web UI for Hermes Agent (Matika / customer builds)"
 
 # Install system packages
 ENV DEBIAN_FRONTEND=noninteractive
@@ -142,6 +142,26 @@ RUN echo "__version__ = '${HERMES_VERSION}'" > /apptoo/api/_version.py
 # Default to binding all interfaces (required for container networking)
 ENV HERMES_WEBUI_HOST=0.0.0.0
 ENV HERMES_WEBUI_PORT=8787
+
+# ── White-label branding (one customer per image/deployment) ────────────────
+# Override at build time and/or runtime. Runtime env wins over file defaults.
+# Aliases: NEXT_PUBLIC_* (docs) and WEBUI_* / HERMES_WEBUI_BOT_NAME also work.
+ARG NEXT_PUBLIC_APP_NAME="Matika AI Assistant"
+ARG NEXT_PUBLIC_COMPANY_NAME="Matika"
+ARG NEXT_PUBLIC_LOGO="static/branding-logo.svg"
+ARG NEXT_PUBLIC_FAVICON="static/favicon.svg"
+ARG NEXT_PUBLIC_PRIMARY_COLOR="#006eb3"
+ARG NEXT_PUBLIC_PRIMARY_COLOR_DARK="#00908d"
+ARG NEXT_PUBLIC_TAGLINE="Your self-hosted AI assistant"
+
+ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME} \
+    NEXT_PUBLIC_COMPANY_NAME=${NEXT_PUBLIC_COMPANY_NAME} \
+    NEXT_PUBLIC_LOGO=${NEXT_PUBLIC_LOGO} \
+    NEXT_PUBLIC_FAVICON=${NEXT_PUBLIC_FAVICON} \
+    NEXT_PUBLIC_PRIMARY_COLOR=${NEXT_PUBLIC_PRIMARY_COLOR} \
+    NEXT_PUBLIC_PRIMARY_COLOR_DARK=${NEXT_PUBLIC_PRIMARY_COLOR_DARK} \
+    NEXT_PUBLIC_TAGLINE=${NEXT_PUBLIC_TAGLINE} \
+    HERMES_WEBUI_BOT_NAME=${NEXT_PUBLIC_APP_NAME}
 
 EXPOSE 8787
 

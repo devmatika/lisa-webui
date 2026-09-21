@@ -2,9 +2,11 @@
   "name": "hermes-webui-devtools",
   "version": "1.0.0",
   "private": true,
-  "description": "Dev-only tooling for hermes-webui. NOT a build step — the app remains pure Python + vanilla JS with no bundler. The only dependency is ESLint, used solely as a runtime-error guard over static/*.js (catches brick-class bugs like #3162 const-reassignment that node --check and source-presence tests miss). See TESTING.md > 'Static JS runtime lint'.",
+  "description": "Dev tooling + white-label branding helper for hermes-webui. The app remains pure Python + vanilla JS with no bundler. `npm run build` validates branding config for customer deployments.",
   "scripts": {
-    "lint:runtime": "eslint --no-config-lookup -c eslint.runtime-guard.config.mjs \"static/**/*.js\""
+    "lint": "npm run lint:runtime",
+    "lint:runtime": "eslint --no-config-lookup -c eslint.runtime-guard.config.mjs \"static/**/*.js\"",
+    "build": "node scripts/apply-branding.mjs"
   },
   "devDependencies": {
     "eslint": "^10.4.0"

@@ -1,0 +1,11 @@
+{
+  "appName": "Matika AI Assistant",
+  "companyName": "Matika",
+  "logo": "static/branding-logo.svg",
+  "favicon": "static/favicon.svg",
+  "primaryColor": "#006eb3",
+  "primaryColorDark": "#00908d",
+  "supportEmail": "",
+  "docsUrl": "",
+  "tagline": "Your self-hosted AI assistant"
+}

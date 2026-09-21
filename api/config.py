@@ -11432,9 +11432,7 @@ _SETTINGS_DEFAULTS = {
     "tab_order": [],  # user-defined sidebar/rail tab order for reorderable tabs; chat/settings stay fixed
     "composer_control_order": [],  # user-defined composer footer control order; invalid/duplicate keys are ignored
     "language": "en",  # UI locale code; must match a key in static/i18n.js LOCALES
-    "bot_name": os.getenv(
-        "HERMES_WEBUI_BOT_NAME", "Hermes"
-    ),  # display name for the assistant
+    "bot_name": "",  # filled from white-label branding in load_settings(); see api/branding.py
     "sound_enabled": False,  # play notification sound when assistant finishes
     "rtl": False,  # right-to-left chat layout (chat messages + composer only)
     "notifications_enabled": False,  # browser notification when tab is in background
@@ -11671,6 +11669,16 @@ def load_settings() -> dict:
             settings["default_model_provider"] = str(model_cfg.get("provider"))
     except Exception:
         logger.debug("Failed to resolve default model provider for settings")
+    # White-label: empty bot_name resolves to the process branding appName
+    # (config/branding.json + NEXT_PUBLIC_*/WEBUI_* env). Stored custom names win.
+    try:
+        from api.branding import default_bot_name
+
+        if not str(settings.get("bot_name") or "").strip():
+            settings["bot_name"] = default_bot_name()
+    except Exception:
+        if not str(settings.get("bot_name") or "").strip():
+            settings["bot_name"] = "Matika AI Assistant"
     return settings
 
 

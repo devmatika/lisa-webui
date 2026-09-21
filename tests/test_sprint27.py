@@ -10,6 +10,13 @@ import urllib.request
 from tests._pytest_port import BASE
 
 
+def _default_name() -> str:
+    from api.branding import clear_branding_cache, default_bot_name
+
+    clear_branding_cache()
+    return default_bot_name()
+
+
 def get(path):
     with urllib.request.urlopen(BASE + path, timeout=10) as r:
         return json.loads(r.read()), r.status
@@ -31,14 +38,19 @@ def post(path, body=None):
         return json.loads(e.read()), e.code
 
 
+def _reset_bot_name():
+    post("/api/settings", {"bot_name": _default_name()})
+
+
 # ── Default value ─────────────────────────────────────────────────────────
 
 def test_settings_default_bot_name():
-    """GET /api/settings should return bot_name defaulting to 'Hermes'."""
+    """GET /api/settings should return bot_name defaulting to white-label appName."""
+    expected = _default_name()
     d, status = get("/api/settings")
     assert status == 200
     assert "bot_name" in d
-    assert d["bot_name"] == "Hermes"
+    assert d["bot_name"] == expected
 
 
 # ── Round-trip ────────────────────────────────────────────────────────────
@@ -52,7 +64,7 @@ def test_settings_set_bot_name():
         d2, _ = get("/api/settings")
         assert d2.get("bot_name") == "TestBot"
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        _reset_bot_name()
 
 
 def test_settings_bot_name_special_chars():
@@ -63,41 +75,44 @@ def test_settings_bot_name_special_chars():
         d2, _ = get("/api/settings")
         assert d2.get("bot_name") == "My Assistant 2.0"
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        _reset_bot_name()
 
 
 # ── Server-side sanitization ──────────────────────────────────────────────
 
-def test_settings_empty_bot_name_defaults_to_hermes():
-    """Posting an empty bot_name should default to 'Hermes' server-side."""
+def test_settings_empty_bot_name_defaults_to_branding():
+    """Posting an empty bot_name should default to branding appName server-side."""
+    expected = _default_name()
     try:
         d, status = post("/api/settings", {"bot_name": ""})
         assert status == 200
-        assert d.get("bot_name") == "Hermes"
+        assert d.get("bot_name") == expected
         d2, _ = get("/api/settings")
-        assert d2.get("bot_name") == "Hermes"
+        assert d2.get("bot_name") == expected
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        _reset_bot_name()
 
 
-def test_settings_whitespace_bot_name_defaults_to_hermes():
-    """Posting a whitespace-only bot_name should default to 'Hermes'."""
+def test_settings_whitespace_bot_name_defaults_to_branding():
+    """Posting a whitespace-only bot_name should default to branding appName."""
+    expected = _default_name()
     try:
         d, status = post("/api/settings", {"bot_name": "   "})
         assert status == 200
-        assert d.get("bot_name") == "Hermes"
+        assert d.get("bot_name") == expected
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        _reset_bot_name()
 
 
 # ── Login page rendering ──────────────────────────────────────────────────
 
 def test_login_page_shows_default_bot_name():
-    """GET /login should contain 'Hermes' in title and h1 when default."""
+    """GET /login should contain branding appName in title and h1 when default."""
+    expected = _default_name()
     html, status = get_raw("/login")
     assert status == 200
-    assert "<title>Hermes" in html
-    assert "<h1>Hermes</h1>" in html
+    assert f"<title>{expected}" in html
+    assert f"<h1>{expected}</h1>" in html
 
 
 def test_login_page_shows_custom_bot_name():
@@ -109,7 +124,7 @@ def test_login_page_shows_custom_bot_name():
         assert "<title>Aria" in html
         assert "<h1>Aria</h1>" in html
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        _reset_bot_name()
 
 
 def test_login_page_empty_name_does_not_crash():
@@ -133,4 +148,4 @@ def test_login_page_xss_escaped():
         # Escaped form should appear
         assert "&lt;script&gt;" in html
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        _reset_bot_name()

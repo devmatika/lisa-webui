@@ -9,7 +9,8 @@ const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCall
 
 function assistantDisplayName(){
   if(S.activeProfile&&S.activeProfile!=='default') return S.activeProfile.charAt(0).toUpperCase()+S.activeProfile.slice(1);
-  return window._botName||'Hermes';
+  const branded=(typeof Branding!=='undefined'&&Branding.defaultBotName)?Branding.defaultBotName():null;
+  return window._botName||branded||'Matika AI Assistant';
 }
 const INFLIGHT={};  // keyed by session_id while request in-flight
 const SESSION_QUEUES={};  // keyed by session_id for queued follow-up turns

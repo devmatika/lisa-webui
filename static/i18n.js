@@ -27004,14 +27004,17 @@ function resolvePreferredLocale(primary, fallback) {
 function t(key, ...args) {
   const val = _locale[key] ?? LOCALES.en[key];
   if (val === undefined) return key;  // final fallback: return key itself
-  if (typeof val === 'function') return val(...args);
+  const brandify = (typeof Branding !== 'undefined' && Branding.brandify)
+    ? Branding.brandify
+    : (s) => s;
+  if (typeof val === 'function') return brandify(val(...args));
   if (args.length) {
     // Locale strings can use numbered placeholders like {0} and {1}.
-    return String(val).replace(/\{(\d+)\}/g, (match, idx) => (
+    return brandify(String(val).replace(/\{(\d+)\}/g, (match, idx) => (
       Object.prototype.hasOwnProperty.call(args, idx) ? String(args[idx]) : match
-    ));
+    )));
   }
-  return val;
+  return brandify(val);
 }
 
 /**

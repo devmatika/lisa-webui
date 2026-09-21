@@ -12787,11 +12787,11 @@ _SHELL_ERROR_HTML = """<!doctype html>
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>Hermes is restarting</title>
+  <title>__BRANDING_APP_NAME__ is restarting</title>
 </head>
 <body style=\"margin:0;padding:2rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#111827;color:#e5e7eb;\">
   <main style=\"max-width:40rem;margin:10vh auto;line-height:1.5;\">
-    <h1 style=\"font-size:1.5rem;margin:0 0 0.75rem;\">Hermes is restarting…</h1>
+    <h1 style=\"font-size:1.5rem;margin:0 0 0.75rem;\">__BRANDING_APP_NAME__ is restarting…</h1>
     <p style=\"margin:0;color:#cbd5e1;\">The WebUI shell could not load cleanly. Refresh in a moment if this page does not update automatically.</p>
   </main>
 </body>
@@ -12801,9 +12801,15 @@ _SHELL_ERROR_HTML = """<!doctype html>
 def _serve_shell_unavailable(handler, exc: Exception) -> bool:
     """Return HTML for shell-route failures so `/` never renders JSON."""
     logger.warning("Failed to serve WebUI shell route: %s", exc)
+    try:
+        from api.branding import apply_branding_to_html
+
+        page = apply_branding_to_html(_SHELL_ERROR_HTML)
+    except Exception:
+        page = _SHELL_ERROR_HTML.replace("__BRANDING_APP_NAME__", "Matika AI Assistant")
     t(
         handler,
-        _SHELL_ERROR_HTML,
+        page,
         status=503,
         content_type="text/html; charset=utf-8",
     )
@@ -12887,11 +12893,16 @@ def _serve_manifest(handler) -> bool:
     session-prefixed (/session/manifest.json, /session/manifest.webmanifest)
     routes so Firefox Android can fetch the manifest when installing from
     a /session/<id> page.  See #2226.
+
+    Name / short_name / description are rewritten from white-label branding
+    so each customer build gets a branded PWA install surface.
     """
+    from api.branding import branded_manifest
+
     static_root = api_config.get_static_root()
     manifest_path = (static_root / "manifest.json").resolve()
     if manifest_path.exists():
-        data = manifest_path.read_bytes()
+        data = branded_manifest(manifest_path.read_bytes())
         handler.send_response(200)
         handler.send_header("Content-Type", "application/manifest+json; charset=utf-8")
         handler.send_header("Cache-Control", "no-store")
@@ -12948,10 +12959,19 @@ def _render_index_shell_base() -> str:
     request and are applied by the caller against this base string.
     """
     from api.updates import WEBUI_VERSION
+    from api.branding import apply_branding_to_html
 
     index_path = api_config.get_index_html_path()
     st = index_path.stat()
-    sig = (index_path, st.st_size, st.st_mtime_ns)
+    # Include branding signature so env/config changes invalidate the cache
+    # without requiring a process restart when branding.json is edited on disk.
+    try:
+        from api.branding import get_branding
+
+        brand_sig = tuple(sorted(get_branding().items()))
+    except Exception:
+        brand_sig = ()
+    sig = (index_path, st.st_size, st.st_mtime_ns, brand_sig)
     with _INDEX_SHELL_CACHE_LOCK:
         cached = _INDEX_SHELL_CACHE.get("base")
         if cached and cached[0] == sig:
@@ -12964,6 +12984,7 @@ def _render_index_shell_base() -> str:
         .replace("__WEBUI_VERSION__", version_token)
         .replace("__MAX_UPLOAD_BYTES__", str(MAX_UPLOAD_BYTES))
     )
+    base = apply_branding_to_html(base)
     with _INDEX_SHELL_CACHE_LOCK:
         _INDEX_SHELL_CACHE["base"] = (sig, base)
     return base
@@ -13611,10 +13632,12 @@ def handle_get(handler, parsed) -> bool:
             return _serve_shell_unavailable(handler, exc)
 
     if parsed.path == "/share" or parsed.path.startswith("/share/"):
+        from api.branding import apply_branding_to_html
+
         share_path = (Path(__file__).parent.parent / "static" / "share.html").resolve()
         return t(
             handler,
-            share_path.read_text(encoding="utf-8"),
+            apply_branding_to_html(share_path.read_text(encoding="utf-8")),
             content_type="text/html; charset=utf-8",
             extra_headers={
                 "X-Robots-Tag": "noindex, nofollow",
@@ -13623,7 +13646,9 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/login":
         _settings = load_settings()
-        _bn = _html.escape(_settings.get("bot_name") or "Hermes")
+        from api.branding import default_bot_name
+
+        _bn = _html.escape(_settings.get("bot_name") or default_bot_name())
         _lang = _settings.get("language", "en")
         _login_strings = _LOGIN_LOCALE[
             _resolve_login_locale_key(_lang)
@@ -16960,7 +16985,9 @@ def handle_post(handler, parsed) -> bool:
         )
 
         if "bot_name" in body:
-            body["bot_name"] = (str(body["bot_name"]) or "").strip() or "Hermes"
+            from api.branding import default_bot_name
+
+            body["bot_name"] = (str(body["bot_name"]) or "").strip() or default_bot_name()
 
         auth_enabled_before = is_auth_enabled()
         password_auth_enabled_before = auth_enabled_before and get_password_hash() is not None

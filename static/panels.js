@@ -9753,7 +9753,7 @@ async function loadSettingsPanel(){
     // Bot name — debounced autosave (text input)
     const botNameField=$('settingsBotName');
     if(botNameField){
-      botNameField.value=settings.bot_name||'Hermes';
+      botNameField.value=settings.bot_name||((typeof Branding!=='undefined'&&Branding.defaultBotName)?Branding.defaultBotName():'Matika AI Assistant');
       let botNameTimer=null;
       botNameField.addEventListener('input',()=>{
         if(botNameTimer) clearTimeout(botNameTimer);
@@ -12155,7 +12155,7 @@ function _applySavedSettingsUi(saved, body, opts){
   if(Object.prototype.hasOwnProperty.call(body,'structured_code_default_view')){
     _applyStructuredCodeViewSettings(body.structured_code_default_view,body.structured_code_auto_tree_lines,false);
   }
-  window._botName=body.bot_name||'Hermes';
+  window._botName=body.bot_name||((typeof Branding!=='undefined'&&Branding.defaultBotName)?Branding.defaultBotName():'Matika AI Assistant');
   if(typeof applyBotName==='function') applyBotName();
   else if(typeof _applyBusyComposerPlaceholder==='function') _applyBusyComposerPlaceholder();
   if(typeof setLocale==='function') setLocale(language);
