@@ -55,4 +55,9 @@ services:
       #   world-readable. Both are documented in api/startup.py.
       # - HERMES_SKIP_CHMOD=1
       # - HERMES_HOME_MODE=0640
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Matika AI Assistant}
+      - NEXT_PUBLIC_COMPANY_NAME=${NEXT_PUBLIC_COMPANY_NAME:-Matika}
+      - NEXT_PUBLIC_PRIMARY_COLOR=${NEXT_PUBLIC_PRIMARY_COLOR:-#006eb3}
+      - NEXT_PUBLIC_PRIMARY_COLOR_DARK=${NEXT_PUBLIC_PRIMARY_COLOR_DARK:-#00908d}
+      - HERMES_WEBUI_BOT_NAME=${NEXT_PUBLIC_APP_NAME:-Matika AI Assistant}
     restart: unless-stopped
