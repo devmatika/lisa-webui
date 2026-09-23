@@ -1,0 +1,18 @@
+# Optional override when Hermes Gateway runs with network_mode: host and its
+# API listens on 127.0.0.1:8642 (common single-server Telegram + WebUI setup).
+#
+# Bridge-network WebUI containers cannot reach the host's 127.0.0.1. This
+# override puts WebUI on the host network so BASE_URL=http://127.0.0.1:8642
+# works. Nginx can keep proxying to 127.0.0.1:8787.
+#
+# Usage on the server (do NOT commit secrets):
+#   cp docker-compose.gateway-host.override.example.yml docker-compose.override.yml
+#   # set HERMES_WEBUI_CHAT_BACKEND=gateway (+ key/url) in .env
+#   docker compose up -d
+#
+# `ports:` is ignored under network_mode: host; WebUI binds HERMES_WEBUI_PORT
+# directly on the host.
+
+services:
+  hermes-webui:
+    network_mode: host

@@ -53,6 +53,16 @@ services:
       # (required if you expose the port beyond 127.0.0.1).
       - HERMES_WEBUI_PASSWORD=${HERMES_WEBUI_PASSWORD:-}
       #
+      # Optional: route browser chat through the Hermes Gateway API (same
+      # runtime path as Telegram). Requires a reachable gateway API server
+      # (typically port 8642) and matching API key. See docs/advanced-chat-setup.md.
+      # On the same host as a network_mode:host gateway, use a compose override
+      # with network_mode: host for WebUI so BASE_URL=http://127.0.0.1:8642 works.
+      - HERMES_WEBUI_CHAT_BACKEND=${HERMES_WEBUI_CHAT_BACKEND:-}
+      - HERMES_WEBUI_GATEWAY_BASE_URL=${HERMES_WEBUI_GATEWAY_BASE_URL:-}
+      - HERMES_WEBUI_GATEWAY_API_KEY=${HERMES_WEBUI_GATEWAY_API_KEY:-${API_SERVER_KEY:-}}
+      - HERMES_WEBUI_GATEWAY_USE_RUNS_API=${HERMES_WEBUI_GATEWAY_USE_RUNS_API:-}
+      #
       # Bind-mount permission handling (fixes #1389, #1399):
       #   When you mount an EXISTING ~/.hermes directory (the common case),
       #   the WebUI's startup credential-permission fixer can clash with
