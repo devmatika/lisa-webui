@@ -11,8 +11,11 @@
 #   docker compose up -d
 #
 # `ports:` is ignored under network_mode: host; WebUI binds HERMES_WEBUI_PORT
-# directly on the host.
+# directly on the host. Keep HOST=127.0.0.1 so nginx (same machine) can proxy
+# without exposing 8787 on the public interface.
 
 services:
   hermes-webui:
     network_mode: host
+    environment:
+      - HERMES_WEBUI_HOST=127.0.0.1
