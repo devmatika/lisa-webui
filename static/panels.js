@@ -391,9 +391,9 @@ function _syncMobileSidebarPanelFromMainView(){
 }
 
 async function switchPanel(name, opts = {}) {
-  // Customer white-label: only Chat + Schedules (tasks) are customer-facing.
+  // Customer white-label: Chat + Schedules (tasks) + Settings are customer-facing.
   // Hidden panels stay in the DOM for maintainers but must not open via URL/JS.
-  const _CUSTOMER_PANELS = new Set(['chat', 'tasks']);
+  const _CUSTOMER_PANELS = new Set(['chat', 'tasks', 'settings']);
   if (!_CUSTOMER_PANELS.has(name || 'chat') && !opts.allowHiddenPanel) {
     name = 'chat';
     opts = Object.assign({}, opts, { fromRailClick: false });
