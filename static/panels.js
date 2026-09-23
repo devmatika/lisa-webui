@@ -391,6 +391,13 @@ function _syncMobileSidebarPanelFromMainView(){
 }
 
 async function switchPanel(name, opts = {}) {
+  // Customer white-label: only Chat + Schedules (tasks) are customer-facing.
+  // Hidden panels stay in the DOM for maintainers but must not open via URL/JS.
+  const _CUSTOMER_PANELS = new Set(['chat', 'tasks']);
+  if (!_CUSTOMER_PANELS.has(name || 'chat') && !opts.allowHiddenPanel) {
+    name = 'chat';
+    opts = Object.assign({}, opts, { fromRailClick: false });
+  }
   const nextPanel = name || 'chat';
   const prevPanel = _currentPanel;
   // ── Desktop sidebar collapse toggle (rail-click only) ──
