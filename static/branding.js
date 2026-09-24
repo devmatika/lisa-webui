@@ -88,27 +88,36 @@
     if (!logo && !mark) return;
 
     function paint(el, src, opts) {
+      var h = opts.height || '56px';
+      var maxW = opts.maxWidth || '280px';
+      var maxH = opts.maxHeight || h;
+      // Parse CSS px height for the HTML width/height attributes (FOUC guard).
+      var hPx = parseInt(h, 10);
+      if (!isFinite(hPx) || hPx <= 0) hPx = 56;
       var existing = el.querySelector && el.querySelector('img[data-brand-img]');
       if (existing) {
-        // Already branded in HTML — only refresh src if needed; never force width.
+        // Already branded in HTML — only refresh src if needed; keep height locked.
         if (src && existing.getAttribute('src') !== src) existing.setAttribute('src', src);
+        existing.setAttribute('height', String(hPx));
         existing.removeAttribute('width');
         existing.style.width = 'auto';
-        existing.style.height = opts.height || '56px';
-        existing.style.maxWidth = opts.maxWidth || '280px';
-        existing.style.maxHeight = opts.height || opts.maxHeight || '56px';
+        existing.style.height = h;
+        existing.style.maxWidth = maxW;
+        existing.style.maxHeight = maxH;
         existing.style.objectFit = 'contain';
+        existing.style.display = 'block';
         return;
       }
       var img = document.createElement('img');
       img.src = src;
       img.alt = branding.appName || '';
       img.setAttribute('data-brand-img', '1');
+      img.setAttribute('height', String(hPx));
       img.style.display = 'block';
       img.style.width = 'auto';
-      img.style.height = opts.height || 'auto';
-      img.style.maxWidth = opts.maxWidth || '100%';
-      if (opts.maxHeight) img.style.maxHeight = opts.maxHeight;
+      img.style.height = h;
+      img.style.maxWidth = maxW;
+      img.style.maxHeight = maxH;
       img.style.objectFit = 'contain';
       el.innerHTML = '';
       el.appendChild(img);

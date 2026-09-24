@@ -1553,8 +1553,13 @@
   .system-health-bar{height:5px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--border) 70%,transparent);border:1px solid color-mix(in srgb,var(--border) 75%,transparent);}
   .system-health-bar-fill{height:100%;width:0%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--accent-hover));transition:width .25s ease;}
   .system-health-foot{font-size:11px;color:var(--muted);line-height:1.45;opacity:.82;}
-  .app-titlebar-icon{display:inline-flex;align-items:center;color:var(--accent);}
-  .app-titlebar-icon img{height:18px;width:auto;max-width:36px;object-fit:contain;display:block;flex:none;}
+  .app-titlebar-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--accent);height:18px;max-width:36px;flex:none;overflow:hidden;}
+  .app-titlebar-icon img,
+  .app-titlebar-icon .app-titlebar-icon-img{
+    height:18px !important;max-height:18px !important;
+    width:auto !important;max-width:36px !important;
+    object-fit:contain;display:block;flex:none;
+  }
   .app-titlebar-title{font-size:12px;font-weight:600;color:var(--text);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw;}
   .app-titlebar-sub{font-size:10px;color:var(--muted);background:var(--hover-bg);padding:2px 7px;border-radius:4px;font-family:var(--font-mono);white-space:nowrap;flex-shrink:0;}
   .app-titlebar-sub[hidden]{display:none;}

@@ -31,6 +31,8 @@
 <script>window.__HERMES_CONFIG__={maxUploadBytes:__MAX_UPLOAD_BYTES__,csrfToken:__CSRF_TOKEN_JSON__};</script>
 <script>window.__BRANDING__=__BRANDING_JSON__;</script>
 <script src="static/branding.js?v=__WEBUI_VERSION__"></script>
+<!-- Critical brand mark size: blocks FOUC before style.css finishes applying. -->
+<style id="brand-critical-chrome">.app-titlebar-icon{display:inline-flex;align-items:center;justify-content:center;height:18px;max-width:36px;overflow:hidden;flex:none}.app-titlebar-icon img{height:18px!important;max-height:18px!important;width:auto!important;max-width:36px!important;object-fit:contain;display:block}</style>
 <script>window.__HERMES_WEBUI_BUNDLE_VERSION__='__WEBUI_VERSION__';</script>
 <script>(function(){
   var cfg=window.__HERMES_CONFIG__||{},token=cfg.csrfToken||'';
@@ -133,7 +135,8 @@
   </div>
   <div class="app-titlebar-inner">
     <span class="app-titlebar-icon" aria-hidden="true">
-      <img data-brand-img="1" src="__BRANDING_FAVICON__" alt="">
+      <!-- Intrinsic size + inline height: avoid FOUC on refresh before style.css / branding.js. -->
+      <img data-brand-img="1" class="app-titlebar-icon-img" src="__BRANDING_FAVICON__" alt="" width="34" height="18" style="height:18px;width:auto;max-width:36px;max-height:18px;object-fit:contain;display:block">
     </span>
     <span class="app-titlebar-title" id="appTitlebarTitle">__BRANDING_COMPANY_NAME__</span>
     <span class="app-titlebar-sub" id="appTitlebarSub" hidden></span>

@@ -8,8 +8,16 @@
 const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCalls:[],activeStreamId:null,currentDir:'.',activeProfile:'default',activeProfileIsDefault:true,showHiddenWorkspaceFiles:false,todos:[],todoStateMeta:null,_pendingSessionToolsets:null};
 
 function assistantDisplayName(){
-  if(S.activeProfile&&S.activeProfile!=='default') return S.activeProfile.charAt(0).toUpperCase()+S.activeProfile.slice(1);
   const branded=(typeof Branding!=='undefined'&&Branding.defaultBotName)?Branding.defaultBotName():null;
+  if(S.activeProfile&&S.activeProfile!=='default'){
+    // White-label: profile slug matching company brand should show the full app
+    // name ("matika" → "Matika AI Assistant"), not a capitalized slug ("Matika").
+    const company=(typeof Branding!=='undefined'&&Branding.get)?String((Branding.get().companyName||'')).trim():'';
+    if(company && S.activeProfile.toLowerCase()===company.toLowerCase() && branded){
+      return branded;
+    }
+    return S.activeProfile.charAt(0).toUpperCase()+S.activeProfile.slice(1);
+  }
   return window._botName||branded||'Matika AI Assistant';
 }
 const INFLIGHT={};  // keyed by session_id while request in-flight

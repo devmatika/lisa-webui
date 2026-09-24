@@ -36,8 +36,10 @@ class TestComposerPlaceholderProfile:
         m = re.search(r'function assistantDisplayName\(\)\{.*?\n\}', src, re.DOTALL)
         assert m, "assistantDisplayName function must exist"
         body = m.group(0)
-        assert "window._botName||'Hermes'" in body, \
-            "assistantDisplayName must use window._botName or 'Hermes' for the default profile"
+        assert "window._botName||branded||'Matika AI Assistant'" in body, \
+            "assistantDisplayName must use window._botName, branding, or Matika AI Assistant for the default profile"
+        assert "companyName" in body, \
+            "assistantDisplayName must map company-matching profile slugs to the branded app name"
 
     def test_chat_surfaces_use_shared_assistant_display_name(self):
         """Chat rows, titles, notifications, and cancel copy must honor profile overrides."""
