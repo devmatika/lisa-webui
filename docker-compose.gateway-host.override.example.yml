@@ -16,6 +16,10 @@
 #
 # Static binds keep UX hotfixes (approval card layout / Tirith reason text)
 # without rebuilding the image after every static tweak.
+#
+# `/opt/data` must also mount the same Hermes home: Matika profile config and
+# `hermes-stt-bridge.sh` use `/opt/data/profiles/...` paths (same as the
+# hermes-agent container). Without this mount, mic STT fails with exit 127.
 
 services:
   hermes-webui:
@@ -23,6 +27,7 @@ services:
     environment:
       - HERMES_WEBUI_HOST=127.0.0.1
     volumes:
+      - ${HERMES_HOME:-${HOME}/.hermes}:/opt/data
       - ./static/boot.js:/apptoo/static/boot.js:ro
       - ./static/messages.js:/apptoo/static/messages.js:ro
       - ./static/index.html:/apptoo/static/index.html:ro
