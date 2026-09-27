@@ -1,8 +1,8 @@
 # Optional override when Hermes Gateway runs with network_mode: host and its
-# API listens on 127.0.0.1:8642 (common single-server Telegram + WebUI setup).
+# API listens on 127.0.0.1:8642 / :8650 (common single-server Telegram + WebUI setup).
 #
 # Bridge-network WebUI containers cannot reach the host's 127.0.0.1. This
-# override puts WebUI on the host network so BASE_URL=http://127.0.0.1:8642
+# override puts WebUI on the host network so BASE_URL=http://127.0.0.1:8650
 # works. Nginx can keep proxying to 127.0.0.1:8787.
 #
 # Usage on the server (do NOT commit secrets):
@@ -13,9 +13,17 @@
 # `ports:` is ignored under network_mode: host; WebUI binds HERMES_WEBUI_PORT
 # directly on the host. Keep HOST=127.0.0.1 so nginx (same machine) can proxy
 # without exposing 8787 on the public interface.
+#
+# Static binds keep UX hotfixes (approval card layout / Tirith reason text)
+# without rebuilding the image after every static tweak.
 
 services:
   hermes-webui:
     network_mode: host
     environment:
       - HERMES_WEBUI_HOST=127.0.0.1
+    volumes:
+      - ./static/boot.js:/apptoo/static/boot.js:ro
+      - ./static/messages.js:/apptoo/static/messages.js:ro
+      - ./static/index.html:/apptoo/static/index.html:ro
+      - ./static/style.css:/apptoo/static/style.css:ro

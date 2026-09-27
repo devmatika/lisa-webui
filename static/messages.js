@@ -7700,13 +7700,38 @@ function showApprovalForSession(sid, pending, pendingCount) {
   showApprovalCard(pending, pendingCount);
 }
 
+function _formatApprovalDescription(raw, keys) {
+  // Match Telegram: short Reason under the command. Collapse Tirith incomplete
+  // package-intel walls that still arrive from older gateway builds.
+  let text = String(raw || "").trim();
+  const incompleteHits = text.match(/Package threat intelligence could not be completed/gi) || [];
+  if (incompleteHits.length || /analysis_incomplete|deadline exhausted/i.test(text)) {
+    const pkgs = [];
+    const pkgRe = /package\s+'([^']+)'/gi;
+    let m;
+    while ((m = pkgRe.exec(text)) !== null) {
+      if (m[1] && m[1] !== "?" && !pkgs.includes(m[1])) pkgs.push(m[1]);
+    }
+    const shown = pkgs.slice(0, 5).join(", ");
+    const more = pkgs.length > 5 ? ` (+${pkgs.length - 5} more)` : "";
+    text = shown
+      ? `Security scan incomplete for ${shown}${more} — threat-intel lookups timed out. Incomplete verification, not evidence of malware.`
+      : "Security scan incomplete — threat-intel lookups timed out. Incomplete verification, not evidence of malware.";
+  } else if (text.length > 420) {
+    text = text.slice(0, 400).trimEnd() + "…";
+  }
+  const displayKeys = (keys || []).filter((k) => !String(k).startsWith("tirith:"));
+  if (displayKeys.length) text += " [" + displayKeys.join(", ") + "]";
+  return text ? ("Reason: " + text) : "";
+}
+
 function showApprovalCard(pending, pendingCount) {
   const sid = _rememberApprovalPending(pending, pendingCount);
   if (!_approvalPromptBelongsToActiveSession(sid)) return;
   if (pending && pending.approval_id && _isApprovalDismissed(sid, pending.approval_id)) return;
   _approvalClearedOwner = null;
   const keys = pending.pattern_keys || (pending.pattern_key ? [pending.pattern_key] : []);
-  const desc = (pending.description || "") + (keys.length ? " [" + keys.join(", ") + "]" : "");
+  const desc = _formatApprovalDescription(pending.description || "", keys);
   const cmd = pending.command || "";
   const sig = JSON.stringify({
     desc,
