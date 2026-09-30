@@ -84,8 +84,10 @@ def test_customer_page_does_not_name_the_voice_host():
     page = (REPO / "static" / "index.html").read_text(encoding="utf-8")
     script = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
     assert 'data-panel="voice"' in page
-    assert 'class="voice-sidebar-link"' in page
     assert 'id="voiceEmbedFrame"' in page
+    assert 'id="mainVoice"' in page
+    assert "voice-sidebar-link" not in page
     assert "matika-voice.fusiontrade.at" not in page
     assert "matika-voice.fusiontrade.at" not in script
     assert "frame.src = '/embed/voice/'" in script
+    assert "window.openVoicePanel = openVoicePanel" in script

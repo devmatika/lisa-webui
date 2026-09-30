@@ -395,6 +395,7 @@ function openVoicePanel(fromRail) {
   switchPanel('voice', fromRail ? {fromRailClick: true} : {});
   if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
 }
+window.openVoicePanel = openVoicePanel;
 
 async function switchPanel(name, opts = {}) {
   // Customer white-label: Chat + Schedules (tasks) + Settings are customer-facing.
@@ -461,6 +462,11 @@ async function switchPanel(name, opts = {}) {
     MAIN_VIEW_PANELS.forEach(p => {
       mainEl.classList.toggle('showing-' + p, nextPanel === p);
     });
+  }
+  const voiceMain = $('mainVoice');
+  if (voiceMain) {
+    if (nextPanel === 'voice') voiceMain.removeAttribute('hidden');
+    else voiceMain.setAttribute('hidden', '');
   }
   // Lazy-load panel data
   if (nextPanel === 'tasks') await loadCrons();

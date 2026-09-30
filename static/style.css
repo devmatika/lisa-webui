@@ -4953,9 +4953,8 @@ main.main.showing-skills > #mainSkills{display:flex;}
 main.main.showing-memory > #mainMemory{display:flex;}
 main.main.showing-tasks > #mainTasks{display:flex;}
 main.main.showing-voice > #mainVoice{display:flex;}
+#mainVoice[hidden]{display:none !important;}
 .voice-embed-frame{flex:1;width:100%;min-height:0;border:0;background:var(--bg);}
-.voice-sidebar-link{display:flex;align-items:center;gap:8px;margin:8px 10px 4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;text-align:start;}
-.voice-sidebar-link:hover{background:var(--accent-bg);color:var(--accent-text);}
 main.main.showing-kanban > #mainKanban{display:flex;overflow-y:auto;}
 main.main.showing-workspaces > #mainWorkspaces{display:flex;}
 main.main.showing-profiles > #mainProfiles{display:flex;}

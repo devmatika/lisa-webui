@@ -30,5 +30,6 @@ services:
       - ${HERMES_HOME:-${HOME}/.hermes}:/opt/data
       - ./static/boot.js:/apptoo/static/boot.js:ro
       - ./static/messages.js:/apptoo/static/messages.js:ro
+      - ./static/panels.js:/apptoo/static/panels.js:ro
       - ./static/index.html:/apptoo/static/index.html:ro
       - ./static/style.css:/apptoo/static/style.css:ro
