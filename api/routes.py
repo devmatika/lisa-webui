@@ -5804,6 +5804,24 @@ def _csrf_exempt_path(path: str) -> bool:
     }
 
 
+def _dispatch_voice_embed(handler, parsed, method: str) -> bool:
+    """Proxy the in-page voice UI before the WebUI CSRF gate.
+
+    The embedded client authenticates to the voice service with its own
+    cookie and CSRF header. It never carries the WebUI session token, so
+    this path only checks browser same-origin on unsafe methods.
+    """
+    from api.voice_embed import is_voice_embed_path, proxy_voice_embed
+
+    if not is_voice_embed_path(getattr(parsed, "path", "") or ""):
+        return False
+    if method in {"POST", "PATCH"} and not _check_same_origin_browser_request(handler):
+        j(handler, {"error": "Cross-origin request rejected"}, status=403)
+        return True
+    proxy_voice_embed(handler, parsed, method)
+    return True
+
+
 _CSRF_FAILURE_ATTR = "_hermes_csrf_failure_reason"
 
 
@@ -13583,6 +13601,8 @@ def _handle_session_get(handler, parsed) -> bool:
 
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
+    if _dispatch_voice_embed(handler, parsed, "GET"):
+        return True
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
     if proxy_result is not False:
         return proxy_result
@@ -15166,6 +15186,8 @@ def _llm_update_summary(system_prompt: str, user_prompt: str, active_profile: st
 
 def handle_post(handler, parsed) -> bool:
     """Handle all POST routes. Returns True if handled, False for 404."""
+    if _dispatch_voice_embed(handler, parsed, "POST"):
+        return True
     diag = RequestDiagnostics.maybe_start("POST", parsed.path, logger=logger, print_fn=getattr(handler, '_safe_webui_print', None))
     if parsed.path == "/api/csp-report":
         if diag:
@@ -17816,6 +17838,8 @@ def handle_post(handler, parsed) -> bool:
 
 def handle_patch(handler, parsed) -> bool:
     """Handle all PATCH routes. Returns True if handled, False for 404."""
+    if _dispatch_voice_embed(handler, parsed, "PATCH"):
+        return True
     if not _check_csrf(handler):
         return j(handler, {"error": _csrf_rejection_error(handler)}, status=403)
     proxy_result = _handle_extension_sidecar_proxy(

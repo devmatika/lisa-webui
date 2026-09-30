@@ -43,8 +43,9 @@ const APP_TITLEBAR_KEYS = {
   chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
   memory: 'tab_memory', workspaces: 'tab_workspaces',
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', settings: 'tab_settings',
+  voice: 'tab_voice',
 };
-const MAIN_VIEW_PANELS = ['settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','plugin'];
+const MAIN_VIEW_PANELS = ['settings','skills','memory','tasks','voice','kanban','workspaces','profiles','insights','logs','plugin'];
 const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
 
 /**
@@ -390,10 +391,15 @@ function _syncMobileSidebarPanelFromMainView(){
   return panel;
 }
 
+function openVoicePanel(fromRail) {
+  switchPanel('voice', fromRail ? {fromRailClick: true} : {});
+  if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
+}
+
 async function switchPanel(name, opts = {}) {
   // Customer white-label: Chat + Schedules (tasks) + Settings are customer-facing.
   // Hidden panels stay in the DOM for maintainers but must not open via URL/JS.
-  const _CUSTOMER_PANELS = new Set(['chat', 'tasks', 'settings']);
+  const _CUSTOMER_PANELS = new Set(['chat', 'tasks', 'voice', 'settings']);
   if (!_CUSTOMER_PANELS.has(name || 'chat') && !opts.allowHiddenPanel) {
     name = 'chat';
     opts = Object.assign({}, opts, { fromRailClick: false });
@@ -458,6 +464,7 @@ async function switchPanel(name, opts = {}) {
   }
   // Lazy-load panel data
   if (nextPanel === 'tasks') await loadCrons();
+  if (nextPanel === 'voice') _mountVoiceEmbed();
   if (nextPanel === 'kanban') await loadKanban();
   if (nextPanel === 'skills') await loadSkills();
   if (nextPanel === 'memory') await loadMemory();
@@ -476,6 +483,12 @@ async function switchPanel(name, opts = {}) {
   if (nextPanel === 'chat' && typeof syncTopbar === 'function') syncTopbar();
   else syncAppTitlebar();
   return true;
+}
+
+function _mountVoiceEmbed() {
+  const frame = document.getElementById('voiceEmbedFrame');
+  if (!frame || frame.getAttribute('src')) return;
+  frame.src = '/embed/voice/';
 }
 
 // ── Cron panel ──

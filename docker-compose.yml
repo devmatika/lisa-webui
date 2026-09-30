@@ -79,4 +79,8 @@ services:
       - NEXT_PUBLIC_PRIMARY_COLOR=${NEXT_PUBLIC_PRIMARY_COLOR:-#006eb3}
       - NEXT_PUBLIC_PRIMARY_COLOR_DARK=${NEXT_PUBLIC_PRIMARY_COLOR_DARK:-#00908d}
       - HERMES_WEBUI_BOT_NAME=${NEXT_PUBLIC_APP_NAME:-Matika AI Assistant}
+      # Voice opens inside this WebUI. Browser never sees this host.
+      # Global default, or per-profile: MATIKA_VOICE_UPSTREAM_<PROFILE>=...
+      # A profile can also set MATIKA_VOICE_UPSTREAM in its own ~/.hermes[/profiles/<name>]/.env
+      - MATIKA_VOICE_UPSTREAM=${MATIKA_VOICE_UPSTREAM:-https://matika-voice.fusiontrade.at/voice}
     restart: unless-stopped

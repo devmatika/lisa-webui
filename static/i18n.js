@@ -998,6 +998,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Chat',
     tab_tasks: 'Tasks',
+    tab_voice: 'Voice',
     tab_skills: 'Skills',
     tab_memory: 'Memory',
     tab_workspaces: 'Spaces',
@@ -2820,6 +2821,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Chat',
     tab_tasks: 'Task',
+    tab_voice: 'Voce',
     tab_skills: 'Skill',
     tab_memory: 'Memoria',
     tab_workspaces: 'Spazi',
@@ -4625,6 +4627,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'チャット',
     tab_tasks: 'タスク',
+    tab_voice: '音声',
     tab_skills: 'スキル',
     tab_memory: 'メモリ',
     tab_workspaces: 'スペース',
@@ -6124,6 +6127,7 @@ const LOCALES = {
     login_conn_failed: 'Не удалось подключиться',
     tab_chat: 'Чат',
     tab_tasks: 'Задачи',
+    tab_voice: 'Голос',
     tab_skills: 'Навыки',
     tab_memory: 'Память',
     tab_workspaces: 'Рабочие пространства',
@@ -7892,6 +7896,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Chat',
     tab_tasks: 'Tareas',
+    tab_voice: 'Voz',
     tab_skills: 'Habilidades',
     tab_memory: 'Memoria',
     tab_workspaces: 'Espacios',
@@ -9619,6 +9624,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Chat',
     tab_tasks: 'Aufgaben',
+    tab_voice: 'Stimme',
     tab_skills: 'Skills',
     tab_memory: 'Gedächtnis',
     tab_workspaces: 'Spaces',
@@ -11401,6 +11407,7 @@ const LOCALES = {
     tab_memory: '记忆',
     tab_skills: '技能',
     tab_tasks: '任务',
+    tab_voice: '语音',
     tab_kanban: '看板',
     kanban_board: '看板',
     kanban_visible_tasks: '{0} 个可见任务',
@@ -13448,6 +13455,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: '聊天',
     tab_tasks: '任務',
+    tab_voice: '語音',
     tab_skills: '技能',
     tab_memory: '記憶',
     tab_workspaces: '工作區',
@@ -15139,6 +15147,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Chat',
     tab_tasks: 'Tarefas',
+    tab_voice: 'Voz',
     tab_skills: 'Skills',
     tab_memory: 'Memória',
     tab_workspaces: 'Spaces',
@@ -16841,6 +16850,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: '채팅',
     tab_tasks: '작업',
+    tab_voice: '음성',
     tab_skills: '스킬',
     tab_memory: '메모리',
     tab_workspaces: '공간',
@@ -18666,6 +18676,7 @@ const LOCALES = {
     project_name_prompt: 'Nom du projet :',
     tab_chat: 'Chat',
     tab_tasks: 'Tâches',
+    tab_voice: 'Voix',
     tab_skills: 'Compétences',
     tab_memory: 'Mémoire',
     tab_workspaces: 'Espaces',
@@ -20651,6 +20662,7 @@ const LOCALES = {
     tab_settings: 'Nastavení',
     tab_skills: 'Dovednosti',
     tab_tasks: 'Úkoly',
+    tab_voice: 'Hlas',
     tab_todos: 'Úkoly',
     tab_workspaces: 'Prostory',
     tasks_empty_sub: 'Zvolte úlohu z bočního panelu pro zobrazení jejích detailů a běhů, nebo vytvořte novou.',
@@ -22196,6 +22208,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Sohbet',
     tab_tasks: 'Görevler',
+    tab_voice: 'Ses',
     tab_skills: 'Yetenekler',
     tab_memory: 'Hafıza',
     tab_workspaces: 'Alanlar',
@@ -24016,6 +24029,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Czat',
     tab_tasks: 'Zadania',
+    tab_voice: 'Głos',
     tab_skills: 'Umiejętności',
     tab_memory: 'Pamięć',
     tab_workspaces: 'Przestrzenie',
@@ -25657,6 +25671,7 @@ const LOCALES = {
     // Sidebar & Tabs
     tab_chat: 'Chat',
     tab_tasks: 'Tác vụ',
+    tab_voice: 'Giọng nói',
     tab_skills: 'Kỹ năng',
     tab_memory: 'Bộ nhớ',
     tab_workspaces: 'Spaces',
