@@ -20,6 +20,10 @@
 # `/opt/data` must also mount the same Hermes home: Matika profile config and
 # `hermes-stt-bridge.sh` use `/opt/data/profiles/...` paths (same as the
 # hermes-agent container). Without this mount, mic STT fails with exit 127.
+#
+# Host Obsidian vaults: workspace/obsidian-vault is an absolute symlink to
+# /vaults/<profile>-obsidian. Hermes already mounts /root/vaults:/vaults;
+# WebUI needs the same mount or the folder appears broken/empty in the UI.
 
 services:
   hermes-webui:
@@ -28,6 +32,7 @@ services:
       - HERMES_WEBUI_HOST=127.0.0.1
     volumes:
       - ${HERMES_HOME:-${HOME}/.hermes}:/opt/data
+      - /root/vaults:/vaults
       - ./static/boot.js:/apptoo/static/boot.js:ro
       - ./static/messages.js:/apptoo/static/messages.js:ro
       - ./static/panels.js:/apptoo/static/panels.js:ro
