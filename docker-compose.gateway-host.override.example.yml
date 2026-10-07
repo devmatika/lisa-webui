@@ -21,8 +21,10 @@
 # `hermes-stt-bridge.sh` use `/opt/data/profiles/...` paths (same as the
 # hermes-agent container). Without this mount, mic STT fails with exit 127.
 #
-# Host Obsidian vaults: workspace/obsidian-vault is an absolute symlink to
-# /vaults/<profile>-obsidian. Hermes already mounts /root/vaults:/vaults;
+# Host Obsidian vaults: workspace/obsidian-vault should be a host bind mount of
+# /root/vaults/<profile>-obsidian (not an absolute symlink — symlinks are
+# read-only in Files and break HERMES_WRITE_SAFE_ROOT). Hermes mounts
+# /root/vaults:/vaults;
 # WebUI needs the same mount or the folder appears broken/empty in the UI.
 
 services:
