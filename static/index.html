@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content">
 <title>__BRANDING_APP_NAME__</title>
 <!-- base href enables subpath mount support; all static paths must stay relative (no leading slash).
      MUST appear before manifest/favicon links so browsers resolve relative URLs against the
@@ -25,10 +25,12 @@
 <meta name="theme-color" id="hermes-theme-color" content="#0D0D1A">
 <script>(function(){try{var t=localStorage.getItem('hermes-theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';var c=t==='dark'?'#141425':'#FAF7F0';document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute('content',c);m.removeAttribute('media');});}catch(e){}})()</script>
 <script>(function(){try{document.documentElement.dataset.workspacePanel=localStorage.getItem('hermes-webui-workspace-panel')==='open'?'open':'closed';}catch(e){document.documentElement.dataset.workspacePanel='closed';}})()</script>
-<script>(function(){try{if(localStorage.getItem('hermes-webui-sidebar-collapsed')==='1')document.documentElement.dataset.sidebarCollapsed='1';}catch(e){}})()</script>
-<link rel="preload" href="static/pwa-startup.js?v=__WEBUI_VERSION__" as="script">
+<!-- Keep this inline pre-paint script in sync with _sidebarShouldCollapse() in boot.js:
+     tri-state rule — '1' = collapsed, '0' = open, unset = collapsed only in the
+     641-900px compact band. If the helper's logic changes, update this too. -->
+<script>(function(){try{var p=localStorage.getItem('hermes-webui-sidebar-collapsed');var compact=(window.matchMedia('(max-width: 900px)').matches&&window.matchMedia('(min-width: 641px)').matches);if(p==='1'||(p==null&&compact))document.documentElement.dataset.sidebarCollapsed='1';}catch(e){}})()</script>
 <script src="static/pwa-startup.js?v=__WEBUI_VERSION__"></script>
-<script>window.__HERMES_CONFIG__={maxUploadBytes:__MAX_UPLOAD_BYTES__,csrfToken:__CSRF_TOKEN_JSON__};</script>
+<script>window.__HERMES_CONFIG__={maxUploadBytes:__MAX_UPLOAD_BYTES__,csrfToken:__CSRF_TOKEN_JSON__,imgSrcExtra:__CSP_IMG_EXTRA_JSON__};</script>
 <script>window.__BRANDING__=__BRANDING_JSON__;</script>
 <script src="static/branding.js?v=__WEBUI_VERSION__"></script>
 <!-- Critical brand mark size: blocks FOUC before style.css finishes applying. -->
@@ -191,7 +193,7 @@
     <button class="rail-btn nav-tab has-tooltip" data-panel="settings" onclick="switchPanel('settings',{fromRailClick:true})" data-tooltip="Settings" data-i18n-title="tab_settings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="auth-warning-badge" id="authWarningBadgeDesktop" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:#e05"></span></button>
   </nav>
   <aside class="sidebar">
-    <button class="panel-head-btn mobile-sidebar-close has-tooltip has-tooltip--bottom-right" type="button" onclick="closeMobileSidebar()" data-tooltip="Close menu" data-i18n-title="close_menu" aria-label="Close menu" data-i18n-aria-label="close_menu">
+    <button class="panel-head-btn mobile-sidebar-close has-tooltip has-tooltip--bottom-right" type="button" onclick="dismissMobileSidebar()" data-tooltip="Close menu" data-i18n-title="close_menu" aria-label="Close menu" data-i18n-aria-label="close_menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="sidebar-nav">
@@ -232,11 +234,11 @@
          before any paint. Mirrors the theme/skin/font-size inline scripts in <head>.
          The boot.js _restoreTabVisibility IIFE is a secondary fallback that also
          handles the active-tab switch. -->
-    <script>(function(){try{var fixed=new Set(['chat','tasks','voice']);var clean=function(v){var o=[];if(!Array.isArray(v))return o;v.forEach(function(id){if(typeof id!=='string')return;id=id.trim();if(!id||fixed.has(id)||o.indexOf(id)!==-1)return;o.push(id);});return o;};var reorder=function(order){order=clean(order);if(!order.length)return;['.rail','.sidebar-nav'].forEach(function(sel){var c=document.querySelector(sel);if(!c)return;var available=[];c.querySelectorAll('.nav-tab[data-panel]').forEach(function(el){var id=el.dataset.panel;if(!id||fixed.has(id)||el.classList.contains('dashboard-link')||el.hasAttribute('data-dashboard-link'))return;if(available.indexOf(id)===-1)available.push(id);});var final=[];order.forEach(function(id){if(available.indexOf(id)!==-1&&final.indexOf(id)===-1)final.push(id);});available.forEach(function(id){if(final.indexOf(id)===-1)final.push(id);});var anchor=Array.prototype.find.call(c.children,function(el){if(el.classList&&el.classList.contains('rail-spacer'))return true;if(el.classList&&el.classList.contains('dashboard-link'))return true;if(el.hasAttribute&&el.hasAttribute('data-dashboard-link'))return true;return el.dataset&&el.dataset.panel==='settings';});final.forEach(function(id){var el=c.querySelector('.nav-tab[data-panel="'+id+'"]');if(el)c.insertBefore(el,anchor||null);});});};var o=localStorage.getItem('hermes-webui-tab-order');if(o)reorder(JSON.parse(o));var h=localStorage.getItem('hermes-webui-hidden-tabs');if(!h)return;var p=clean(JSON.parse(h));p.forEach(function(id){document.querySelectorAll('[data-panel="'+id+'"]').forEach(function(el){el.classList.add('nav-tab-hidden');});});try{var ac=document.querySelector('.rail .rail-btn.nav-tab.active[data-panel]')||document.querySelector('.sidebar-nav .nav-tab.active[data-panel]');if(ac&&ac.classList.contains('nav-tab-hidden')){ac.classList.remove('active');var c=document.querySelector('.rail .rail-btn.nav-tab[data-panel="chat"]')||document.querySelector('.sidebar-nav .nav-tab[data-panel="chat"]');if(c)c.classList.add('active');}}catch(_){}}catch(e){}})();</script>
+    <script>(function(){try{var fixed=new Set(['chat','tasks','voice','settings']);var clean=function(v){var o=[];if(!Array.isArray(v))return o;v.forEach(function(id){if(typeof id!=='string')return;id=id.trim();if(!id||fixed.has(id)||o.indexOf(id)!==-1)return;o.push(id);});return o;};var reorder=function(order){order=clean(order);if(!order.length)return;['.rail','.sidebar-nav'].forEach(function(sel){var c=document.querySelector(sel);if(!c)return;var available=[];c.querySelectorAll('.nav-tab[data-panel]').forEach(function(el){var id=el.dataset.panel;if(!id||fixed.has(id)||el.classList.contains('dashboard-link')||el.hasAttribute('data-dashboard-link'))return;if(available.indexOf(id)===-1)available.push(id);});var final=[];order.forEach(function(id){if(available.indexOf(id)!==-1&&final.indexOf(id)===-1)final.push(id);});available.forEach(function(id){if(final.indexOf(id)===-1)final.push(id);});var anchor=Array.prototype.find.call(c.children,function(el){if(el.classList&&el.classList.contains('rail-spacer'))return true;if(el.classList&&el.classList.contains('dashboard-link'))return true;if(el.hasAttribute&&el.hasAttribute('data-dashboard-link'))return true;return el.dataset&&el.dataset.panel==='settings';});final.forEach(function(id){var el=c.querySelector('.nav-tab[data-panel="'+id+'"]');if(el)c.insertBefore(el,anchor||null);});});};var o=localStorage.getItem('hermes-webui-tab-order');if(o)reorder(JSON.parse(o));var h=localStorage.getItem('hermes-webui-hidden-tabs');var p=h?clean(JSON.parse(h)):[];try{var ct=localStorage.getItem('hermes-webui-chat-todos');if(ct==='1'&&p.indexOf('todos')===-1)p.push('todos');}catch(e){}if(!p.length)return;p.forEach(function(id){document.querySelectorAll('[data-panel="'+id+'"]').forEach(function(el){el.classList.add('nav-tab-hidden');});});try{var ac=document.querySelector('.rail .rail-btn.nav-tab.active[data-panel]')||document.querySelector('.sidebar-nav .nav-tab.active[data-panel]');if(ac&&ac.classList.contains('nav-tab-hidden')){ac.classList.remove('active');var c=document.querySelector('.rail .rail-btn.nav-tab[data-panel="chat"]')||document.querySelector('.sidebar-nav .nav-tab[data-panel="chat"]');if(c)c.classList.add('active');}}catch(_){}}catch(e){}})();</script>
     <!-- Chat panel -->
     <div class="panel-view active" id="panelChat">
       <div class="panel-head">
-        <span data-i18n="tab_chat">Chat</span>
+        <h2 class="panel-head-title" data-i18n="tab_chat">Chat</h2>
         <div class="panel-head-actions">
           <button class="panel-head-btn has-tooltip has-tooltip--bottom-right" id="btnNewChat" data-tooltip="New conversation (Cmd+K)" data-i18n-title="new_conversation" aria-label="New conversation">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -280,7 +282,7 @@
         <label class="kanban-check"><input id="kanbanOnlyMine" type="checkbox" onchange="loadKanban(true)"> <span data-i18n="kanban_only_mine">Only mine</span></label>
         <div id="kanbanStats" class="kanban-stats" aria-live="polite"></div>
         <div id="kanbanBulkBar" class="kanban-bulk-bar">
-          <select id="kanbanBulkStatus" aria-label="Bulk status"><option value="">Status</option><option value="ready">Ready</option><option value="blocked">Blocked</option><option value="done">Done</option><option value="archived">Archived</option></select>
+          <select id="kanbanBulkStatus" aria-label="Bulk status" data-i18n-aria-label="kanban_bulk_status_aria"><option value="" data-i18n="kanban_status">Status</option><option value="scheduled" data-i18n="kanban_status_scheduled">Scheduled</option><option value="ready" data-i18n="kanban_status_ready">Ready</option><option value="blocked" data-i18n="kanban_status_blocked">Blocked</option><option value="done" data-i18n="kanban_status_done">Done</option><option value="archived" data-i18n="kanban_status_archived">Archived</option></select>
           <button class="btn secondary" onclick="bulkUpdateKanban()" data-i18n="kanban_bulk_action">Bulk action</button>
           <button class="btn secondary kanban-nudge-dispatch-btn" onclick="nudgeKanbanDispatcher()" data-i18n="kanban_nudge_dispatcher" title="Dry-run: shows what would be claimed without spawning workers">Preview</button>
           <button class="btn primary kanban-run-dispatch-btn" onclick="runKanbanDispatcher()" data-i18n="kanban_run_dispatcher" title="Claims Ready tasks and spawns worker subprocesses">Run dispatcher</button>
@@ -326,13 +328,25 @@
           <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="insightsRefreshBtn" onclick="loadInsights(true)" data-tooltip="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
         </div>
       </div>
-      <div class="panel-head-sub" style="padding:0 12px 8px">
-        <select id="insightsPeriod" class="insights-period-select" onchange="loadInsights()">
-          <option value="7">7 days</option>
-          <option value="30" selected>30 days</option>
-          <option value="90">90 days</option>
-          <option value="365">365 days</option>
+      <div class="panel-head-sub insights-range-bar">
+        <select id="insightsPeriod" class="insights-period-select" onchange="insightsPeriodChange()">
+          <option value="7" data-i18n="insights_period_7d">7 days</option>
+          <option value="30" selected data-i18n="insights_period_30d">30 days</option>
+          <option value="90" data-i18n="insights_period_90d">90 days</option>
+          <option value="365" data-i18n="insights_period_365d">365 days</option>
+          <option value="custom" data-i18n="insights_custom_range">Custom range…</option>
         </select>
+        <div id="insightsCustomRange">
+          <label class="insights-range-field" for="insightsStart">
+            <span class="insights-range-field-label" data-i18n="insights_start_date">Start date</span>
+            <input type="date" id="insightsStart" min="1970-01-01" aria-label="Start date" data-i18n-aria-label="insights_start_date" onfocus="_insightsSyncDateLimits()" onchange="insightsRangeInputs()">
+          </label>
+          <label class="insights-range-field" for="insightsEnd">
+            <span class="insights-range-field-label" data-i18n="insights_end_date">End date</span>
+            <input type="date" id="insightsEnd" min="1970-01-01" aria-label="End date" data-i18n-aria-label="insights_end_date" onfocus="_insightsSyncDateLimits()" onchange="insightsRangeInputs()">
+          </label>
+          <div id="insightsRangeNote" class="insights-range-note" role="status"></div>
+        </div>
       </div>
     </div>
     <!-- Workspaces panel -->
@@ -482,7 +496,24 @@
         title="Conversation outline"
         aria-label="Toggle conversation outline"
         aria-controls="outlinePanelWrapper">&#9776;</button>
-    <div class="messages" id="messages">
+            <div class="chat-todos" id="chatTodosPanel" hidden>
+              <button type="button" class="chat-todos-head" id="chatTodosHead" onclick="toggleChatTodos()" aria-expanded="false" aria-controls="chatTodosBody">
+                <span class="chat-todos-head-inner">
+                <span class="chat-todos-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
+                  <span id="chatTodosSummary"></span>
+                </span>
+                <span class="chat-todos-chevron" id="chatTodosChevron">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+                </span>
+              </button>
+              <div class="chat-todos-body-wrap" id="chatTodosBodyWrap">
+                <div class="chat-todos-body" id="chatTodosBody"></div>
+                <div class="chat-todos-scroll-cue" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div class="messages" id="messages">
       <div class="empty-state" id="emptyState">
         <div class="empty-logo"><img data-brand-img="1" class="empty-logo-img" src="__BRANDING_LOGO__" alt="__BRANDING_APP_NAME__" style="height:56px;width:auto;max-width:280px;object-fit:contain;display:block"></div>
         <h2 data-i18n="empty_title">What can I help with?</h2>
@@ -637,11 +668,12 @@
           <span class="voice-mode-indicator" id="voiceModeIndicator"></span>
           <span class="voice-mode-label" id="voiceModeLabel"></span>
         </div>
-        <textarea id="msg" rows="1" placeholder="Message __BRANDING_APP_NAME__…"></textarea>
+        <textarea id="msg" rows="1" enterkeyhint="enter" placeholder="Message __BRANDING_APP_NAME__…"></textarea>
         <div id="composerWorkspaceContext" class="sr-only"></div>
         <div class="composer-footer">
           <div class="composer-left">
             <input type="file" id="fileInput" class="file-input-visually-hidden" multiple accept="image/*,text/*,application/pdf,application/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.md,.py,.js,.ts,.yaml,.yml,.toml,.csv,.sh,.txt,.log,.env,.xls,.xlsx,.doc,.docx,.zip,.tar,.gz,.tgz,.bz2,.xz">
+            <input type="file" id="cameraFileInput" tabindex="-1" aria-hidden="true" class="file-input-visually-hidden" accept="image/*" capture="environment">
             <button type="button" class="icon-btn has-tooltip" id="btnAttach" data-tooltip="Attach files" data-i18n-title="composer_control_attach" data-i18n-aria-label="composer_control_attach" aria-label="Attach files">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
             </button>
@@ -740,6 +772,10 @@
               </button>
             </div>
           </div>
+          <div id="attachChoicePopup" class="attach-choice-popup" role="menu" aria-label="Attach options" data-i18n-aria-label="composer_attach_options" hidden>
+            <button type="button" class="ws-opt-action" role="menuitem" tabindex="-1" data-attach-choice="camera"><span class="ws-opt-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="15" rx="2"/><path d="m7 6 2-3h6l2 3"/><circle cx="12" cy="13" r="4"/></svg></span><span class="ws-opt-name" data-i18n="composer_attach_photo">Take photo</span></button>
+            <button type="button" class="ws-opt-action" role="menuitem" tabindex="-1" data-attach-choice="files"><span class="ws-opt-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></span><span class="ws-opt-name" data-i18n="composer_attach_files">Choose files</span></button>
+          </div>
           <div id="savedPromptsPopup" class="saved-prompts-popup" style="display:none" role="menu" aria-label="Saved prompts" data-i18n-aria-label="composer_control_saved_prompts"></div>
           <div class="composer-right">
             <span class="composer-status" id="composerStatus" style="display:none"></span>
@@ -778,7 +814,7 @@
               <span class="composer-model-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></span>
               <span class="composer-mobile-config-copy"><span class="composer-mobile-config-kicker" data-i18n="composer_mobile_model">Model</span><span class="composer-mobile-config-value" id="composerMobileModelLabel"></span></span>
             </button>
-            <button class="composer-mobile-config-action" id="composerMobileQuotaAction" type="button" onclick="switchPanel('settings');switchSettingsSection('providers')" title="Provider quota" style="display:none">
+            <button class="composer-mobile-config-action" id="composerMobileQuotaAction" type="button" onclick="switchPanel('settings');switchSettingsSection('providers')" title="Provider quota" hidden>
               <span class="composer-model-icon" aria-hidden="true"><span class="provider-quota-chip-dot" style="box-shadow:none"></span></span>
               <span class="composer-mobile-config-copy"><span class="composer-mobile-config-kicker" data-i18n="composer_mobile_quota">Quota</span><span class="composer-mobile-config-value" id="composerMobileQuotaLabel"></span></span>
             </button>
@@ -1075,13 +1111,6 @@
             </div>
             <div class="settings-field">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                <input type="checkbox" id="settingsWorkspaceTodosTab" style="width:15px;height:15px;accent-color:var(--accent)">
-                <span data-i18n="settings_label_workspace_todos_tab">Show Todos tab in workspace panel</span>
-              </label>
-              <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_workspace_todos_tab">When enabled, a Todos tab appears in the workspace panel (right side). The sidebar Todos panel remains available regardless.</div>
-            </div>
-            <div class="settings-field">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                 <input type="checkbox" id="settingsSessionJumpButtons" style="width:15px;height:15px;accent-color:var(--accent)">
                 <span data-i18n="settings_label_session_jump_buttons">Show session jump buttons</span>
               </label>
@@ -1093,6 +1122,26 @@
                 <span data-i18n="settings_label_session_endless_scroll">Load older messages while scrolling up</span>
               </label>
               <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_session_endless_scroll">When enabled, older messages load automatically as you scroll upward. When disabled, use the older-messages button.</div>
+            </div>
+            <div class="settings-field" style="margin-top:8px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="settingsChatTodosInChat" style="width:15px;height:15px;accent-color:var(--accent)">
+                <span data-i18n="settings_label_chat_todos_in_chat">Show task list in chat</span>
+              </label>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_chat_todos_in_chat">Show a collapsible task list at the top of the chat area. When enabled, the sidebar Todos panel is hidden to avoid duplication.</div>
+            </div>
+            <!-- The in-chat tray owns the task list while it is on, so this field
+                 stays in place next to the setting above but is DISABLED with an
+                 explanation instead of disappearing — a hidden field made the two
+                 settings silently contradict each other (reviewer re-gate
+                 2026-10-08T03:10:50Z). -->
+            <div class="settings-field" id="settingsWorkspaceTodosTabField">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="settingsWorkspaceTodosTab" style="width:15px;height:15px;accent-color:var(--accent)">
+                <span data-i18n="settings_label_workspace_todos_tab">Show Todos tab in workspace panel</span>
+              </label>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_workspace_todos_tab">When enabled, a Todos tab appears in the workspace panel (right side).</div>
+              <div id="settingsWorkspaceTodosTabNote" hidden style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic" data-i18n="settings_note_workspace_todos_tab_disabled">Disabled while the task list in chat is on.</div>
             </div>
             <div class="settings-field" style="margin-top:8px">
               <label id="settingsChatActivityDisplayModeLabel" for="settingsChatActivityDisplayMode" data-i18n="settings_label_chat_activity_display_mode">Activity display</label>
@@ -1119,12 +1168,12 @@
               </label>
               <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_transparent_stream_event_timestamps">Keeps the response footer time visible while hiding the per-event timestamp chips.</div>
             </div>
-            <div class="settings-field" style="margin-top:8px">
+            <div class="settings-field" style="margin-top:8px" data-settings-search="autoscroll auto-follow follow sticky bottom streaming">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                 <input type="checkbox" id="settingsAutoScrollFollow" style="width:15px;height:15px;accent-color:var(--accent)">
-                <span data-i18n="settings_label_auto_scroll_follow">Auto-follow new content</span>
+                <span data-i18n="settings_label_auto_scroll_follow">Auto-scroll to new content</span>
               </label>
-              <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_auto_scroll_follow">When enabled, the view scrolls to the bottom as new tokens stream in. When disabled, you control the scroll position manually.</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_auto_scroll_follow">When enabled, the view auto-scrolls to the bottom as new tokens stream in. When disabled, you control the scroll position manually.</div>
             </div>
             <div class="settings-field" style="margin-top:8px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -1241,9 +1290,9 @@
             <div class="settings-field">
               <label for="settingsSendKey" data-i18n="settings_label_send_key">Send Key</label>
               <select id="settingsSendKey" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px">
-                <option value="enter">Enter (Shift+Enter for newline)</option>
-                <option value="ctrl+enter">Ctrl+Enter (Enter for newline)</option>
-                <option value="shift+enter">Shift+Enter (Enter for newline)</option>
+                <option value="enter" data-i18n="settings_send_key_enter">Enter (Shift+Enter for newline)</option>
+                <option value="ctrl+enter" data-i18n="settings_send_key_ctrl_enter">Ctrl+Enter (Enter for newline)</option>
+                <option value="shift+enter" data-i18n="settings_send_key_shift_enter">Shift+Enter (Enter for newline)</option>
               </select>
             </div>
             <div class="settings-field">
@@ -1302,7 +1351,7 @@
             <div class="settings-field">
               <label for="settingsTtsEngine" data-i18n="settings_label_tts_engine">TTS Engine</label><select id="settingsTtsEngine" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px"><option value="browser">Browser speech synthesis</option><option value="edge">Edge TTS (server)</option><option value="elevenlabs">ElevenLabs (server)</option><option value="openai">OpenAI TTS (server)</option></select><div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_tts_engine">Choose speech engine. Edge TTS uses Microsoft neural voices via the server.</div></div><div class="settings-field"><label for="settingsTtsVoice" data-i18n="settings_label_tts_voice">Voice</label>
               <select id="settingsTtsVoice" style="width:100%;padding:8px;background:var(--code-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px">
-                <option value="">Default system voice</option>
+                <option value="" data-i18n="settings_tts_voice_default_system">Default system voice</option>
               </select>
               <div style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="settings_desc_tts_voice">Preferred voice. Populated from your browser's available voices.</div>
             </div>
@@ -1703,11 +1752,16 @@
         <button class="panel-icon-btn has-tooltip has-tooltip--bottom" id="btnNewFolder" data-tooltip="New folder" data-i18n-title="new_folder" data-i18n-aria-label="new_folder" aria-label="New folder" onclick="promptNewFolder()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
         <button class="panel-icon-btn has-tooltip has-tooltip--bottom" id="btnRefreshPanel" data-tooltip="Refresh" data-i18n-title="kanban_refresh" data-i18n-aria-label="kanban_refresh" aria-label="Refresh" onclick="if(S.session)refreshWorkspacePanel()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg></button>
         <button class="panel-icon-btn has-tooltip has-tooltip--bottom" id="btnUploadWorkspace" data-tooltip="Upload file" data-i18n-title="workspace_upload_file" data-i18n-aria-label="workspace_upload_file" aria-label="Upload file" onclick="triggerWorkspaceUpload()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
-        <button class="panel-icon-btn has-tooltip has-tooltip--bottom" id="btnWorkspacePrefs" data-tooltip="Workspace options" data-i18n-title="workspace_options" aria-haspopup="true" aria-expanded="false" onclick="toggleWorkspacePrefsMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg><span class="workspace-prefs-dot" id="workspacePrefsDot" hidden></span></button>
+        <button class="panel-icon-btn has-tooltip has-tooltip--bottom" id="btnWorkspacePrefs" data-tooltip="Workspace options" data-i18n-title="workspace_options" aria-label="Workspace options" data-i18n-aria-label="workspace_options" aria-haspopup="true" aria-expanded="false" onclick="toggleWorkspacePrefsMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg><span class="workspace-prefs-dot" id="workspacePrefsDot" hidden></span></button>
         <button class="panel-icon-btn close-preview has-tooltip has-tooltip--bottom" id="btnClearPreview" data-tooltip="Close preview" data-i18n-title="workspace_close_preview" data-i18n-aria-label="workspace_close_preview" aria-label="Close preview"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
-    <input type="file" id="workspaceFileInput" class="file-input-visually-hidden" multiple accept="image/*,text/*,.pdf,.json,.csv,.md,.py,.js,.ts,.yaml,.yml,.toml,.zip,.tar,.gz,.tgz,.bz2,.xz">
+    <!-- tabindex="-1" (#7713 follow-up): this input is the programmatic target of
+         triggerWorkspaceUpload() and is styled off-screen; the visible
+         #btnUploadWorkspace button is what a user should tab to. Left focusable
+         it was a tab stop inside the drawer that moved focus off-screen and
+         vanished for one Tab press. -->
+    <input type="file" id="workspaceFileInput" class="file-input-visually-hidden" tabindex="-1" multiple accept="image/*,text/*,.pdf,.json,.csv,.md,.py,.js,.ts,.yaml,.yml,.toml,.zip,.tar,.gz,.tgz,.bz2,.xz">
     <div class="workspace-panel-tabs" role="tablist" aria-label="Workspace panel views" data-i18n-aria-label="workspace_panel_views">
       <button class="workspace-panel-tab active" id="workspaceFilesTab" type="button" onclick="switchWorkspacePanelTab('files')" role="tab" aria-selected="true" data-i18n="workspace_files_tab">Files</button>
       <button class="workspace-panel-tab" id="workspaceArtifactsTab" type="button" onclick="switchWorkspacePanelTab('artifacts')" role="tab" aria-selected="false"><span data-i18n="workspace_artifacts_tab">Artifacts</span> <span id="workspaceArtifactsCount" class="workspace-artifacts-count">0</span></button>
@@ -1763,7 +1817,7 @@
     </div>
   </div>
 </div>
-<div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileSidebar()"></div>
+<div class="mobile-overlay" id="mobileOverlay" onclick="dismissMobileSidebar()"></div>
 <div class="pwa-sidebar-edge-guard" id="pwaSidebarEdgeGuard" aria-hidden="true"></div>
 <div class="app-dialog-overlay" id="appDialogOverlay" style="display:none" aria-hidden="true">
   <div class="app-dialog" id="appDialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogDesc">
