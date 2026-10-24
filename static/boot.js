@@ -731,6 +731,12 @@ function _micToastKeyForRecognitionError(error){
   let _micPointerDown=false;
   let _micStartSeq=0;
   const _micHoldThresholdMs=300;
+  // Safety maximum for MediaRecorder captures (click-to-toggle mic).
+  // Browser Web Speech one-shot is NOT used when server STT is available.
+  const _MAX_MEDIA_RECORDING_MS=120000;
+  let _mediaRecordingTimer=null;
+  let _mediaRecordingStartedAt=0;
+  let _mediaElapsedTimer=null;
 
   function _setButtonTooltipAndKey(btn, key){
     const text = t(key);
@@ -751,7 +757,40 @@ function _micToastKeyForRecognitionError(error){
     _setButtonTooltipAndKey(btn, on ? (_rawAudioMode ? 'voice_recording_active' : 'voice_dictate_active') : (_rawAudioMode ? 'voice_send_raw' : 'voice_dictate'));
     status.style.display=on?'':'none';
     if(statusText) statusText.textContent=on?'Listening':'Listening';
-    if(!on){ _finalText=''; _prefix=''; }
+    if(!on){
+      _finalText='';
+      _prefix='';
+      if(_mediaRecordingTimer){ clearTimeout(_mediaRecordingTimer); _mediaRecordingTimer=null; }
+      if(_mediaElapsedTimer){ clearInterval(_mediaElapsedTimer); _mediaElapsedTimer=null; }
+      _mediaRecordingStartedAt=0;
+    }
+  }
+
+  function _formatRecordingElapsed(ms){
+    const total=Math.max(0, Math.floor(ms/1000));
+    const m=Math.floor(total/60);
+    const s=total%60;
+    return m+':'+String(s).padStart(2,'0');
+  }
+
+  function _startMediaRecordingWatchdogs(recorder){
+    if(_mediaRecordingTimer){ clearTimeout(_mediaRecordingTimer); _mediaRecordingTimer=null; }
+    if(_mediaElapsedTimer){ clearInterval(_mediaElapsedTimer); _mediaElapsedTimer=null; }
+    _mediaRecordingStartedAt=Date.now();
+    if(statusText){
+      statusText.textContent='Recording 0:00';
+      _mediaElapsedTimer=setInterval(()=>{
+        if(!window._micActive||!_mediaRecordingStartedAt) return;
+        const elapsed=Date.now()-_mediaRecordingStartedAt;
+        statusText.textContent='Recording '+_formatRecordingElapsed(elapsed);
+      },250);
+    }
+    _mediaRecordingTimer=setTimeout(()=>{
+      _mediaRecordingTimer=null;
+      if(mediaRecorder===recorder && recorder.state!=='inactive'){
+        try{ recorder.stop(); }catch(_){ }
+      }
+    },_MAX_MEDIA_RECORDING_MS);
   }
 
   function _updateMicTooltip(){
@@ -1089,12 +1128,21 @@ function _micToastKeyForRecognitionError(error){
   }
 
   async function _probeServerSttCapability(){
-    if(!_canRecordAudio||_micForceMediaRecorderStored!==null) return;
+    // Always probe when MediaRecorder exists. A stale mic_force_mediarecorder='0'
+    // (set after a prior server-STT failure) must not permanently trap desktop
+    // users in Chrome's one-shot Web Speech path (~few seconds per utterance).
+    if(!_canRecordAudio) return;
     try{
       const res=await fetch('api/transcribe/capability',{cache:'no-store'});
       const data=await res.json().catch(()=>({}));
       if(res.ok&&data&&data.available){
         _serverSttAvailable=true;
+        try{
+          const stored=localStorage.getItem(_micForceMediaRecorderKey);
+          // '0' is only written by automatic fallback after server failure.
+          // Clear it once the server reports STT available again.
+          if(stored==='0') localStorage.removeItem(_micForceMediaRecorderKey);
+        }catch(_){}
         if(!window._micActive){
           _forceMediaRecorder=true;
           recognition=null;
@@ -1234,8 +1282,12 @@ function _micToastKeyForRecognitionError(error){
       };
       _activeCaptureMode=captureMode;
       mediaRecorder=recorder;
-      recorder.start();
+      // timeslice emits periodic dataavailable events; all chunks are combined
+      // on stop. Without timeslice some browsers buffer until stop only — still
+      // fine, but timeslice keeps memory flatter for long captures.
+      recorder.start(1000);
       _setRecording(true);
+      _startMediaRecordingWatchdogs(recorder);
     }catch(err){
       if(startSeq!==_micStartSeq) return;
       _isRecording=false;
