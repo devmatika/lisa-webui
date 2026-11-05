@@ -1732,6 +1732,12 @@
               <div id="mcpToolPager" class="mcp-tool-pager" aria-label="MCP tools pagination" data-i18n-aria-label="mcp_tools_pagination_label"></div>
               <div class="mcp-restart-hint" data-i18n="mcp_tools_runtime_note">Tool inventory only uses already-known active MCP runtime data; the WebUI does not start or probe servers.</div>
             </div>
+            <!-- Guided Setup Wizard Section -->
+            <div class="settings-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+              <label>Guided Setup Wizard</label>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Configure workspace profile, AI provider, business capabilities, service connectors, action approvals, and daily briefings.</div>
+              <button class="sm-btn" id="btnRunSetupWizardAgain" onclick="runSetupWizardAgain()" style="width:100%;padding:8px;font-weight:600;color:var(--blue);border-color:rgba(124,185,255,.32)">Run Setup Wizard Again</button>
+            </div>
             <button class="sm-btn" onclick="saveSettings()" style="margin-top:12px;width:100%;padding:8px;font-weight:600" data-i18n="settings_save_btn">Save Settings</button>
           </div>
         
@@ -1817,6 +1823,28 @@
     </div>
   </div>
 </div>
+<!-- Customer Onboarding Wizard Overlay -->
+<div class="customer-wizard-overlay" id="customerWizardOverlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="customerWizardTitle">
+  <div class="customer-wizard-card">
+    <div class="customer-wizard-shell">
+      <div class="customer-wizard-sidebar">
+        <div class="customer-wizard-badge">GUIDED SETUP</div>
+        <h2 id="customerWizardTitle">Lisa Setup Wizard</h2>
+        <p id="customerWizardLead">Configure your workspace, services, and intelligent capabilities.</p>
+        <div class="customer-wizard-steps" id="customerWizardSteps"></div>
+      </div>
+      <div class="customer-wizard-main">
+        <div class="customer-wizard-status" id="customerWizardNotice" style="display:none"></div>
+        <div class="customer-wizard-body" id="customerWizardBody"></div>
+        <div class="customer-wizard-actions" id="customerWizardActions">
+          <button class="sm-btn" id="customerWizardBackBtn" onclick="prevCustomerWizardStep()" style="display:none">Back</button>
+          <button class="sm-btn" id="customerWizardSkipBtn" onclick="skipCustomerWizardStep()" style="margin-right:auto;opacity:.7">Skip</button>
+          <button class="sm-btn" id="customerWizardNextBtn" onclick="nextCustomerWizardStep()" style="font-weight:700;color:var(--blue);border-color:rgba(124,185,255,.32)">Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="mobile-overlay" id="mobileOverlay" onclick="dismissMobileSidebar()"></div>
 <div class="pwa-sidebar-edge-guard" id="pwaSidebarEdgeGuard" aria-hidden="true"></div>
 <div class="app-dialog-overlay" id="appDialogOverlay" style="display:none" aria-hidden="true">
@@ -1848,6 +1876,7 @@
 <script src="static/extension_settings.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/panels.js?v=__WEBUI_VERSION__&amp;vb=20260930v2" defer></script>
 <script src="static/onboarding.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/customer_wizard.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/boot.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/outline.js?v=__WEBUI_VERSION__" defer></script>
 
