@@ -627,16 +627,16 @@ function _renderStepServices(el) {
                   ` : ''}
 
                   ${(s.id === 'google_workspace') ? `
-                    <div class="cw-oauth-action-box" id="google_auth_box" style="margin: 14px 0; padding: 14px; border: 1px solid var(--border-color, #444); border-radius: 8px; background: rgba(0, 110, 179, 0.08);">
+                    <div class="cw-oauth-action-box" id="google_auth_box">
                       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                        <div style="font-weight:600; font-size:14px; color:var(--text-bright,#fff);">
+                        <div class="cw-oauth-action-title">
                           🔑 Google Workspace Account Authorization
                         </div>
                         <span class="cw-status-badge ${isVerified ? 'cw-badge-verified' : 'cw-badge-needs_auth'}">
                           ${isVerified ? '✓ Authorized' : '⚠️ User Authorization Required'}
                         </span>
                       </div>
-                      <p class="cw-hint" style="margin-bottom:12px;">
+                      <p class="cw-oauth-hint" style="margin-bottom:12px;">
                         ${isVerified ?
                           'Your Google Workspace account is connected and verified. You can generate a new link below anytime to refresh consent.' :
                           'Client credentials are saved. Click the button below to sign in with your Google Workspace account and grant Calendar & Gmail permissions.'
@@ -650,9 +650,9 @@ function _renderStepServices(el) {
                         <span class="cw-hint">Opens in a new browser tab</span>
                       </div>
 
-                      <div id="google_auth_step_instructions" style="display:none; margin-top:12px; padding:12px; background:rgba(0,0,0,0.25); border-radius:6px;">
-                        <ol style="margin:0 0 10px 18px; padding:0; font-size:13px; line-height:1.5;">
-                          <li>Visit the authorization link: <a id="google_auth_url_link" href="#" target="_blank" rel="noopener" style="color:var(--primary,#3b82f6); font-weight:600; text-decoration:underline;">Click here to sign in with Google ↗</a></li>
+                      <div class="cw-oauth-step-instructions" id="google_auth_step_instructions" style="display:none; margin-top:12px; padding:14px; border-radius:6px;">
+                        <ol style="margin:0 0 10px 18px; padding:0; font-size:13px; line-height:1.6;">
+                          <li>Visit the authorization link: <a id="google_auth_url_link" href="#" target="_blank" rel="noopener" style="color:var(--blue); font-weight:600; text-decoration:underline;">Click here to sign in with Google ↗</a></li>
                           <li>Sign in with your Google Workspace account and click <strong>Allow</strong> to grant Calendar & Gmail permissions.</li>
                           <li>When redirected to <code>http://localhost:1/?code=...</code>, copy the <strong>code</strong> (or the entire address bar URL) and paste it below:</li>
                         </ol>
@@ -1122,8 +1122,8 @@ function _renderStepKnowledge(el) {
               </table>
             </div>
 
-            <div class="cw-team-guide-callout" style="margin-top:14px; padding:12px; border-radius:6px; background:rgba(0,110,179,0.08); font-size:13px; line-height:1.5;">
-              <strong>ℹ️ How Lisa uses this directory:</strong>
+            <div class="cw-team-guide-callout" style="margin-top:14px; padding:12px; border-radius:6px; font-size:13px; line-height:1.5;">
+              <strong style="display:block; margin-bottom:6px;">ℹ️ How Lisa uses this directory:</strong>
               <ul style="margin:6px 0 0 18px; padding:0;">
                 <li><strong>ClickUp Task Creation:</strong> In meetings and chats, when Lisa creates action items, she maps attendee names to their exact ClickUp numeric user IDs.</li>
                 <li><strong>Telegram DMs & Briefings:</strong> Lisa routes private notifications and personalized morning briefings to mapped Telegram user IDs.</li>
@@ -1236,10 +1236,10 @@ function _renderStepKnowledge(el) {
               </div>
             </div>
 
-            <div class="cw-team-guide-callout" style="margin-top:14px; padding:14px; border-radius:8px; background:rgba(56, 189, 248, 0.08); border-left:3px solid #38bdf8; font-size:13px; line-height:1.6;">
-              <strong style="color:#38bdf8; display:block; margin-bottom:6px;">💡 How your team updates and collaborates via Obsidian:</strong>
+            <div class="cw-team-guide-callout" style="margin-top:14px; padding:14px; border-radius:8px; font-size:13px; line-height:1.6;">
+              <strong style="display:block; margin-bottom:6px;">💡 How your team updates and collaborates via Obsidian:</strong>
               <ol style="margin:0; padding-left:20px;">
-                <li>Team members download the free <a href="https://obsidian.md" target="_blank" rel="noopener" class="cw-obsidian-app-link" style="color:#38bdf8 !important; text-decoration:underline !important; font-weight:600;">Obsidian app ↗</a>.</li>
+                <li>Team members download the free <a href="https://obsidian.md" target="_blank" rel="noopener" class="cw-obsidian-app-link">Obsidian app ↗</a>.</li>
                 <li>Open or clone the vault directory or use the Team Sync link above.</li>
                 <li>Create and link notes using standard <code>[[WikiLinks]]</code> (e.g. <code>[[01-People/Davood Fouladi|Davood Fouladi]]</code>).</li>
                 <li>Lisa automatically indexes all markdown files and uses them to answer team queries, draft emails, and prepare morning briefings.</li>
