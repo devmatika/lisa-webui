@@ -947,31 +947,31 @@ function _renderStepKnowledge(el) {
         <p>Customize Lisa's core identity, organization context, institutional memory, team members directory, and connect your team's Obsidian vault.</p>
       </div>
 
-      <div class="cw-tabs-bar" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:8px; margin-bottom:18px; padding:6px; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.08); border-radius:10px; overflow:visible;">
+      <div class="cw-tabs-bar" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:8px; margin-bottom:18px; padding:6px; border-radius:10px; overflow:visible;">
         <button type="button" class="cw-tab-btn ${activeTab === 'team' ? 'active' : ''}" onclick="_switchKnowledgeTab('team')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
           <span class="cw-tab-icon" style="font-size:16px; line-height:1;">👥</span>
           <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Team Directory</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.75; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">identity-mapping</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">identity-mapping</span>
         </button>
         <button type="button" class="cw-tab-btn ${activeTab === 'soul' ? 'active' : ''}" onclick="_switchKnowledgeTab('soul')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
           <span class="cw-tab-icon" style="font-size:16px; line-height:1;">🔮</span>
           <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Lisa Soul</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.75; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">SOUL.md</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">SOUL.md</span>
         </button>
         <button type="button" class="cw-tab-btn ${activeTab === 'user' ? 'active' : ''}" onclick="_switchKnowledgeTab('user')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
           <span class="cw-tab-icon" style="font-size:16px; line-height:1;">👤</span>
           <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">User Profile</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.75; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">USER.md</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">USER.md</span>
         </button>
         <button type="button" class="cw-tab-btn ${activeTab === 'memory' ? 'active' : ''}" onclick="_switchKnowledgeTab('memory')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
           <span class="cw-tab-icon" style="font-size:16px; line-height:1;">🧠</span>
           <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Institutional Memory</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.75; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">MEMORY.md</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">MEMORY.md</span>
         </button>
         <button type="button" class="cw-tab-btn ${activeTab === 'obsidian' ? 'active' : ''}" onclick="_switchKnowledgeTab('obsidian')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
           <span class="cw-tab-icon" style="font-size:16px; line-height:1;">📓</span>
           <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Obsidian Vault</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.75; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Handbook & Notes</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Handbook & Notes</span>
         </button>
       </div>
 
@@ -989,8 +989,8 @@ function _renderStepKnowledge(el) {
               </div>
             </div>
 
-            <div id="cw_member_form_container" style="display:none; margin: 12px 0; padding: 16px; border: 1px solid var(--border-color, #444); border-radius: 8px; background: rgba(0,0,0,0.3);">
-              <h4 id="cw_member_form_title" style="margin-top:0; margin-bottom:14px; color:var(--text-bright,#fff); font-size:15px;">Add New Team Member</h4>
+            <div id="cw_member_form_container" style="display:none; margin: 12px 0; padding: 16px; border-radius: 8px;">
+              <h4 id="cw_member_form_title" style="margin-top:0; margin-bottom:14px; font-size:15px;">Add New Team Member</h4>
               <input type="hidden" id="cw_m_person_id" value="" />
               <input type="hidden" id="cw_m_edit_index" value="-1" />
               <div class="cw-form-row">
@@ -1078,30 +1078,30 @@ function _renderStepKnowledge(el) {
                       const aliasesList = Array.isArray(aliases) ? aliases : [aliases];
 
                       return `
-                        <tr style="border-bottom: 1px solid var(--border-color,#333);">
+                        <tr style="border-bottom: 1px solid var(--border2, rgba(255,255,255,0.08));">
                           <td style="padding:10px 8px; vertical-align:top;">
                             <strong>${_escapeHtml(name)}</strong>
-                            <div style="font-size:12px; color:var(--text-muted);">${_escapeHtml(role)}</div>
-                            ${person_id ? `<div style="font-size:10px; opacity:0.55; font-family:monospace; margin-top:2px;">ID: ${_escapeHtml(person_id.substring(0, 13))}...</div>` : ''}
+                            <div style="font-size:12px; color:var(--muted);">${_escapeHtml(role)}</div>
+                            ${person_id ? `<div style="font-size:10px; opacity:0.65; font-family:monospace; margin-top:2px;">ID: ${_escapeHtml(person_id.substring(0, 13))}...</div>` : ''}
                           </td>
                           <td style="padding:10px 8px; vertical-align:top;">
                             ${(emails && emails.length) ? emails.map(e => `
                               <div style="margin:2px 0;">
-                                <code style="font-size:11px; padding:2px 6px; background:rgba(255,255,255,0.06); border-radius:4px; color:#cbd5e1;">${_escapeHtml(e)}</code>
+                                <code class="cw-email-tag">${_escapeHtml(e)}</code>
                               </div>
-                            `).join('') : '<span style="color:var(--text-muted);">—</span>'}
+                            `).join('') : '<span style="color:var(--muted);">—</span>'}
                           </td>
                           <td style="padding:10px 8px; vertical-align:top;">
-                            ${t_id ? `<code style="font-size:11px; padding:2px 6px; background:rgba(0,180,255,0.12); border-radius:4px; color:#38bdf8;">${_escapeHtml(t_id)}</code>` : '<span style="color:var(--text-muted);">—</span>'}
-                            ${t_disp ? `<div style="font-size:11px; color:var(--text-bright,#fff); margin-top:3px;">${_escapeHtml(t_disp)}</div>` : ''}
-                            ${t_u ? `<div style="font-size:11px; color:var(--text-muted);">${_escapeHtml(t_u)}</div>` : ''}
+                            ${t_id ? `<code class="cw-tele-badge">${_escapeHtml(t_id)}</code>` : '<span style="color:var(--muted);">—</span>'}
+                            ${t_disp ? `<div style="font-size:11px; color:var(--text); margin-top:3px; font-weight:500;">${_escapeHtml(t_disp)}</div>` : ''}
+                            ${t_u ? `<div style="font-size:11px; color:var(--muted);">${_escapeHtml(t_u)}</div>` : ''}
                           </td>
                           <td style="padding:10px 8px; vertical-align:top;">
-                            ${c_id ? `<code style="font-size:11px; padding:2px 6px; background:rgba(123,97,255,0.12); border-radius:4px; color:#c4b5fd;">${_escapeHtml(c_id)}</code>` : '<span style="color:var(--text-muted);">—</span>'}
-                            ${c_name ? `<div style="font-size:11px; color:var(--text-muted); margin-top:3px;">${_escapeHtml(c_name)}</div>` : ''}
+                            ${c_id ? `<code class="cw-clickup-badge">${_escapeHtml(c_id)}</code>` : '<span style="color:var(--muted);">—</span>'}
+                            ${c_name ? `<div style="font-size:11px; color:var(--muted); margin-top:3px;">${_escapeHtml(c_name)}</div>` : ''}
                           </td>
                           <td style="padding:10px 8px; vertical-align:top;">
-                            ${aliasesList.map(a => `<span style="display:inline-block; margin:2px 3px 2px 0; padding:1px 6px; background:rgba(255,255,255,0.05); border-radius:8px; font-size:11px;">${_escapeHtml(a)}</span>`).join('')}
+                            ${aliasesList.map(a => `<span class="cw-alias-pill">${_escapeHtml(a)}</span>`).join('')}
                           </td>
                           <td style="padding:10px 8px; text-align:right; white-space:nowrap; vertical-align:top;">
                             <button type="button" class="sm-btn" onclick="_editMember(${idx})" title="Edit" style="margin-right:4px;">✏️ Edit</button>
@@ -1148,7 +1148,7 @@ function _renderStepKnowledge(el) {
                 <button type="button" class="sm-btn" onclick="_applySoulTemplate('support')">🤝 Client Success</button>
               </div>
             </div>
-            <textarea id="cwSoulEditor" class="cw-code-editor" style="width:100% !important; min-height:360px; box-sizing:border-box !important; display:block; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.6; padding:14px; background:rgba(0,0,0,0.3); border:1px solid var(--border-color,#333); border-radius:8px; color:#e2e8f0; resize:vertical;" placeholder="Write or customize SOUL.md..." oninput="CUSTOMER_WIZARD.draft.knowledge.soul = this.value">${_escapeHtml(k.soul || '')}</textarea>
+            <textarea id="cwSoulEditor" class="cw-code-editor" style="width:100% !important; min-height:360px; box-sizing:border-box !important; display:block; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.6; padding:14px; border-radius:8px; resize:vertical;" placeholder="Write or customize SOUL.md..." oninput="CUSTOMER_WIZARD.draft.knowledge.soul = this.value">${_escapeHtml(k.soul || '')}</textarea>
             <div class="cw-editor-footer" style="margin-top:10px;">
               <small class="cw-hint">Saved to <code>HERMES_HOME/SOUL.md</code>. Auto-saved on Continue.</small>
               <button type="button" class="btn sm-btn" onclick="_saveKnowledgeFilesNow('soul')">Save Soul Now</button>
@@ -1169,7 +1169,7 @@ function _renderStepKnowledge(el) {
                 <button type="button" class="sm-btn" onclick="_applyUserTemplate('startup')">🚀 Product & Tech Team</button>
               </div>
             </div>
-            <textarea id="cwUserEditor" class="cw-code-editor" style="width:100% !important; min-height:360px; box-sizing:border-box !important; display:block; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.6; padding:14px; background:rgba(0,0,0,0.3); border:1px solid var(--border-color,#333); border-radius:8px; color:#e2e8f0; resize:vertical;" placeholder="Write or customize USER.md..." oninput="CUSTOMER_WIZARD.draft.knowledge.user = this.value">${_escapeHtml(k.user || '')}</textarea>
+            <textarea id="cwUserEditor" class="cw-code-editor" style="width:100% !important; min-height:360px; box-sizing:border-box !important; display:block; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.6; padding:14px; border-radius:8px; resize:vertical;" placeholder="Write or customize USER.md..." oninput="CUSTOMER_WIZARD.draft.knowledge.user = this.value">${_escapeHtml(k.user || '')}</textarea>
             <div class="cw-editor-footer" style="margin-top:10px;">
               <small class="cw-hint">Saved to <code>HERMES_HOME/memories/USER.md</code>. Auto-saved on Continue.</small>
               <button type="button" class="btn sm-btn" onclick="_saveKnowledgeFilesNow('user')">Save User Profile Now</button>
@@ -1185,7 +1185,7 @@ function _renderStepKnowledge(el) {
                 <p>Curated company facts, approved terminology, key client notes, and recurring operational guidelines.</p>
               </div>
             </div>
-            <textarea id="cwMemoryEditor" class="cw-code-editor" style="width:100% !important; min-height:360px; box-sizing:border-box !important; display:block; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.6; padding:14px; background:rgba(0,0,0,0.3); border:1px solid var(--border-color,#333); border-radius:8px; color:#e2e8f0; resize:vertical;" placeholder="Write or customize MEMORY.md..." oninput="CUSTOMER_WIZARD.draft.knowledge.memory = this.value">${_escapeHtml(k.memory || '')}</textarea>
+            <textarea id="cwMemoryEditor" class="cw-code-editor" style="width:100% !important; min-height:360px; box-sizing:border-box !important; display:block; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.6; padding:14px; border-radius:8px; resize:vertical;" placeholder="Write or customize MEMORY.md..." oninput="CUSTOMER_WIZARD.draft.knowledge.memory = this.value">${_escapeHtml(k.memory || '')}</textarea>
             <div class="cw-editor-footer" style="margin-top:10px;">
               <small class="cw-hint">Saved to <code>HERMES_HOME/memories/MEMORY.md</code>. Auto-saved on Continue.</small>
               <button type="button" class="btn sm-btn" onclick="_saveKnowledgeFilesNow('memory')">Save Memory Now</button>
