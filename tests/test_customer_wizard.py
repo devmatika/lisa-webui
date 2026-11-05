@@ -693,3 +693,22 @@ def test_canonical_multi_email_identity_mapping(mock_hermes_env, tmp_path):
     assert "57259309" in user_md
 
 
+def test_deepseek_and_active_model_resolution(mock_hermes_env):
+    """Verify that deepseek/deepseek-v4-flash-0731 and active models from config.yaml are in supported_providers."""
+    # Write active model into config.yaml
+    cfg_file = mock_hermes_env / "config.yaml"
+    cfg_file.write_text("model:\n  provider: openrouter\n  default: deepseek/deepseek-v4-flash-0731\n", encoding="utf-8")
+
+    status = get_customer_wizard_status()
+    assert status["provider"]["provider"] == "openrouter"
+    assert status["provider"]["model"] == "deepseek/deepseek-v4-flash-0731"
+
+    openrouter_meta = next(p for p in status["provider"]["supported_providers"] if p["id"] == "openrouter")
+    model_ids = [m["id"] for m in openrouter_meta["models"]]
+    assert "deepseek/deepseek-v4-flash-0731" in model_ids
+    assert "deepseek/deepseek-v4-flash" in model_ids
+    assert "deepseek/deepseek-v4.1-flash" in model_ids
+    assert "deepseek/deepseek-v4-pro" in model_ids
+
+
+

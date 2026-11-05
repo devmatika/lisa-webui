@@ -187,9 +187,20 @@ function _collectCurrentStepData(stepName) {
       logo: ($('cwLogo') ? $('cwLogo').value : '').trim(),
     };
   } else if (stepName === 'provider') {
+    const sel = $('cwModel');
+    const custom = $('cwModelCustom');
+    let modelVal = '';
+    if (sel && sel.value === '__custom__') {
+      modelVal = custom ? custom.value.trim() : '';
+    } else if (sel) {
+      modelVal = sel.value.trim();
+    }
+    if (!modelVal && custom && custom.value.trim()) {
+      modelVal = custom.value.trim();
+    }
     CUSTOMER_WIZARD.draft.provider = {
       provider: ($('cwProvider') ? $('cwProvider').value : 'openrouter'),
-      model: ($('cwModel') ? $('cwModel').value : '').trim(),
+      model: modelVal || (CUSTOMER_WIZARD.draft.provider && CUSTOMER_WIZARD.draft.provider.model) || '',
       base_url: ($('cwBaseUrl') ? $('cwBaseUrl').value : '').trim(),
       api_key: ($('cwApiKey') ? $('cwApiKey').value : '').trim(),
     };
@@ -364,7 +375,12 @@ function _renderStepProvider(el) {
   const supported = statusProvider.supported_providers || [];
   const selectedMeta = supported.find(s => s.id === p.provider) || {};
 
-  const models = selectedMeta.models || [];
+  const models = [...(selectedMeta.models || [])];
+  // Ensure the active/draft model is always present in the options list
+  if (p.model && !models.some(m => m.id === p.model)) {
+    models.unshift({ id: p.model, label: `${p.model} (Active in Hermes)` });
+  }
+
   const keyPlaceholder = statusProvider.is_configured ? '•••••••• (Configured — leave blank to keep)' : 'Enter API key';
 
   el.innerHTML = `
@@ -382,14 +398,34 @@ function _renderStepProvider(el) {
       </div>
 
       <div class="cw-form-group">
-        <label>Default Model <span class="cw-req">*</span></label>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <label style="margin:0;">Default Model <span class="cw-req">*</span></label>
+          <a href="javascript:void(0)" onclick="_toggleCustomModelInput()" style="font-size:11.5px; color:var(--blue,#0284c7); text-decoration:underline; font-weight:600;">Custom model slug...</a>
+        </div>
         ${models.length > 0 ? `
-          <select id="cwModel">
+          <select id="cwModel" onchange="_onModelSelectChange(this.value)">
             ${models.map(m => `<option value="${m.id}" ${m.id === p.model ? 'selected' : ''}>${m.label || m.id}</option>`).join('')}
+            <option value="__custom__">✏️ Custom Model (type ID manually)...</option>
           </select>
         ` : `
           <input type="text" id="cwModel" value="${_escapeHtml(p.model || selectedMeta.default_model || '')}" placeholder="e.g. gpt-4o">
         `}
+
+        <div id="cwCustomModelWrapper" style="display:none; margin-top:8px;">
+          <label style="font-size:11px; margin-bottom:4px; display:block; color:var(--muted,#64748b); font-weight:600;">Custom Model ID / Slug:</label>
+          <input type="text" id="cwModelCustom" value="${_escapeHtml(p.model || '')}" placeholder="e.g. deepseek/deepseek-v4-flash-0731" oninput="CUSTOMER_WIZARD.draft.provider.model=this.value.trim();">
+          <small class="cw-hint">Type any exact model ID supported by your provider (e.g. <code>deepseek/deepseek-v4-flash-0731</code>).</small>
+        </div>
+
+        <div class="cw-quick-picks" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+          <span style="font-size:11px; color:var(--muted,#64748b); font-weight:600;">Popular picks:</span>
+          <button type="button" class="cw-toggle-btn" style="padding:2px 8px; font-size:11px;" onclick="_quickSetModel('deepseek/deepseek-v4-flash-0731')">DeepSeek V4 Flash 0731</button>
+          <button type="button" class="cw-toggle-btn" style="padding:2px 8px; font-size:11px;" onclick="_quickSetModel('deepseek/deepseek-v4-flash')">DeepSeek V4 Flash</button>
+          <button type="button" class="cw-toggle-btn" style="padding:2px 8px; font-size:11px;" onclick="_quickSetModel('deepseek/deepseek-v4.1-flash')">DeepSeek V4.1 Flash</button>
+          <button type="button" class="cw-toggle-btn" style="padding:2px 8px; font-size:11px;" onclick="_quickSetModel('deepseek/deepseek-v4-pro')">DeepSeek V4 Pro</button>
+          <button type="button" class="cw-toggle-btn" style="padding:2px 8px; font-size:11px;" onclick="_quickSetModel('anthropic/claude-sonnet-4.6')">Claude Sonnet 4.6</button>
+          <button type="button" class="cw-toggle-btn" style="padding:2px 8px; font-size:11px;" onclick="_quickSetModel('openai/gpt-5.4-mini')">GPT-5.4 Mini</button>
+        </div>
       </div>
 
       ${selectedMeta.requires_base_url ? `
@@ -412,6 +448,53 @@ function _renderStepProvider(el) {
   `;
 }
 
+window._toggleCustomModelInput = function() {
+  const wrap = document.getElementById('cwCustomModelWrapper');
+  const sel = document.getElementById('cwModel');
+  const customInput = document.getElementById('cwModelCustom');
+  if (!wrap) return;
+  const isHidden = (wrap.style.display === 'none' || !wrap.style.display);
+  wrap.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    if (sel) sel.value = '__custom__';
+    if (customInput) customInput.focus();
+  }
+};
+
+window._onModelSelectChange = function(val) {
+  const wrap = document.getElementById('cwCustomModelWrapper');
+  const customInput = document.getElementById('cwModelCustom');
+  if (val === '__custom__') {
+    if (wrap) wrap.style.display = 'block';
+    if (customInput) {
+      customInput.focus();
+      if (customInput.value.trim()) {
+        CUSTOMER_WIZARD.draft.provider.model = customInput.value.trim();
+      }
+    }
+  } else {
+    if (wrap) wrap.style.display = 'none';
+    CUSTOMER_WIZARD.draft.provider.model = val;
+  }
+};
+
+window._quickSetModel = function(modelId) {
+  CUSTOMER_WIZARD.draft.provider.model = modelId;
+  const sel = document.getElementById('cwModel');
+  const customInput = document.getElementById('cwModelCustom');
+  const wrap = document.getElementById('cwCustomModelWrapper');
+  if (wrap) wrap.style.display = 'none';
+  if (customInput) customInput.value = modelId;
+  if (sel) {
+    let opt = Array.from(sel.options).find(o => o.value === modelId);
+    if (!opt) {
+      opt = new Option(modelId, modelId);
+      sel.add(opt, 0);
+    }
+    sel.value = modelId;
+  }
+};
+
 async function _testProviderConnection() {
   const statusSpan = $('cwProviderProbeStatus');
   if (statusSpan) {
@@ -431,6 +514,20 @@ async function _testProviderConnection() {
     if (res && res.ok) {
       statusSpan.className = 'cw-probe-msg ok';
       statusSpan.textContent = `✓ Connected. ${Array.isArray(res.models) ? res.models.length : 0} models available.`;
+      if (Array.isArray(res.models) && res.models.length > 0) {
+        const sel = $('cwModel');
+        if (sel) {
+          const currentVal = sel.value;
+          res.models.forEach(m => {
+            const mId = typeof m === 'string' ? m : (m.id || '');
+            const mLabel = typeof m === 'string' ? m : (m.label || m.name || m.id || '');
+            if (mId && !Array.from(sel.options).some(o => o.value === mId)) {
+              sel.add(new Option(mLabel, mId));
+            }
+          });
+          sel.value = currentVal;
+        }
+      }
     } else {
       statusSpan.className = 'cw-probe-msg error';
       statusSpan.textContent = `✕ Connection failed: ${res.detail || res.error || 'unreachable'}`;

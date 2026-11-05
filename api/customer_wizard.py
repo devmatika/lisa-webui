@@ -1694,6 +1694,68 @@ def scaffold_obsidian_vault(vault_path: str | None = None) -> dict[str, Any]:
     }
 
 
+def _get_provider_models(pid: str, meta: dict[str, Any], active_model: str = "", home: Path | None = None) -> list[dict[str, str]]:
+    """Build comprehensive model list for provider, including curated DeepSeek models and active models."""
+    base_models: list[dict[str, str]] = [dict(m) for m in meta.get("models", [])]
+    seen_ids = {m["id"] for m in base_models if "id" in m}
+
+    # Add well-known popular DeepSeek snapshots and models for OpenRouter/DeepSeek
+    if pid == "openrouter":
+        curated_openrouter = [
+            {"id": "deepseek/deepseek-v4-flash-0731", "label": "DeepSeek V4 Flash (0731)"},
+            {"id": "deepseek/deepseek-v4-flash", "label": "DeepSeek V4 Flash"},
+            {"id": "deepseek/deepseek-v4.1-flash", "label": "DeepSeek V4.1 Flash"},
+            {"id": "deepseek/deepseek-v4-pro", "label": "DeepSeek V4 Pro"},
+            {"id": "deepseek/deepseek-chat", "label": "DeepSeek V3 Chat"},
+            {"id": "deepseek/deepseek-r1", "label": "DeepSeek R1"},
+            {"id": "anthropic/claude-sonnet-4.6", "label": "Claude Sonnet 4.6"},
+            {"id": "anthropic/claude-opus-4.7", "label": "Claude Opus 4.7"},
+            {"id": "openai/gpt-5.4-mini", "label": "GPT-5.4 Mini"},
+            {"id": "openai/gpt-5.4", "label": "GPT-5.4"},
+        ]
+        for item in curated_openrouter:
+            if item["id"] not in seen_ids:
+                base_models.append(item)
+                seen_ids.add(item["id"])
+    elif pid == "deepseek":
+        curated_deepseek = [
+            {"id": "deepseek-v4-flash-0731", "label": "DeepSeek V4 Flash (0731)"},
+            {"id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash"},
+            {"id": "deepseek-v4.1-flash", "label": "DeepSeek V4.1 Flash"},
+            {"id": "deepseek-v4-pro", "label": "DeepSeek V4 Pro"},
+            {"id": "deepseek-chat", "label": "DeepSeek V3 Chat"},
+            {"id": "deepseek-r1", "label": "DeepSeek R1"},
+        ]
+        for item in curated_deepseek:
+            if item["id"] not in seen_ids:
+                base_models.append(item)
+                seen_ids.add(item["id"])
+
+    # Attempt to read cached models from Hermes disk cache if present
+    if home:
+        cache_file = home / "provider_models_cache.json"
+        if cache_file.is_file():
+            try:
+                import json as _j
+                with open(cache_file, encoding="utf-8") as f:
+                    cdata = _j.load(f)
+                prov_cached = cdata.get(pid, {})
+                cached_list = prov_cached.get("models", []) if isinstance(prov_cached, dict) else []
+                for m_id in cached_list:
+                    if isinstance(m_id, str) and m_id not in seen_ids:
+                        base_models.append({"id": m_id, "label": m_id})
+                        seen_ids.add(m_id)
+            except Exception:
+                pass
+
+    # Ensure active model is present and at the top if it belongs to this provider
+    if active_model and active_model not in seen_ids:
+        base_models.insert(0, {"id": active_model, "label": f"{active_model} (Active in Hermes)"})
+        seen_ids.add(active_model)
+
+    return base_models
+
+
 # ── Full Wizard Status Payload ───────────────────────────────────────────────
 
 def get_customer_wizard_status() -> dict[str, Any]:
@@ -1715,17 +1777,21 @@ def get_customer_wizard_status() -> dict[str, Any]:
         "logo": saved_state.get("logo") or settings.get("logo", "static/matika-logo.png"),
     }
 
-    # Step B provider info
+    # Step B provider info: reflect active Hermes config.yaml
     model_cfg = cfg.get("model", {}) if isinstance(cfg.get("model"), dict) else {}
     current_provider = model_cfg.get("provider", "openrouter")
     current_model = model_cfg.get("default", "anthropic/claude-sonnet-4.6")
     current_base_url = model_cfg.get("base_url", "")
     provider_has_key = bool(env_values.get(_SUPPORTED_PROVIDER_SETUPS.get(current_provider, {}).get("env_var", "")))
 
+    resolved_provider = model_cfg.get("provider") or saved_state.get("provider", "openrouter")
+    resolved_model = model_cfg.get("default") or saved_state.get("model", "anthropic/claude-sonnet-4.6")
+    resolved_base_url = model_cfg.get("base_url") if "base_url" in model_cfg else saved_state.get("base_url", "")
+
     provider_info = {
-        "provider": saved_state.get("provider", current_provider),
-        "model": saved_state.get("model", current_model),
-        "base_url": saved_state.get("base_url", current_base_url),
+        "provider": resolved_provider,
+        "model": resolved_model,
+        "base_url": resolved_base_url,
         "is_configured": provider_has_key,
         "supported_providers": [
             {
@@ -1734,7 +1800,12 @@ def get_customer_wizard_status() -> dict[str, Any]:
                 "default_model": meta.get("default_model", ""),
                 "requires_base_url": bool(meta.get("requires_base_url")),
                 "key_optional": bool(meta.get("key_optional")),
-                "models": meta.get("models", []),
+                "models": _get_provider_models(
+                    pid,
+                    meta,
+                    active_model=resolved_model if pid == resolved_provider else "",
+                    home=home,
+                ),
             }
             for pid, meta in _SUPPORTED_PROVIDER_SETUPS.items()
         ],
