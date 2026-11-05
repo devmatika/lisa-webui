@@ -597,6 +597,7 @@ install_venv_dependencies() {
         --exclude='*.egg-info' --exclude='build' --exclude='dist' \
         --exclude='__pycache__' --exclude='.git' \
         --exclude='.playwright' \
+        --exclude='node_modules' \
         --exclude='.install.lock' \
         "$_agent_src"/ "$_stage_src"/ \
         || { echo "!! Failed to stage hermes-agent source to writable build dir"; return 1; }
@@ -607,6 +608,7 @@ install_venv_dependencies() {
         || { echo "!! Failed to copy hermes-agent source to writable build dir"; return 1; }
       rm -rf "$_stage_src"/*.egg-info "$_stage_src"/build "$_stage_src"/dist 2>/dev/null || true
       rm -rf "$_stage_src"/.playwright 2>/dev/null || true
+      rm -rf "$_stage_src"/node_modules 2>/dev/null || true
       rm -rf "$_stage_src"/.install.lock "$_stage_src"/tools/.install.lock 2>/dev/null || true
       find "$_stage_src" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
     fi
@@ -616,7 +618,30 @@ install_venv_dependencies() {
     # stage and falls back to the authorized Agent directory.
     write_agent_stage_manifest "$_agent_src" "$_stage_src" \
       || echo "!! WARNING: could not record which hermes-agent source was staged; the startup recovery installer will not use the staged copy"
-    uv pip install -e "$_stage_src[all]" --trusted-host pypi.org --trusted-host files.pythonhosted.org \
+
+    # Extract [tool.uv.override-dependencies] from the agent's pyproject.toml if present.
+    # uv pip install does not automatically inherit overrides from staged source pyproject.toml
+    # when run from the WebUI working directory, which otherwise trips on browser-harness/pillow pins.
+    _overrides_file="$_stage_src/.uv_overrides.txt"
+    python3 -c "
+import tomllib, pathlib
+try:
+    p = pathlib.Path('$_stage_src/pyproject.toml')
+    if p.exists():
+        data = tomllib.loads(p.read_text('utf-8'))
+        overrides = data.get('tool', {}).get('uv', {}).get('override-dependencies', [])
+        if overrides:
+            pathlib.Path('$_overrides_file').write_text('\n'.join(overrides) + '\n', 'utf-8')
+except Exception:
+    pass
+" 2>/dev/null || true
+
+    _uv_override_args=()
+    if [ -s "$_overrides_file" ]; then
+      _uv_override_args=(--overrides "$_overrides_file")
+    fi
+
+    uv pip install "${_uv_override_args[@]}" -e "$_stage_src[all]" --trusted-host pypi.org --trusted-host files.pythonhosted.org \
       || { echo "!! Failed to install hermes-agent's requirements"; return 1; }
   else
     echo ""

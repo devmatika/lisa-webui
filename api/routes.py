@@ -16814,6 +16814,14 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/onboarding/status":
         return j(handler, get_onboarding_status())
 
+    if parsed.path == "/api/customer-wizard/status":
+        from api.customer_wizard import get_customer_wizard_status
+        return j(handler, get_customer_wizard_status())
+
+    if parsed.path == "/api/customer-wizard/team":
+        from api.customer_wizard import get_identity_mapping
+        return j(handler, get_identity_mapping())
+
     if parsed.path == "/api/extensions/status":
         from api.extensions import get_extension_status
 
@@ -20259,6 +20267,118 @@ def handle_post(handler, parsed) -> bool:
             return j(handler, probe_provider_endpoint(provider, base_url, api_key))
         except Exception as e:
             return bad(handler, f"probe failed: {e}", 500)
+
+    # ── Customer Onboarding Wizard (POST) ──
+    if parsed.path == "/api/customer-wizard/step":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import save_wizard_step
+            step = str((body or {}).get("step") or "").strip()
+            data = (body or {}).get("data") if isinstance((body or {}).get("data"), dict) else (body or {})
+            return j(handler, save_wizard_step(step, data))
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/probe":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard probe is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import get_service_status
+            service_id = str((body or {}).get("service_id") or "").strip()
+            return j(handler, get_service_status(service_id, probe=True))
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/configure-service":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import configure_service
+            service_id = str((body or {}).get("service_id") or "").strip()
+            env_vars = (body or {}).get("env_vars") or {}
+            files = (body or {}).get("files") or {}
+            return j(handler, configure_service(service_id, env_vars, files))
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/scaffold-obsidian":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import scaffold_obsidian_vault
+            vault_path = str((body or {}).get("vault_path") or "").strip() or None
+            return j(handler, scaffold_obsidian_vault(vault_path))
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/validate":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import validate_setup
+            return j(handler, validate_setup())
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/apply":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import apply_wizard_setup
+            return j(handler, apply_wizard_setup())
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/team":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import save_identity_mapping
+            people = (body or {}).get("people") or (body or {}).get("team_members") or []
+            aliases = (body or {}).get("aliases")
+            return j(handler, save_identity_mapping(people, aliases))
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/google-auth-url":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import generate_google_auth_url
+            redirect_uri = str((body or {}).get("redirect_uri") or "http://localhost:1").strip()
+            return j(handler, generate_google_auth_url(redirect_uri))
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/google-auth-code":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import exchange_google_auth_code
+            code = str((body or {}).get("code") or "").strip()
+            if not code:
+                return bad(handler, "Missing authorization code.", 400)
+            return j(handler, exchange_google_auth_code(code))
+        except Exception as e:
+            return bad(handler, str(e), 500)
+
+    if parsed.path == "/api/customer-wizard/reset":
+        if not _onboarding_gate_allows(handler):
+            return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
+        try:
+            from api.customer_wizard import reset_customer_wizard
+            return j(handler, reset_customer_wizard())
+        except Exception as e:
+            return bad(handler, str(e), 500)
 
     # ── Session pin (POST) ──
     if parsed.path == "/api/session/pin":
