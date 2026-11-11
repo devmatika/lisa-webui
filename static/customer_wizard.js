@@ -96,6 +96,18 @@ function openCustomerWizard() {
   _renderCustomerWizardBody();
 }
 
+async function goToCustomerWizardStep(idx) {
+  if (idx === CUSTOMER_WIZARD.step || CUSTOMER_WIZARD.applied) return;
+  await _saveCurrentStepDraft();
+  CUSTOMER_WIZARD.step = idx;
+  _renderCustomerWizardSteps();
+  _renderCustomerWizardBody();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && CUSTOMER_WIZARD.active) closeCustomerWizard();
+});
+
 function closeCustomerWizard() {
   CUSTOMER_WIZARD.active = false;
   const overlay = $('customerWizardOverlay');
@@ -243,11 +255,12 @@ function _renderCustomerWizardSteps() {
     const isDone = idx < CUSTOMER_WIZARD.step;
     const cls = isCurrent ? 'cw-step-item active' : (isDone ? 'cw-step-item done' : 'cw-step-item');
     const badge = isDone ? '✓' : String(idx + 1);
+    // Every step is reachable (not only finished ones): re-running the wizard means jumping to one setting.
     return `
-      <div class="${cls}" onclick="if(${isDone}){_saveCurrentStepDraft().then(()=>{CUSTOMER_WIZARD.step=${idx};_renderCustomerWizardSteps();_renderCustomerWizardBody();});}">
+      <button type="button" class="${cls}" ${isCurrent ? 'aria-current="step"' : ''} onclick="goToCustomerWizardStep(${idx})">
         <span class="cw-step-num">${badge}</span>
         <span class="cw-step-title">${CUSTOMER_WIZARD.stepTitles[idx]}</span>
-      </div>
+      </button>
     `;
   }).join('');
 

@@ -9226,3 +9226,11 @@ html[data-conversation-outline="enabled"] #outlineToggleBtn:not([hidden]){displa
   color: #334155 !important;
 }
 
+
+/* Setup wizard: close button + steps as real buttons (keyboard reachable) */
+.customer-wizard-card{position:relative}
+.customer-wizard-close{position:absolute;top:12px;right:12px;z-index:2;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-size:16px;cursor:pointer}
+.customer-wizard-close:hover{background:var(--surface-subtle-hover)}
+.customer-wizard-close:focus-visible,button.cw-step-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.cw-step-item{width:100%;text-align:left;font:inherit;background:none;border:0;cursor:pointer}
