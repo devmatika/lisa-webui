@@ -238,7 +238,7 @@
     const learned = EA.data.learned || {};
     const p = Object.entries(props).map(([cat, pr]) => `
       <div class="ea-card ea-card--proposal">
-        <div class="ea-card-head"><strong>Suggestion for ${esc(cat)}</strong><span class="ea-muted">from ${esc(pr.based_on)} replies you edited · ${esc(pr.at || '')}</span></div>
+        <div class="ea-card-head"><strong>Suggestion for ${esc(cat)}</strong><span class="ea-muted">${pr.source === 'sent' ? `from ${esc(pr.based_on)} emails in your Sent folder` : `from ${esc(pr.based_on)} replies you edited`} · ${esc(pr.at || '')}</span></div>
         ${pr.current ? `<p class="ea-muted">Now: ${esc(pr.current)}</p>` : ''}
         <textarea rows="4" data-ea-prop="${esc(cat)}" aria-label="Suggested notes for ${esc(cat)}">${esc(pr.notes)}</textarea>
         ${(pr.examples || []).length ? `<details class="ea-why"><summary>Why? Your ${esc(pr.examples.length)} edits behind this suggestion</summary>
