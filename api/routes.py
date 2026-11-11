@@ -22257,7 +22257,8 @@ def _handle_escape_file_raw(handler, parsed):
     # Content-Security-Policy sandboxing is carried through the csp=sandbox_csp handoff below.
     csp = sandbox_csp if (inline_preview and not force_download and disposition == "inline") else None
     if html_inline_ok:
-        return _serve_inline_html_preview(handler, target, "no-store", csp=sandbox_csp, anchor_root=anchor_root)
+        return _serve_inline_html_preview(handler, target, "no-store", csp=sandbox_csp, anchor_root=anchor_root,
+                                          print_mode=qs.get("print", [""])[0] == "1")
     return _serve_file_bytes(handler, target, mime, disposition, "no-store", csp=csp, anchor_root=anchor_root)
 
 
@@ -24322,7 +24323,8 @@ def _html_preview_with_blank_base(raw: bytes) -> bytes:
     return text.encode("utf-8")
 
 
-def _serve_inline_html_preview(handler, target: Path, cache_control: str, *, csp: str, anchor_root: Path | None = None):
+def _serve_inline_html_preview(handler, target: Path, cache_control: str, *, csp: str, anchor_root: Path | None = None,
+                               print_mode: bool = False):
     """Serve sandboxed workspace HTML preview with links targeting a new tab."""
     fd = None
     try:
@@ -24330,6 +24332,8 @@ def _serve_inline_html_preview(handler, target: Path, cache_control: str, *, csp
         with os.fdopen(fd, "rb", closefd=True) as f:
             fd = None
             body = _html_preview_with_blank_base(f.read())
+            if print_mode:
+                body += b"<script>addEventListener('load',()=>setTimeout(()=>print(),400))</script>"
     except PermissionError:
         return bad(handler, "Permission denied", 403)
     except FileNotFoundError:
@@ -24351,7 +24355,8 @@ def _serve_inline_html_preview(handler, target: Path, cache_control: str, *, csp
     handler.send_header("Accept-Ranges", "none")
     handler.send_header("Cache-Control", cache_control)
     handler.send_header("Content-Disposition", _content_disposition_value("inline", target.name))
-    handler.send_header("Content-Security-Policy", csp)
+    # "Save as PDF" (?print=1): same sandbox plus allow-modals, so the page may open the print dialog.
+    handler.send_header("Content-Security-Policy", csp + (" allow-modals" if print_mode else ""))
     handler.send_header("X-Content-Type-Options", "nosniff")
     handler.send_header("Referrer-Policy", "same-origin")
     handler.send_header(
@@ -25136,7 +25141,8 @@ def _handle_file_raw(handler, parsed):
     csp = sandbox_csp if (inline_preview and not force_download and disposition == "inline") else None
     # _serve_file_bytes sends Content-Security-Policy when csp is set.
     if html_inline_ok:
-        return _serve_inline_html_preview(handler, target, "no-store", csp=sandbox_csp, anchor_root=anchor_root)
+        return _serve_inline_html_preview(handler, target, "no-store", csp=sandbox_csp, anchor_root=anchor_root,
+                                          print_mode=qs.get("print", [""])[0] == "1")
     return _serve_file_bytes(handler, target, mime, disposition, "no-store", csp=csp, anchor_root=anchor_root)
 
 

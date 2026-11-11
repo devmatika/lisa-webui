@@ -93,6 +93,22 @@ def test_inline_html_preview_reads_through_anchor(monkeypatch, tmp_path):
     assert calls == [(workspace, target.resolve(), False)]
 
 
+def test_inline_html_print_mode_adds_print_call(monkeypatch, tmp_path):
+    from api import routes
+
+    target = tmp_path / "page.html"
+    target.write_text("<html><body>x</body></html>", encoding="utf-8")
+    monkeypatch.setattr(routes, "open_anchored_fd", lambda root, resolved, *, want_dir: os.open(str(target), os.O_RDONLY))
+    handler = _FakeHandler()
+    routes._serve_inline_html_preview(handler, target, "no-store", csp="sandbox", anchor_root=tmp_path, print_mode=True)
+    assert handler.body.endswith(b"print(),400))</script>")
+    assert ("Content-Security-Policy", "sandbox allow-modals") in handler.sent_headers
+    plain = _FakeHandler()
+    routes._serve_inline_html_preview(plain, target, "no-store", csp="sandbox", anchor_root=tmp_path)
+    assert b"print()" not in plain.body
+    assert ("Content-Security-Policy", "sandbox") in plain.sent_headers
+
+
 def test_editor_file_endpoints_use_anchored_helpers():
     src = ROUTES_PY.read_text(encoding="utf-8")
     delete_body = _func_body(src, "_handle_file_delete")
@@ -138,7 +154,7 @@ def test_raw_and_inline_file_targets_carry_anchor_root():
     assert "return workspace_root, target" in raw_target
     assert "return attachment_root, attachment_target" in raw_target
     assert "anchor_root, target = resolved" in raw_handler
-    assert "_serve_inline_html_preview(handler, target, \"no-store\", csp=sandbox_csp, anchor_root=anchor_root)" in raw_handler
+    assert "_serve_inline_html_preview(handler, target, \"no-store\", csp=sandbox_csp, anchor_root=anchor_root,\n" in raw_handler
     assert "_serve_file_bytes(handler, target, mime, disposition, \"no-store\", csp=csp, anchor_root=anchor_root)" in raw_handler
 
 
@@ -149,7 +165,7 @@ def test_escape_raw_and_read_routes_use_authorized_helpers():
 
     assert "read_authorized_escape_file_content" in escape_read
     assert "raw_authorized_escape_target" in escape_raw
-    assert "_serve_inline_html_preview(handler, target, \"no-store\", csp=sandbox_csp, anchor_root=anchor_root)" in escape_raw
+    assert "_serve_inline_html_preview(handler, target, \"no-store\", csp=sandbox_csp, anchor_root=anchor_root,\n" in escape_raw
     assert "_serve_file_bytes(handler, target, mime, disposition, \"no-store\", csp=csp, anchor_root=anchor_root)" in escape_raw
 
 

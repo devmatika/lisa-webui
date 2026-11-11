@@ -513,6 +513,57 @@ function noteWorkspaceMutationsFromToolCall(tc){
   }
 }
 
+// Claude-style artifacts: when Lisa writes a document (html/md/pdf/svg) during a live turn, open it beside
+// the chat once; when she edits the file that is already open, refresh it so the user sees it change.
+const ARTIFACT_AUTO_OPEN_RE = /\.(html?|md|pdf|svg)$/i;
+const _autoOpenedArtifacts = new Set();
+function autoOpenArtifactFromToolCall(tc){
+  if(!tc||tc.is_error||!S.session) return;
+  const paths=_artifactCandidatesFromToolCall(tc).map(a=>_normalizeArtifactPath(a.path)).filter(p=>p&&ARTIFACT_AUTO_OPEN_RE.test(p));
+  if(!paths.length) return;
+  const current=_previewCurrentPath&&_normalizeArtifactPath(_previewCurrentPath);
+  const isCurrent=(p)=>current&&(p===current||p.endsWith('/'+current));
+  const open=paths.find(isCurrent);
+  if(open){ if(!_previewDirty) openFile(_previewCurrentPath,{bustCache:true}); return; }
+  if(window.matchMedia&&window.matchMedia('(max-width: 900px)').matches) return;  // phones/tablets: never cover the chat
+  const key=S.session.session_id+'|'+paths[0];
+  if(_autoOpenedArtifacts.has(key)) return;
+  _autoOpenedArtifacts.add(key);
+  _autoOpenArtifact(paths[0], _previewCurrentPath, 2);
+}
+// A workspace tree reload right after the write (common mid-stream) retires the open; retry unless the user moved on.
+async function _autoOpenArtifact(path, before, tries){
+  const ok=await openArtifactPath(path);
+  if(ok){ if(_previewCurrentMode==='html') setPreviewWide(true); return; }
+  if(tries>0&&_previewCurrentPath===before) setTimeout(()=>{ if(_previewCurrentPath===before) _autoOpenArtifact(path, before, tries-1); },700);
+}
+
+const _isPreviewWide=(panel)=>panel.offsetWidth>=Math.round(window.innerWidth*0.45);
+function setPreviewWide(on){
+  const panel=document.querySelector('.rightpanel');
+  if(!panel) return;
+  if(on!==_isPreviewWide(panel)){
+    if(on){ panel.dataset.narrowW=panel.style.width||''; panel.style.width=Math.min(1200,Math.round(window.innerWidth*0.55))+'px'; }
+    else panel.style.width=(panel.dataset.narrowW&&parseInt(panel.dataset.narrowW,10)<window.innerWidth*0.45)?panel.dataset.narrowW:'420px';
+  }
+  _syncWideBtn();
+}
+function togglePreviewWide(){
+  const panel=document.querySelector('.rightpanel');
+  if(panel) setPreviewWide(!_isPreviewWide(panel));
+}
+function _syncWideBtn(){
+  const btn=$('btnPreviewWide'), panel=document.querySelector('.rightpanel');
+  if(!btn||!panel) return;
+  setTimeout(()=>{ const on=_isPreviewWide(panel); btn.setAttribute('aria-pressed',String(on)); btn.querySelector('span').textContent=on?'Narrow':'Wide'; },300);  // after the width transition
+}
+
+// Opens the HTML in its own sandboxed tab with ?print=1; the server adds the print call (browser offers "Save as PDF").
+function printPreviewAsPdf(){
+  if(!_previewCurrentPath||!S.session) return;
+  window.open(_workspaceRouteForPath(_previewCurrentPath,'raw',{inline:true})+'&print=1','_blank','noopener');
+}
+
 function noteWorkspaceMutationsFromToolCalls(toolCalls){
   if(!Array.isArray(toolCalls)) return;
   for(const tc of toolCalls) noteWorkspaceMutationsFromToolCall(tc);
@@ -1245,6 +1296,9 @@ function showPreview(mode){
   // Show "Open in browser" button for iframe-backed document previews
   const openBtn=$('btnOpenInBrowser');
   if(openBtn) openBtn.style.display = (mode==='html'||mode==='pdf')?'inline-flex':'none';
+  const pdfBtn=$('btnPrintPdf'); if(pdfBtn) pdfBtn.style.display = mode==='html'?'inline-flex':'none';
+  const wideBtn=$('btnPreviewWide'); if(wideBtn) wideBtn.style.display = (mode==='html'||mode==='pdf'||mode==='md')?'inline-flex':'none';
+  _syncWideBtn();
   setLargeMarkdownForceRenderVisible(false);
 }
 
