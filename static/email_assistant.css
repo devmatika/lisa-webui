@@ -58,3 +58,6 @@
 .ea-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
 .ea-compare pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.45;margin:4px 0 0;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
 @media (max-width:640px){.ea-compare{grid-template-columns:1fr}}
+.ea-provider{display:flex;gap:6px;flex-wrap:wrap}
+.ea-chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+.ea-chip.is-active{border-color:var(--accent);color:var(--text);font-weight:600}

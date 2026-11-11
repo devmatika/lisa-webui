@@ -83,6 +83,29 @@
   }
 
   // ── pieces ─────────────────────────────────────────────────────────────────
+  function mailboxCard() {
+    const m = EA.data.mailbox || {};
+    if (m.connected && !EA.reconnect) {
+      return `<div class="ea-card"><div class="ea-card-head"><strong>Mailbox connected</strong>
+        <span class="ea-muted">${esc(m.address || '')}${m.via === 'admin' ? ' · set up by your admin' : ''}</span>
+        <button class="ea-link" data-ea-reconnect>Change</button></div></div>`;
+    }
+    return `<div class="ea-card"><div class="ea-card-head"><strong>Connect your mailbox</strong></div>
+      <div class="ea-provider"><span class="ea-chip is-active">IMAP (any mail server)</span>
+        <span class="ea-chip" title="Coming soon">Gmail — soon</span><span class="ea-chip" title="Coming soon">Outlook — soon</span></div>
+      <div class="ea-grid2">
+        <label>Email address<input id="ea_c_user" type="email" autocomplete="username" value="${esc(EA.draft.address || '')}" placeholder="name@company.com"></label>
+        <label>Password<input id="ea_c_pass" type="password" autocomplete="current-password" placeholder="mailbox password"></label>
+        <label>IMAP server<input id="ea_c_host" placeholder="mail.example.com" autocapitalize="off" spellcheck="false"></label>
+        <label>Port<input id="ea_c_port" inputmode="numeric" value="993"></label>
+      </div>
+      <p class="ea-muted">Lisa only reads mail and saves drafts — she never sends. The password is stored on your server only,
+        never shown again. The connection is tested before anything is saved.</p>
+      <div class="ea-actions-row"><button class="sm-btn ea-primary" data-ea-connect>Connect and test</button>
+        ${m.connected ? '<button class="sm-btn" data-ea-reconnect-cancel>Cancel</button>' : ''}</div></div>`;
+  }
+
+
   function ownerForm(full) {
     const d = EA.draft;
     return `
@@ -176,7 +199,7 @@
 
   // ── render ─────────────────────────────────────────────────────────────────
   const WIZ = [
-    ['Your mailbox', () => `<p class="ea-muted">The mailbox itself (IMAP, Gmail or Outlook) is connected by your admin on the server. Here you set how Lisa writes.</p>${ownerForm(false)}`],
+    ['Your mailbox', () => `${mailboxCard()}${ownerForm(false)}`],
     ['Categories & tone', () => `<p class="ea-muted">Each incoming email gets one category. Each category has its own tone.</p>${categoryCards()}`],
     ['Start', () => `
       <label class="ea-choice"><input type="radio" name="ea_mode" value="shadow" ${EA.draft.drafts ? '' : 'checked'}>
@@ -200,7 +223,7 @@
     const tabs = [['status', 'Status'], ['owner', 'Mailbox & facts'], ['categories', 'Categories & tone'], ['rules', 'Rules'], ['learned', 'Learned']];
     updateBadge();
     head.innerHTML = tabs.map(([k, t]) => `<button class="ea-tab ${EA.tab === k ? 'is-active' : ''}" data-ea-tab="${k}" role="tab" aria-selected="${EA.tab === k}">${t}${k === 'learned' && Object.keys(EA.data.proposals || {}).length ? ' •' : ''}</button>`).join('');
-    body.innerHTML = { status: statusView, owner: () => ownerForm(true) + `
+    body.innerHTML = { status: statusView, owner: () => mailboxCard() + ownerForm(true) + `
         <label class="ea-switch"><input type="checkbox" id="ea_drafts" ${EA.draft.drafts ? 'checked' : ''}> Write drafts (off = summary only)</label>
         <label>Chat messages (Telegram)<select id="ea_notify">
           <option value="actionable" ${EA.draft.notify !== 'all' && EA.draft.notify !== 'off' ? 'selected' : ''}>Only when I need to act (recommended)</option>
@@ -227,6 +250,27 @@
     if (ds.eaClose !== undefined) return close();
     collectCurrent();
     if (ds.eaTab) { EA.tab = ds.eaTab; return render(); }
+    if (ds.eaReconnect !== undefined) { EA.reconnect = true; return render(); }
+    if (ds.eaReconnectCancel !== undefined) { EA.reconnect = false; return render(); }
+    if (ds.eaConnect !== undefined) {
+      const payload = { user: el('ea_c_user').value.trim(), password: el('ea_c_pass').value,
+        host: el('ea_c_host').value.trim(), port: el('ea_c_port').value.trim(), name: (el('ea_name') && el('ea_name').value.trim()) || EA.draft.name || '' };
+      t.disabled = true; t.textContent = 'Testing…';
+      try {
+        const res = await api('/api/email-assistant/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeoutMs: 90000 });
+        const keep = EA.draft;
+        EA.data = res;
+        EA.draft = { ...keep, address: payload.user };
+        EA.reconnect = false;
+        render(true);
+        const f = res.connected_folders || {};
+        notice(`Connected. Drafts folder: ${f.drafts || '?'}${f.sent ? ` · Sent: ${f.sent}` : ''}`, false);
+      } catch (err) {
+        t.disabled = false; t.textContent = 'Connect and test';
+        notice((err && err.message) || 'Could not connect.', true);
+      }
+      return;
+    }
     if (ds.eaNext !== undefined) {
       if (EA.step === 0 && !EA.draft.address) return notice('Enter the mailbox address.', true);
       if (EA.step < WIZ.length - 1) { EA.step += 1; return render(); }

@@ -25,6 +25,7 @@ def good_config(**over):
 def test_not_configured_yet_offers_presets(home):
     st = ea.get_email_assistant()
     assert st["configured"] is False and "customer" in st["presets"] and st["cron"] is None
+    assert st["mailbox"] == {"connected": False}
 
 
 def test_save_writes_the_file_the_cron_job_reads(home):
@@ -57,7 +58,6 @@ def test_server_only_keys_are_kept_and_hidden(home):
     {"rules": [{"from": "@x.at", "category": "missing"}]},
     {"rules": [{"category": "customer"}]},
     {"max_per_run": 99},
-    {"account": "a b; rm -rf"},
     {"only_from": "x@y.at"},
     {"facts": "x" * 2001},
     {"mail_url": "javascript:alert(1)"},
@@ -99,3 +99,73 @@ def test_cron_status_is_read_from_jobs_json(home):
         {"name": "email-drafts", "enabled": True, "schedule": {"display": "*/20 7-19 * * 1-5"}, "last_status": "ok"}]}))
     assert ea.get_email_assistant()["cron"] == {"enabled": True, "schedule": "*/20 7-19 * * 1-5",
                                                 "last_run_at": None, "last_status": "ok"}
+
+
+FAKE_HIMALAYA = """#!/usr/bin/env python3
+import json, os, sys
+if os.environ.get("EMAIL_ASSISTANT_IMAP_PASSWORD") != "right":
+    print("Error: IMAP authentication failed: invalid credentials", file=sys.stderr); sys.exit(1)
+if "mailbox" in sys.argv:
+    print(json.dumps({"mailboxes": [{"name": "INBOX"}, {"name": "INBOX.Drafts"}, {"name": "INBOX.Sent Messages"},
+                                    {"name": "INBOX.Papierkorb"}]}))
+else:
+    print(json.dumps({"envelopes": []}))
+"""
+
+
+@pytest.fixture
+def mailhome(home, monkeypatch):
+    (home / "bin").mkdir()
+    b = home / "bin/himalaya"
+    b.write_text(FAKE_HIMALAYA)
+    b.chmod(0o755)
+    env_writes = {}
+    import api.providers
+    monkeypatch.setattr(api.providers, "_write_env_file", lambda path, upd: env_writes.update(upd))
+    return home, env_writes
+
+
+def test_connect_imap_finds_folders_and_keeps_password_out_of_files(mailhome):
+    home, env_writes = mailhome
+    st = ea.connect_imap({"host": "mail.agenturserver.de", "port": 993, "user": "alex@matika.at",
+                          "password": "right", "name": "Alex"})
+    toml = (home / ea.MAILBOX_TOML).read_text()
+    assert 'mailbox.alias.drafts = "INBOX.Drafts"' in toml and 'mailbox.alias.sent = "INBOX.Sent Messages"' in toml
+    assert "right" not in toml and env_writes == {ea.PASS_ENV: "right"}
+    cfg = json.loads((home / "workspace/email-assistant/config.json").read_text())
+    assert cfg["account"] == "mailbox" and cfg["himalaya_config"] == ea.MAILBOX_TOML and cfg["address"] == "alex@matika.at"
+    assert st["mailbox"]["connected"] and st["mailbox"]["via"] == "wizard" and st["configured"] is False
+    assert st["connected_folders"]["drafts"] == "INBOX.Drafts"
+    assert "account" not in st["config"]
+
+
+def test_wrong_password_saves_nothing(mailhome):
+    home, env_writes = mailhome
+    with pytest.raises(ValueError, match="invalid credentials"):
+        ea.connect_imap({"host": "mail.example.com", "user": "a@b.at", "password": "wrong"})
+    assert not (home / ea.MAILBOX_TOML).exists() and not list((home / "himalaya").glob("*.test")) and env_writes == {}
+
+
+@pytest.mark.parametrize("bad", [{"host": "evil;rm -rf /"}, {"host": "-x"}, {"user": "nope"}, {"password": ""},
+                                 {"password": "a\nb"}, {"port": 0}])
+def test_connect_input_is_validated(mailhome, bad):
+    with pytest.raises(ValueError):
+        ea.connect_imap({"host": "mail.example.com", "port": 993, "user": "a@b.at", "password": "right", **bad})
+
+
+def test_folder_names_of_common_providers():
+    assert ea.pick_folders(["INBOX", "[Gmail]/Drafts", "[Gmail]/Sent Mail", "[Gmail]/Trash"]) == {
+        "drafts": "[Gmail]/Drafts", "sent": "[Gmail]/Sent Mail", "trash": "[Gmail]/Trash"}
+    assert ea.pick_folders(["Posteingang", "Entwürfe", "Gesendete Elemente", "Gelöschte Elemente"]) == {
+        "drafts": "Entwürfe", "sent": "Gesendete Elemente", "trash": "Gelöschte Elemente"}
+    assert ea.pick_folders(["INBOX", "Drafts", "Sent", "Trash"])["drafts"] == "Drafts"
+
+
+def test_browser_cannot_change_server_side_mailbox_settings(home):
+    d = home / "workspace/email-assistant"
+    d.mkdir(parents=True)
+    (d / "config.json").write_text(json.dumps({"address": "a@b.at", "account": "mailbox", "himalaya_config": "himalaya/x.toml",
+                                               "telegram_chats": ["1"]}))
+    ea.save_email_assistant_config(good_config(account="evil", himalaya_config="/etc/passwd", telegram_chats=["999"]))
+    saved = json.loads((d / "config.json").read_text())
+    assert saved["account"] == "mailbox" and saved["himalaya_config"] == "himalaya/x.toml" and saved["telegram_chats"] == ["1"]

@@ -20274,10 +20274,13 @@ def handle_post(handler, parsed) -> bool:
 
     # ── Customer Onboarding Wizard (POST) ──
     # ── Email auto-drafts (shared config with the email_drafts.py cron job) ──
-    if parsed.path in ("/api/email-assistant/config", "/api/email-assistant/proposal", "/api/email-assistant/learned"):
+    if parsed.path in ("/api/email-assistant/config", "/api/email-assistant/proposal", "/api/email-assistant/learned",
+                       "/api/email-assistant/connect"):
         from api import email_assistant as ea
         b = body or {}
         try:
+            if parsed.path.endswith("/connect"):
+                return j(handler, ea.connect_imap(b))
             if parsed.path.endswith("/config"):
                 return j(handler, ea.save_email_assistant_config(b.get("config")))
             if parsed.path.endswith("/proposal"):

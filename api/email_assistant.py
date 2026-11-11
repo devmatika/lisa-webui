@@ -10,7 +10,9 @@ Never editable from the browser: the himalaya binary/config paths and the model 
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -20,8 +22,18 @@ from api.profiles import get_active_hermes_home
 CATEGORY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,30}$")
 EMAIL_RE = re.compile(r"^[^@\s<>\"]+@[^@\s<>\"]+\.[^@\s<>\"]+$")
 TEXT_FIELDS = ("description", "tone", "address", "greeting", "farewell", "do", "dont", "language")
-LOCKED_KEYS = ("himalaya", "himalaya_config", "model", "watch_seconds", "watch_every")  # admin, server only
+LOCKED_KEYS = ("himalaya", "himalaya_config", "account", "model", "watch_seconds", "watch_period", "watch_every",
+               "telegram_chats")  # set on the server (admin or Connect mailbox), never by the browser
 MAX_CATEGORIES, MAX_RULES = 15, 50
+HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
+PASS_ENV = "EMAIL_ASSISTANT_IMAP_PASSWORD"  # profile .env; the cron job's himalaya reads it via password.command
+ACCOUNT = "mailbox"
+MAILBOX_TOML = "himalaya/email-assistant.toml"  # relative to the profile (not in the workspace: not browser-readable)
+FOLDER_PATTERNS = {
+    "drafts": r"(^|[./])(drafts|entw(ü|ue)rfe|brouillons|bozze|borradores)$",
+    "sent": r"(^|[./])(sent|sent messages|sent items|sent mail|gesendet|gesendete (objekte|elemente))$",
+    "trash": r"(^|[./])(trash|papierkorb|deleted messages|deleted items|gelöschte (objekte|elemente))$",
+}
 
 PRESETS: dict[str, dict[str, Any]] = {
     "customer": {"description": "Existing customer", "tone": "friendly, concrete, solution first"},
@@ -46,9 +58,21 @@ def _read_json(path: Path, default: Any) -> Any:
         return default
 
 
+def _own(path: Path, mode: int = 0o644) -> None:
+    """The WebUI may run as root; the cron job runs as the profile owner and must read (and rewrite) these files."""
+    try:
+        st = get_active_hermes_home().stat()
+        os.chown(path, st.st_uid, st.st_gid)
+        os.chmod(path, mode)
+    except OSError:
+        pass
+
+
 def _write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    _own(path.parent, 0o755)
     _atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=1))
+    _own(path)
 
 
 def read_learned(path: Path) -> dict[str, str]:
@@ -76,6 +100,7 @@ def write_learned(path: Path, notes: dict[str, str]) -> None:
             out += [f"## {cat}", notes[cat].strip(), ""]
     path.parent.mkdir(parents=True, exist_ok=True)
     _atomic_write_text(path, "\n".join(out))
+    _own(path)
 
 
 def _cron_job(home: Path) -> dict[str, Any] | None:
@@ -94,14 +119,127 @@ def get_email_assistant() -> dict[str, Any]:
     cfg = _read_json(d / "config.json", None)
     public_cfg = {k: v for k, v in (cfg or {}).items() if k not in LOCKED_KEYS}
     return {
-        "configured": isinstance(cfg, dict),
+        "configured": isinstance(cfg, dict) and bool(cfg.get("categories")),
         "config": public_cfg,
         "presets": PRESETS,
         "status": _read_json(d / "status.json", None),
         "learned": read_learned(d / "learned.md"),
         "proposals": _read_json(d / "proposals.json", {}),
         "cron": _cron_job(get_active_hermes_home()),
+        "mailbox": _mailbox_status(cfg if isinstance(cfg, dict) else {}),
     }
+
+
+def _mailbox_status(cfg: dict[str, Any]) -> dict[str, Any]:
+    home = get_active_hermes_home()
+    toml = home / str(cfg.get("himalaya_config") or "himalaya/config.toml")
+    if not toml.is_file():
+        return {"connected": False}
+    return {"connected": True, "address": cfg.get("address", ""),
+            "via": "wizard" if cfg.get("account") == ACCOUNT else "admin"}
+
+
+def _toml_str(value: str) -> str:
+    return json.dumps(value)  # a JSON string is a valid TOML basic string (validated input has no control chars)
+
+
+def _mailbox_toml(host: str, port: int, user: str, name: str, folders: dict[str, str]) -> str:
+    return "\n".join([
+        f"# Written by the WebUI Email setup. The password is {PASS_ENV} in the profile .env, never in this file.",
+        f"[accounts.{ACCOUNT}]",
+        "default = true",
+        f"email = {_toml_str(user)}",
+        f"display-name = {_toml_str(name or user)}",
+        'mailbox.alias.inbox = "INBOX"',
+        f"mailbox.alias.drafts = {_toml_str(folders.get('drafts', 'Drafts'))}",
+        f"mailbox.alias.sent = {_toml_str(folders.get('sent', 'Sent'))}",
+        f"mailbox.alias.trash = {_toml_str(folders.get('trash', 'Trash'))}",
+        f"imap.server = {_toml_str(f'imaps://{host}:{port}')}",
+        f"imap.sasl.plain.username = {_toml_str(user)}",
+        f'imap.sasl.plain.password.command = "printenv {PASS_ENV}"',
+        "",
+    ])
+
+
+def _himalaya(home: Path, toml: Path, password: str, args: list[str]) -> str:
+    binary = home / "bin" / "himalaya"
+    if not binary.is_file():
+        raise ValueError("The mail tool (himalaya) is not installed in this profile yet — ask your admin.")
+    env = {**os.environ, PASS_ENV: password}
+    try:
+        r = subprocess.run([str(binary), "-c", str(toml), "-a", ACCOUNT, *args], capture_output=True, text=True,
+                           timeout=45, env=env, check=False)
+    except subprocess.TimeoutExpired:
+        raise ValueError("The mail server did not answer within 45 s. Check server name and port.")
+    if r.returncode != 0:
+        msg = (r.stderr or r.stdout or "").strip().splitlines()
+        hint = next((ln for ln in reversed(msg) if ln.strip()), "")
+        # himalaya prints nothing for a rejected login (verified against Mittwald)
+        raise ValueError(f"Could not connect: {hint[-200:]}" if hint else
+                         "Login failed. Check the email address, password and IMAP server.")
+    return r.stdout
+
+
+def pick_folders(names: list[str]) -> dict[str, str]:
+    out = {}
+    for role, pattern in FOLDER_PATTERNS.items():
+        hit = next((n for n in names if re.search(pattern, n, re.I)), None)
+        if hit:
+            out[role] = hit
+    return out
+
+
+def connect_imap(data: Any) -> dict[str, Any]:
+    """Test an IMAP login read-only, find the Drafts/Sent folders, then save. Nothing is stored if the test fails;
+    the password goes only into the profile .env and is never returned. No SMTP: this feature never sends."""
+    if not isinstance(data, dict):
+        raise ValueError("mailbox data missing")
+    host = _text(data.get("host"), "server", 253)
+    if not HOST_RE.match(host):
+        raise ValueError("server: a host name like mail.example.com")
+    port = 993 if data.get("port") in (None, "") else int(data["port"])
+    if not 1 <= port <= 65535:
+        raise ValueError("port: 1–65535")
+    user = _text(data.get("user"), "email", 200)
+    if not EMAIL_RE.match(user):
+        raise ValueError("email: the full mailbox address")
+    password = str(data.get("password") or "")
+    if not password or len(password) > 300 or any(c in password for c in "\r\n\0"):
+        raise ValueError("password missing")
+    name = _text(data.get("name"), "name", 100)
+
+    home = get_active_hermes_home()
+    toml = home / MAILBOX_TOML
+    toml.parent.mkdir(parents=True, exist_ok=True)
+    trial = toml.with_name(toml.name + ".test")
+    try:  # test with a trial file: a failed attempt never replaces a working mailbox config
+        _atomic_write_text(trial, _mailbox_toml(host, port, user, name, {}))
+        listing = json.loads(_himalaya(home, trial, password, ["mailbox", "list", "--json"]) or "{}")
+        folders = pick_folders([m.get("name") or m.get("id") or "" for m in listing.get("mailboxes", [])])
+        if "drafts" not in folders:
+            raise ValueError("Connected, but no Drafts folder was found in this mailbox.")
+        _atomic_write_text(trial, _mailbox_toml(host, port, user, name, folders))
+        _himalaya(home, trial, password, ["envelope", "list", "-m", "inbox", "-s", "1", "--json"])  # read-only probe
+    except Exception:
+        trial.unlink(missing_ok=True)
+        raise
+    trial.replace(toml)
+    _own(toml)
+    from api.providers import _write_env_file  # shared, locked .env writer
+    _write_env_file(home / ".env", {PASS_ENV: password})
+
+    path = _dir() / "config.json"
+    cfg = _read_json(path, {})
+    cfg = cfg if isinstance(cfg, dict) else {}
+    cfg.update({"account": ACCOUNT, "himalaya_config": MAILBOX_TOML, "address": user})
+    if name:
+        cfg["name"] = name
+    if not cfg.get("categories"):  # connected before the wizard finished: keep it a valid draft config
+        cfg.setdefault("drafts", False)
+    _write_json(path, cfg)
+    out = get_email_assistant()
+    out["connected_folders"] = folders
+    return out
 
 
 def _text(value: Any, field: str, limit: int) -> str:
@@ -173,11 +311,7 @@ def validate_config(data: Any) -> dict[str, Any]:
     if not isinstance(only_from, list) or len(only_from) > 20:
         raise ValueError("only_from: a list of at most 20 senders")
     only_from = [t for t in (_text(x, "only_from", 100) for x in only_from) if t]
-    account = _text(data.get("account"), "account", 60)
-    if account and not re.match(r"^[A-Za-z0-9_.-]+$", account):
-        raise ValueError("account: letters, digits, . _ - only")
     return {
-        "account": account,
         "address": address,
         "name": _text(data.get("name"), "name", 100),
         "owner": _text(data.get("owner"), "owner", 400),
