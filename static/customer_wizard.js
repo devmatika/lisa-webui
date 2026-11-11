@@ -98,7 +98,7 @@ function openCustomerWizard() {
 
 async function goToCustomerWizardStep(idx) {
   if (idx === CUSTOMER_WIZARD.step || CUSTOMER_WIZARD.applied) return;
-  await _saveCurrentStepDraft();
+  _saveCurrentStepDraft();
   CUSTOMER_WIZARD.step = idx;
   _renderCustomerWizardSteps();
   _renderCustomerWizardBody();
@@ -109,6 +109,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 function closeCustomerWizard() {
+  if (CUSTOMER_WIZARD.active && !CUSTOMER_WIZARD.applied) _saveCurrentStepDraft();  // keep what was typed; reopen continues here
   CUSTOMER_WIZARD.active = false;
   const overlay = $('customerWizardOverlay');
   if (overlay) {
@@ -128,27 +129,25 @@ async function runSetupWizardAgain() {
 
 // ── Step Navigation & Auto-Saving ─────────────────────────────────────────────
 
-async function _saveCurrentStepDraft() {
+// Collects the step at once and saves it in the background (saves stay in order), so switching steps is instant.
+let _wizardSaveChain = Promise.resolve();
+function _saveCurrentStepDraft() {
   const currentStepName = CUSTOMER_WIZARD.steps[CUSTOMER_WIZARD.step];
-  if (!currentStepName || currentStepName === 'finish') return;
+  if (!currentStepName || currentStepName === 'finish') return _wizardSaveChain;
   _collectCurrentStepData(currentStepName);
-  try {
-    const dataToSend = CUSTOMER_WIZARD.draft[currentStepName] || {};
-    await api('/api/customer-wizard/step', {
-      method: 'POST',
-      body: JSON.stringify({
-        step: currentStepName,
-        data: dataToSend
-      })
+  const body = JSON.stringify({ step: currentStepName, data: CUSTOMER_WIZARD.draft[currentStepName] || {} });
+  _wizardSaveChain = _wizardSaveChain
+    .then(() => api('/api/customer-wizard/step', { method: 'POST', body }))
+    .catch((err) => {
+      console.warn('Auto-save step draft failed:', err);
+      _showWizardNotice('Could not save "' + currentStepName + '" — check your connection and try again.', 'error');
     });
-  } catch (err) {
-    console.warn('Auto-save step draft failed:', err);
-  }
+  return _wizardSaveChain;
 }
 
 async function prevCustomerWizardStep() {
   if (CUSTOMER_WIZARD.step > 0) {
-    await _saveCurrentStepDraft();
+    _saveCurrentStepDraft();
     CUSTOMER_WIZARD.step--;
     _renderCustomerWizardSteps();
     _renderCustomerWizardBody();
@@ -161,8 +160,7 @@ async function nextCustomerWizardStep() {
   if (nextBtn) nextBtn.disabled = true;
 
   try {
-    // Save draft step progress to backend
-    await _saveCurrentStepDraft();
+    const saved = _saveCurrentStepDraft();  // background; awaited only before the final apply
 
     if (CUSTOMER_WIZARD.step < CUSTOMER_WIZARD.steps.length - 1) {
       CUSTOMER_WIZARD.step++;
@@ -170,6 +168,7 @@ async function nextCustomerWizardStep() {
       _renderCustomerWizardBody();
     } else {
       // On the final step, apply changes
+      await saved;
       await _applyCustomerWizard();
     }
   } catch (err) {
@@ -181,7 +180,7 @@ async function nextCustomerWizardStep() {
 
 async function skipCustomerWizardStep() {
   if (CUSTOMER_WIZARD.step < CUSTOMER_WIZARD.steps.length - 1) {
-    await _saveCurrentStepDraft();
+    _saveCurrentStepDraft();
     CUSTOMER_WIZARD.step++;
     _renderCustomerWizardSteps();
     _renderCustomerWizardBody();
@@ -309,6 +308,8 @@ function _renderCustomerWizardBody() {
   const body = $('customerWizardBody');
   if (!body) return;
   _showWizardNotice('', 'info');
+  const main = body.closest('.customer-wizard-main');
+  if (main) main.scrollTop = 0;  // each step starts at its top
 
   const stepName = CUSTOMER_WIZARD.steps[CUSTOMER_WIZARD.step];
   if (stepName === 'company') {
@@ -1700,6 +1701,7 @@ async function _renderStepFinish(el) {
   `;
 
   try {
+    await _wizardSaveChain;  // validate what the user just entered, not an older save
     const res = await api('/api/customer-wizard/validate', { method: 'POST', body: '{}' });
     CUSTOMER_WIZARD.validation = res;
     _renderValidationBox(res);

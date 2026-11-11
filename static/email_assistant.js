@@ -11,21 +11,36 @@
   const EA = { data: null, draft: null, tab: 'status', step: 0 };
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const el = (id) => document.getElementById(id);
+  const slug = (v) => String(v || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^[^a-z]+|-+$/g, '').slice(0, 31);
+  // [key, label, placeholder, hint]; the first 4 are always visible, the rest sit under "More options".
   const FIELDS = [
-    ['description', 'Who writes these emails?', 'e.g. Existing customer'],
-    ['tone', 'Tone', 'e.g. friendly, concrete, solution first'],
-    ['address', 'Form of address', 'Sie / du'],
-    ['greeting', 'Greeting', 'e.g. Hallo {Vorname},'],
-    ['farewell', 'Sign-off', 'e.g. Beste Grüße, Alex'],
-    ['do', 'Always', 'e.g. offer a short call'],
-    ['dont', 'Never', 'e.g. mention prices'],
-    ['language', 'Reply language', 'empty = same as the email'],
-    ['max_words', 'Max words', 'e.g. 150'],
+    ['description', 'Which emails belong here?', 'e.g. existing customers with questions about their project',
+      'Lisa reads this to sort each new email. Describe the sender or topic in plain words.'],
+    ['tone', 'How should the reply sound?', 'e.g. friendly, concrete, solution first', 'A few words are enough.'],
+    ['address', 'Sie or du?', '', ''],
+    ['farewell', 'Sign-off', 'e.g. Beste Grüße, Alex', 'Exactly as it should appear under the reply.'],
+    ['greeting', 'Greeting', 'e.g. Hallo {Vorname},', 'Empty = Lisa picks one that fits.'],
+    ['do', 'Always do', 'e.g. offer a short call', 'One thing every reply in this category should do.'],
+    ['dont', 'Never do', 'e.g. mention prices', 'Something Lisa must avoid here.'],
+    ['language', 'Reply language', '', ''],
+    ['max_words', 'Max. length (words)', 'e.g. 150', 'Empty = no limit.'],
   ];
+  const BASIC = 4;
+  const CHOICES = {
+    address: [['', 'Like the sender writes'], ['Sie', 'Sie (formal)'], ['du', 'du (casual)']],
+    language: [['', 'Same as the email'], ['German', 'Always German'], ['English', 'Always English']],
+  };
 
+  // Order- and type-insensitive snapshot, so "unsaved changes" only fires on a real edit.
+  const canon = (v) => (Array.isArray(v) ? v.map(canon)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().filter((k) => v[k] !== '' && v[k] != null).map((k) => [k, canon(v[k])]))
+      : typeof v === 'number' ? String(v) : v);
+  const snap = () => JSON.stringify(canon(EA.draft));
   async function load() {
     EA.data = await api('/api/email-assistant');
     EA.draft = JSON.parse(JSON.stringify(EA.data.config || {}));
+    EA.saved = snap();
     if (!EA.data.configured) {
       EA.draft = { address: '', name: '', owner: '', facts: '', drafts: false, max_per_run: 8, rules: [],
                    categories: Object.fromEntries(['customer', 'prospect', 'internal', 'other'].map((k) => [k, { ...EA.data.presets[k] }])) };
@@ -37,6 +52,7 @@
     try {
       EA.data = await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       EA.draft = JSON.parse(JSON.stringify(EA.data.config || {}));
+      EA.saved = snap();
       notice('Saved.', false);
       return true;
     } catch (e) {
@@ -62,12 +78,14 @@
     if (el('ea_only_from')) EA.draft.only_from = el('ea_only_from').value.split(',').map((s) => s.trim()).filter(Boolean);
   }
   function collectCategories() {
+    EA.openCats = EA.openCats || new Set();
     document.querySelectorAll('[data-ea-cat]').forEach((card) => {
       const name = card.dataset.eaCat;
       const c = {};
       FIELDS.forEach(([f]) => { const i = card.querySelector(`[data-f="${f}"]`); if (i && i.value.trim()) c[f] = i.value.trim(); });
       if (!card.querySelector('[data-f="draft"]').checked) c.draft = false;
       EA.draft.categories[name] = c;
+      if (card.open) EA.openCats.add(name); else EA.openCats.delete(name);
     });
   }
   function collectRules() {
@@ -122,25 +140,65 @@
         <input id="ea_only_from" value="${esc((d.only_from || []).join(', '))}" placeholder="test@example.com"></label>` : ''}`;
   }
 
+  function fieldInput([f, label, ph, hint], c) {
+    const v = c[f] ?? '';
+    const input = CHOICES[f]
+      ? `<select data-f="${f}">${[...CHOICES[f], ...(CHOICES[f].some(([k]) => k === v) ? [] : [[v, v]])]
+          .map(([k, t]) => `<option value="${esc(k)}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`
+      : `<input data-f="${f}" value="${esc(v)}" placeholder="${esc(ph)}"${f === 'max_words' ? ' inputmode="numeric"' : ''}>`;
+    return `<label>${esc(label)}${input}${hint ? `<small>${esc(hint)}</small>` : ''}</label>`;
+  }
+
+  // A rough picture of a draft in this category, so the settings are easy to judge.
+  function previewText(c) {
+    const du = c.address === 'du';
+    const greet = c.greeting || (du ? 'Hallo {Vorname},' : 'Guten Tag {Name},');
+    const sign = c.farewell || `${du ? 'LG' : 'Beste Grüße'}\n${EA.draft.name || ''}`.trim();
+    return `${greet}\n\n[reply — ${c.tone || 'polite'}${c.do ? `; ${c.do}` : ''}${c.max_words ? `; max. ${c.max_words} words` : ''}]\n\n${sign}`;
+  }
+
   function categoryCards() {
     const cats = EA.draft.categories || {};
-    const cards = Object.entries(cats).map(([name, c]) => `
-      <div class="ea-card" data-ea-cat="${esc(name)}">
-        <div class="ea-card-head">
+    EA.openCats = EA.openCats || new Set();
+    const cards = Object.entries(cats).map(([name, c]) => {
+      const more = FIELDS.slice(BASIC).some(([f]) => c[f] != null && c[f] !== '');
+      return `
+      <details class="ea-card ea-cat" data-ea-cat="${esc(name)}" ${EA.openCats.has(name) ? 'open' : ''}>
+        <summary class="ea-cat-sum">
           <strong>${esc(name)}</strong>
-          <label class="ea-switch"><input type="checkbox" data-f="draft" ${c.draft === false ? '' : 'checked'}> write drafts</label>
-          <button class="ea-link" data-ea-remove="${esc(name)}" aria-label="Remove ${esc(name)}">Remove</button>
+          <span class="ea-muted ea-cat-desc">${esc(c.description || 'no description yet — open to set it up')}</span>
+          <span class="ea-pill ${c.draft === false ? '' : 'is-on'}">${c.draft === false ? 'no drafts' : 'drafts on'}</span>
+        </summary>
+        <div class="ea-cat-body">
+          <label class="ea-switch"><input type="checkbox" data-f="draft" ${c.draft === false ? '' : 'checked'}>
+            Write reply drafts for these emails <small>(off = Lisa only sorts and lists them)</small></label>
+          <div class="ea-grid2">${FIELDS.slice(0, BASIC).map((fd) => fieldInput(fd, c)).join('')}</div>
+          <details class="ea-more" ${more ? 'open' : ''}><summary>More options</summary>
+            <div class="ea-grid2">${FIELDS.slice(BASIC).map((fd) => fieldInput(fd, c)).join('')}</div></details>
+          <div class="ea-preview"><span class="ea-muted">Example of how a draft will start and end</span>
+            <pre data-ea-preview>${esc(previewText(c))}</pre></div>
+          <div class="ea-actions-row"><button class="ea-link ea-danger" data-ea-remove="${esc(name)}">Remove category “${esc(name)}”</button></div>
         </div>
-        <div class="ea-grid3">${FIELDS.map(([f, label, ph]) => `
-          <label>${label}<input data-f="${f}" value="${esc(c[f])}" placeholder="${esc(ph)}"></label>`).join('')}</div>
-      </div>`).join('');
+      </details>`;
+    }).join('');
     const missing = Object.keys(EA.data.presets).filter((k) => !cats[k]);
-    return `${cards}
-      <div class="ea-add">
-        ${missing.map((k) => `<button class="sm-btn" data-ea-add="${k}">+ ${esc(k)}</button>`).join('')}
-        <input id="eaNewCat" placeholder="own category (e.g. press)" aria-label="New category name">
-        <button class="sm-btn" data-ea-add="__new">Add</button>
-      </div>`;
+    return `
+      <div class="ea-guide">
+        <b>How it works</b>
+        <ol><li>A new email arrives → Lisa puts it into <b>one</b> category, using “Which emails belong here?”.</li>
+          <li>She writes the reply in that category's tone and saves it in your <b>Drafts</b> folder. Nothing is sent.</li>
+          <li>You edit and send it yourself. Lisa learns from what you really sent.</li></ol>
+        <span class="ea-muted">Click a category to change it. Don't forget <b>Save</b> at the bottom.</span>
+      </div>
+      <div class="ea-card ea-addbox">
+        <strong>Add a category</strong>
+        ${missing.length ? `<div class="ea-add"><span class="ea-muted">Ready-made:</span>${missing.map((k) =>
+          `<button class="sm-btn" data-ea-add="${esc(k)}" title="${esc(EA.data.presets[k].description || '')}">+ ${esc(k)}</button>`).join('')}</div>` : ''}
+        <div class="ea-add"><span class="ea-muted">Your own:</span>
+          <input id="eaNewCat" placeholder="name, e.g. press or job applications" aria-label="New category name">
+          <button class="sm-btn" data-ea-add="__new">+ Add</button></div>
+      </div>
+      ${cards}`;
   }
 
   function rulesForm() {
@@ -200,7 +258,7 @@
   // ── render ─────────────────────────────────────────────────────────────────
   const WIZ = [
     ['Your mailbox', () => `${mailboxCard()}${ownerForm(false)}`],
-    ['Categories & tone', () => `<p class="ea-muted">Each incoming email gets one category. Each category has its own tone.</p>${categoryCards()}`],
+    ['Categories & tone', categoryCards],
     ['Start', () => `
       <label class="ea-choice"><input type="radio" name="ea_mode" value="shadow" ${EA.draft.drafts ? '' : 'checked'}>
         <span><b>Test week (recommended)</b><br>Lisa only sorts and summarizes. No drafts yet.</span></label>
@@ -279,20 +337,32 @@
     }
     if (ds.eaBack !== undefined) { EA.step -= 1; return render(); }
     if (ds.eaAdd) {
-      const name = ds.eaAdd === '__new' ? (el('eaNewCat').value || '').trim().toLowerCase() : ds.eaAdd;
-      if (!/^[a-z][a-z0-9_-]{0,30}$/.test(name)) return notice('Category name: lowercase letters, digits, - or _', true);
+      const name = ds.eaAdd === '__new' ? slug(el('eaNewCat').value) : ds.eaAdd;
+      if (!/^[a-z][a-z0-9_-]{0,30}$/.test(name)) return notice('Type a name first, e.g. "press".', true);
+      if (EA.draft.categories[name]) return notice(`"${name}" already exists.`, true);
       EA.draft.categories[name] = { ...(EA.data.presets[name] || { description: '', tone: '' }) };
-      return render();
+      (EA.openCats = EA.openCats || new Set()).add(name);
+      render();
+      const card = document.querySelector(`[data-ea-cat="${CSS.escape(name)}"]`);
+      card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card?.querySelector('[data-f="description"]')?.focus({ preventScroll: true });
+      return notice(`Added "${name}". Fill it in, then press Save.`, false);
     }
     if (ds.eaRemove) {
       if (Object.keys(EA.draft.categories).length <= 1) return notice('Keep at least one category.', true);
+      if (!confirm(`Remove the category "${ds.eaRemove}"? Its rules go too. (Nothing changes until you press Save.)`)) return;
       delete EA.draft.categories[ds.eaRemove];
       EA.draft.rules = (EA.draft.rules || []).filter((r) => r.category !== ds.eaRemove);
       return render();
     }
     if (ds.eaRuleAdd !== undefined) { EA.draft.rules = [...(EA.draft.rules || []), { from: '', category: Object.keys(EA.draft.categories)[0] }]; return render(); }
     if (ds.eaRuleDel !== undefined) { t.closest('[data-ea-rule]').remove(); collectRules(); return render(); }
-    if (ds.eaSave !== undefined) { if (await post('/api/email-assistant/config', { config: EA.draft })) render(true); return; }
+    if (ds.eaSave !== undefined) {
+      t.disabled = true; t.textContent = 'Saving…';
+      if (await post('/api/email-assistant/config', { config: EA.draft })) render(true);
+      else { t.disabled = false; t.textContent = 'Save'; }
+      return;
+    }
     if (ds.eaRefresh !== undefined) { await load(); return render(); }
     if (ds.eaApprove) {
       const notes = document.querySelector(`[data-ea-prop="${CSS.escape(ds.eaApprove)}"]`).value;
@@ -318,12 +388,21 @@
     o.innerHTML = `<div class="ea-dialog">
         <div class="ea-head"><h2 id="eaTitle">Email drafts</h2><button class="ea-link" data-ea-close aria-label="Close">✕</button></div>
         <nav class="ea-tabs" id="eaTabs" role="tablist"></nav>
-        <div class="ea-notice" id="eaNotice" hidden></div>
+        <div class="ea-notice" id="eaNotice" role="status" aria-live="polite" hidden></div>
         <div class="ea-body" id="eaBody"></div>
         <div class="ea-foot" id="eaFoot"></div></div>`;
     document.body.appendChild(o);
     o.addEventListener('click', (e) => { if (e.target === o) close(); else onClick(e); });
     o.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    o.addEventListener('input', (e) => {  // live draft example while typing in a category
+      const card = e.target.closest('[data-ea-cat]');
+      const pre = card && card.querySelector('[data-ea-preview]');
+      if (!pre) return;
+      const c = {};
+      card.querySelectorAll('[data-f]').forEach((i) => { if (i.type !== 'checkbox') c[i.dataset.f] = i.value.trim(); });
+      pre.textContent = previewText(c);
+      card.querySelector('.ea-cat-desc').textContent = c.description || 'no description yet — open to set it up';
+    });
   }
 
   let opener = null;
@@ -343,6 +422,10 @@
     }
   }
   function close() {
+    if (EA.data && EA.data.configured) {
+      collectCurrent();
+      if (snap() !== EA.saved && !confirm('You have unsaved changes. Close without saving?')) return;
+    }
     el('eaOverlay').hidden = true;
     if (opener && opener.focus) opener.focus();
   }

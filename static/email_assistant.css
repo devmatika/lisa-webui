@@ -61,3 +61,23 @@
 .ea-provider{display:flex;gap:6px;flex-wrap:wrap}
 .ea-chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
 .ea-chip.is-active{border-color:var(--accent);color:var(--text);font-weight:600}
+/* Categories tab: guide, add box, collapsible category cards with a live draft example */
+.ea-guide{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.5;background:var(--surface)}
+.ea-guide ol{margin:4px 0 6px;padding-left:20px}
+.ea-addbox{gap:8px}
+.ea-cat{display:block}
+.ea-cat-sum{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;min-height:28px}
+.ea-cat-sum::-webkit-details-marker{display:none}
+.ea-cat-sum::before{content:'▸';color:var(--muted);transition:transform .15s}
+.ea-cat[open]>.ea-cat-sum::before{transform:rotate(90deg)}
+.ea-cat-sum strong{font-size:15px;text-transform:capitalize}
+.ea-cat-desc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ea-cat-sum:focus-visible,.ea-more summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.ea-cat-body{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.ea-pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.ea-pill.is-on{border-color:var(--accent);color:var(--text)}
+.ea-more summary{cursor:pointer;color:var(--muted);font-size:13px}
+.ea-more[open] summary{margin-bottom:10px}
+.ea-preview pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.45;margin:4px 0 0;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;background:var(--surface)}
+.ea-danger{margin-left:0;color:#e05a4f}
+.ea-foot{position:sticky;bottom:0;background:var(--bg)}
