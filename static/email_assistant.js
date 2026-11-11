@@ -58,6 +58,7 @@
   // ── collect form values back into EA.draft ──────────────────────────────────
   function collectOwner() {
     ['address', 'name', 'owner', 'facts'].forEach((k) => { if (el('ea_' + k)) EA.draft[k] = el('ea_' + k).value.trim(); });
+    if (el('ea_mail_url')) EA.draft.mail_url = el('ea_mail_url').value.trim();
     if (el('ea_only_from')) EA.draft.only_from = el('ea_only_from').value.split(',').map((s) => s.trim()).filter(Boolean);
   }
   function collectCategories() {
@@ -92,6 +93,8 @@
       <label>About you / the company (one line)<input id="ea_owner" value="${esc(d.owner)}" placeholder="Runs MATIKA, a digital agency in Vienna"></label>
       <label>Facts drafts may use <small>— services, opening hours, prices. Nothing else is stated; unknowns become [TODO] markers.</small>
         <textarea id="ea_facts" rows="3" placeholder="We build websites and AI assistants…">${esc(d.facts)}</textarea></label>
+      ${full ? `<label>Webmail link <small>— shown in the chat message so you can open your drafts</small>
+        <input id="ea_mail_url" value="${esc(d.mail_url)}" placeholder="https://webmail.example.com/"></label>` : ''}
       ${full ? `<label>Only these senders (pilot) <small>— comma separated, empty = all mail</small>
         <input id="ea_only_from" value="${esc((d.only_from || []).join(', '))}" placeholder="test@example.com"></label>` : ''}`;
   }

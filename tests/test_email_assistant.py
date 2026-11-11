@@ -60,6 +60,7 @@ def test_server_only_keys_are_kept_and_hidden(home):
     {"account": "a b; rm -rf"},
     {"only_from": "x@y.at"},
     {"facts": "x" * 2001},
+    {"mail_url": "javascript:alert(1)"},
 ])
 def test_invalid_config_is_rejected(home, bad):
     with pytest.raises(ValueError):

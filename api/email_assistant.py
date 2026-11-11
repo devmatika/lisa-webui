@@ -115,6 +115,13 @@ def _text(value: Any, field: str, limit: int) -> str:
     return text
 
 
+def _url(value: Any) -> str:
+    url = _text(value, "mail_url", 300)
+    if url and not re.match(r"^https://[^\s<>\"']+$", url):
+        raise ValueError("mail_url must start with https://")
+    return url
+
+
 def validate_config(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("config must be an object")
@@ -175,6 +182,7 @@ def validate_config(data: Any) -> dict[str, Any]:
         "name": _text(data.get("name"), "name", 100),
         "owner": _text(data.get("owner"), "owner", 400),
         "facts": _text(data.get("facts"), "facts", 2000),
+        "mail_url": _url(data.get("mail_url")),
         "only_from": only_from,
         "drafts": data.get("drafts") is True,
         "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",
