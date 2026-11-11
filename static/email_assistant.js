@@ -160,6 +160,9 @@
         <div class="ea-card-head"><strong>Suggestion for ${esc(cat)}</strong><span class="ea-muted">from ${esc(pr.based_on)} replies you edited · ${esc(pr.at || '')}</span></div>
         ${pr.current ? `<p class="ea-muted">Now: ${esc(pr.current)}</p>` : ''}
         <textarea rows="4" data-ea-prop="${esc(cat)}" aria-label="Suggested notes for ${esc(cat)}">${esc(pr.notes)}</textarea>
+        ${(pr.examples || []).length ? `<details class="ea-why"><summary>Why? Your ${esc(pr.examples.length)} edits behind this suggestion</summary>
+          ${pr.examples.map((ex) => `<div class="ea-compare"><div><span class="ea-muted">Lisa's draft</span><pre>${esc(ex.draft)}</pre></div>
+            <div><span class="ea-muted">What you sent</span><pre>${esc(ex.sent)}</pre></div></div>`).join('')}</details>` : ''}
         <div class="ea-actions-row"><button class="sm-btn ea-primary" data-ea-approve="${esc(cat)}">Approve</button>
           <button class="sm-btn" data-ea-reject="${esc(cat)}">Reject</button></div>
       </div>`).join('');
@@ -167,7 +170,7 @@
     const a = cats.map((cat) => `
       <label>${esc(cat)}<textarea rows="3" data-ea-learned="${esc(cat)}" placeholder="Nothing learned yet">${esc(learned[cat] || '')}</textarea></label>
       <button class="sm-btn" data-ea-learned-save="${esc(cat)}">Save ${esc(cat)}</button>`).join('');
-    return `<p class="ea-muted">Lisa compares her drafts with what you really sent. After a few edits she suggests style notes — they are used only after you approve them.</p>
+    return `<p class="ea-muted">Every reply you send teaches Lisa your style at once. After 3 edits in a category she also suggests style rules — they apply only after you approve them. You can edit or clear the active rules any time.</p>
       ${p || '<p class="ea-muted">No new suggestions.</p>'}<h4>Active style notes</h4>${a}`;
   }
 
@@ -195,6 +198,7 @@
       return;
     }
     const tabs = [['status', 'Status'], ['owner', 'Mailbox & facts'], ['categories', 'Categories & tone'], ['rules', 'Rules'], ['learned', 'Learned']];
+    updateBadge();
     head.innerHTML = tabs.map(([k, t]) => `<button class="ea-tab ${EA.tab === k ? 'is-active' : ''}" data-ea-tab="${k}" role="tab" aria-selected="${EA.tab === k}">${t}${k === 'learned' && Object.keys(EA.data.proposals || {}).length ? ' •' : ''}</button>`).join('');
     body.innerHTML = { status: statusView, owner: () => ownerForm(true) + `
         <label class="ea-switch"><input type="checkbox" id="ea_drafts" ${EA.draft.drafts ? 'checked' : ''}> Write drafts (off = summary only)</label>
@@ -287,6 +291,7 @@
     try {
       await load();
       if (mode === 'wizard' && EA.data.configured) EA.tab = 'categories';
+      else if (Object.keys(EA.data.proposals || {}).length) EA.tab = 'learned';
       render();
       el('eaOverlay').querySelector('button, input')?.focus();
     } catch (e) {
@@ -296,6 +301,21 @@
   function close() {
     el('eaOverlay').hidden = true;
     if (opener && opener.focus) opener.focus();
+  }
+
+  function updateBadge() {
+    const btn = el('eaRailBtn');
+    if (!btn || !EA.data) return;
+    const n = Object.keys(EA.data.proposals || {}).length;
+    let dot = btn.querySelector('.ea-badge');
+    if (!n) { if (dot) dot.remove(); btn.setAttribute('aria-label', 'Email drafts'); return; }
+    if (!dot) { dot = document.createElement('span'); dot.className = 'ea-badge'; btn.appendChild(dot); }
+    dot.textContent = String(n);
+    btn.setAttribute('aria-label', `Email drafts — ${n} style suggestion${n > 1 ? 's' : ''} to review`);
+  }
+
+  async function refreshBadge() {
+    try { EA.data = await api('/api/email-assistant', { timeoutToast: false, redirect401: false }); updateBadge(); } catch (e) { /* not logged in yet */ }
   }
 
   function addRailButton() {
@@ -310,6 +330,8 @@
     b.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
     b.addEventListener('click', () => open());
     settings.parentNode.insertBefore(b, settings);
+    refreshBadge();
+    setInterval(refreshBadge, 5 * 60 * 1000);
   }
 
   window.EmailAssistant = { open };
