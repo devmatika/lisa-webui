@@ -1676,6 +1676,13 @@ async function _renderStepFinish(el) {
       <div id="cwValidationResults" class="cw-validation-box">
         <span class="cw-spinner"></span> Validating configuration…
       </div>
+      ${(CUSTOMER_WIZARD.draft.capabilities || []).includes('email_assistant') && window.EmailAssistant ? `
+      <div class="cw-validation-box">
+        <strong>Automatic email drafts</strong>
+        <p>Choose categories and the tone per category. Lisa then writes reply drafts into the mailbox's Drafts folder.
+          The same settings stay editable later under the Email button.</p>
+        <button class="sm-btn" type="button" onclick="window.EmailAssistant.open('wizard')">Set up automatic email drafts</button>
+      </div>` : ''}
     </div>
   `;
 

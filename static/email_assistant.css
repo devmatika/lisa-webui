@@ -1,0 +1,52 @@
+/* Email drafts panel (static/email_assistant.js). Uses the WebUI theme tokens, so light/dark/skins just work. */
+.ea-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.45);padding:16px}
+.ea-overlay[hidden]{display:none !important}
+.ea-dialog{width:min(920px,100%);max-height:min(88vh,900px);display:flex;flex-direction:column;background:var(--bg);
+  color:var(--text);border:1px solid var(--border);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden}
+.ea-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px}
+.ea-head h2{margin:0;font-size:18px}
+.ea-tabs{display:flex;gap:4px;flex-wrap:wrap;padding:0 16px 8px;border-bottom:1px solid var(--border)}
+.ea-tab{background:none;border:0;border-radius:8px;padding:7px 12px;color:var(--muted);cursor:pointer;font:inherit}
+.ea-tab:hover{background:var(--surface-subtle-hover)}
+.ea-tab.is-active{background:var(--surface);color:var(--text);font-weight:600}
+.ea-tab:focus-visible,.ea-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ea-step{padding:7px 10px;color:var(--muted);font-size:13px}
+.ea-step.is-active{color:var(--text);font-weight:600}
+.ea-body{padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.ea-body label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.ea-body input:not([type=checkbox]):not([type=radio]),.ea-body textarea,.ea-body select{font:inherit;font-size:14px;color:var(--text);
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;min-width:0}
+.ea-body textarea{resize:vertical}
+.ea-body small{color:var(--muted);font-weight:400}
+.ea-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.ea-grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.ea-card{border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--surface-subtle)}
+.ea-card--proposal{border-color:var(--accent)}
+.ea-card-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ea-card-head strong{font-size:15px;text-transform:capitalize}
+.ea-body .ea-switch{flex-direction:row;align-items:center;gap:6px;color:var(--text)}
+.ea-link{background:none;border:0;color:var(--muted);cursor:pointer;font:inherit;padding:4px 6px;border-radius:6px;margin-left:auto}
+.ea-link:hover{color:var(--text)}
+.ea-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ea-rule{display:grid;grid-template-columns:150px 1fr 160px auto;gap:8px;align-items:center}
+.ea-body .ea-choice{flex-direction:row;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text);cursor:pointer}
+.ea-choice span{line-height:1.45}
+.ea-muted{color:var(--muted);font-size:13px;margin:0}
+.ea-body p{margin:0}
+.ea-body h4{margin:8px 0 0}
+.ea-table{overflow:auto;border:1px solid var(--border);border-radius:10px}
+.ea-table table{width:100%;border-collapse:collapse;font-size:13px}
+.ea-table th,.ea-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.ea-table th{color:var(--muted);font-weight:600;background:var(--surface)}
+.ea-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--border)}
+.ea-actions-row{display:flex;gap:8px}
+.ea-primary{font-weight:700}
+.ea-notice{margin:8px 20px 0;padding:8px 12px;border-radius:8px;background:var(--surface);font-size:13px}
+.ea-notice--error{background:rgba(220,60,60,.12);color:#e05a4f}
+.ea-notice--ok{background:rgba(46,160,90,.14);color:#2ea05a}
+@media (max-width:640px){
+  .ea-overlay{padding:0}
+  .ea-dialog{max-height:100vh;height:100%;border-radius:0}
+  .ea-rule{grid-template-columns:1fr 1fr}
+}

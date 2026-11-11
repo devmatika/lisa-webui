@@ -16814,6 +16814,10 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/onboarding/status":
         return j(handler, get_onboarding_status())
 
+    if parsed.path == "/api/email-assistant":
+        from api.email_assistant import get_email_assistant
+        return j(handler, get_email_assistant())
+
     if parsed.path == "/api/customer-wizard/status":
         from api.customer_wizard import get_customer_wizard_status
         return j(handler, get_customer_wizard_status())
@@ -20269,6 +20273,19 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, f"probe failed: {e}", 500)
 
     # ── Customer Onboarding Wizard (POST) ──
+    # ── Email auto-drafts (shared config with the email_drafts.py cron job) ──
+    if parsed.path in ("/api/email-assistant/config", "/api/email-assistant/proposal", "/api/email-assistant/learned"):
+        from api import email_assistant as ea
+        b = body or {}
+        try:
+            if parsed.path.endswith("/config"):
+                return j(handler, ea.save_email_assistant_config(b.get("config")))
+            if parsed.path.endswith("/proposal"):
+                return j(handler, ea.resolve_proposal(b.get("category"), b.get("action"), b.get("notes")))
+            return j(handler, ea.save_learned_notes(b.get("category"), b.get("notes")))
+        except (ValueError, TypeError) as e:
+            return bad(handler, str(e), 400)
+
     if parsed.path == "/api/customer-wizard/step":
         if not _onboarding_gate_allows(handler):
             return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
