@@ -33,7 +33,7 @@ def test_save_writes_the_file_the_cron_job_reads(home):
     assert saved["categories"]["customer"] == {"tone": "friendly", "address": "Sie", "max_words": 120}
     assert saved["categories"]["admin"]["draft"] is False
     assert saved["rules"][1] == {"subject": "Newsletter", "skip": True} and saved["drafts"] is True
-    assert saved["facts"] == "" and saved["only_from"] == []
+    assert saved["facts"] == "" and saved["only_from"] == [] and saved["notify"] == "actionable"
 
 
 def test_server_only_keys_are_kept_and_hidden(home):

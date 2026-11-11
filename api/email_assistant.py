@@ -177,6 +177,7 @@ def validate_config(data: Any) -> dict[str, Any]:
         "facts": _text(data.get("facts"), "facts", 2000),
         "only_from": only_from,
         "drafts": data.get("drafts") is True,
+        "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",
         "max_per_run": max_per_run,
         "categories": cats,
         "rules": rules,

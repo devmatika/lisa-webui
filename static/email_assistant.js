@@ -194,7 +194,11 @@
     const tabs = [['status', 'Status'], ['owner', 'Mailbox & facts'], ['categories', 'Categories & tone'], ['rules', 'Rules'], ['learned', 'Learned']];
     head.innerHTML = tabs.map(([k, t]) => `<button class="ea-tab ${EA.tab === k ? 'is-active' : ''}" data-ea-tab="${k}" role="tab" aria-selected="${EA.tab === k}">${t}${k === 'learned' && Object.keys(EA.data.proposals || {}).length ? ' •' : ''}</button>`).join('');
     body.innerHTML = { status: statusView, owner: () => ownerForm(true) + `
-        <label class="ea-switch"><input type="checkbox" id="ea_drafts" ${EA.draft.drafts ? 'checked' : ''}> Write drafts (off = summary only)</label>`,
+        <label class="ea-switch"><input type="checkbox" id="ea_drafts" ${EA.draft.drafts ? 'checked' : ''}> Write drafts (off = summary only)</label>
+        <label>Chat messages (Telegram)<select id="ea_notify">
+          <option value="actionable" ${EA.draft.notify !== 'all' && EA.draft.notify !== 'off' ? 'selected' : ''}>Only when I need to act (recommended)</option>
+          <option value="all" ${EA.draft.notify === 'all' ? 'selected' : ''}>Every processed email</option>
+          <option value="off" ${EA.draft.notify === 'off' ? 'selected' : ''}>None — I check the Drafts folder myself</option></select></label>`,
       categories: categoryCards, rules: rulesForm, learned: learnedView }[EA.tab]();
     foot.innerHTML = ['owner', 'categories', 'rules'].includes(EA.tab) ? '<button class="sm-btn ea-primary" data-ea-save>Save</button>' : '<button class="sm-btn" data-ea-refresh>Refresh</button>';
   }
@@ -202,6 +206,7 @@
   function collectCurrent() {
     if (el('ea_address')) collectOwner();
     if (el('ea_drafts')) EA.draft.drafts = el('ea_drafts').checked;
+    if (el('ea_notify')) EA.draft.notify = el('ea_notify').value;
     if (document.querySelector('[data-ea-cat]')) collectCategories();
     if (document.querySelector('[data-ea-rule]') || el('eaBody').querySelector('[data-ea-rule-add]')) collectRules();
     const mode = document.querySelector('input[name="ea_mode"]:checked');
