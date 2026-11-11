@@ -23,7 +23,7 @@ CATEGORY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,30}$")
 EMAIL_RE = re.compile(r"^[^@\s<>\"]+@[^@\s<>\"]+\.[^@\s<>\"]+$")
 TEXT_FIELDS = ("description", "tone", "address", "greeting", "farewell", "do", "dont", "language")
 LOCKED_KEYS = ("himalaya", "himalaya_config", "account", "model", "watch_seconds", "watch_period", "watch_every",
-               "telegram_chats")  # set on the server (admin or Connect mailbox), never by the browser
+               "telegram_chats", "timezone", "open_days", "learn_every", "skip_from")  # set on the server (admin or Connect mailbox), never by the browser
 MAX_CATEGORIES, MAX_RULES = 15, 50
 HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 PASS_ENV = "EMAIL_ASSISTANT_IMAP_PASSWORD"  # profile .env; the cron job's himalaya reads it via password.command
@@ -311,6 +311,17 @@ def validate_config(data: Any) -> dict[str, Any]:
     if not isinstance(only_from, list) or len(only_from) > 20:
         raise ValueError("only_from: a list of at most 20 senders")
     only_from = [t for t in (_text(x, "only_from", 100) for x in only_from) if t]
+    daily_at = str(data.get("daily_at") if data.get("daily_at") is not None else "07:30").strip()
+    if daily_at and not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", daily_at):
+        raise ValueError("daily summary time: HH:MM, e.g. 07:30 (empty = off)")
+    t_in = data.get("tasks") if isinstance(data.get("tasks"), dict) else {}
+    tasks = {"enabled": t_in.get("enabled") is True, "list_id": str(t_in.get("list_id") or "").strip(),
+             "assignee": str(t_in.get("assignee") or "").strip(),
+             "min_priority": t_in.get("min_priority") if t_in.get("min_priority") in ("high", "normal") else "high"}
+    if tasks["list_id"] and not tasks["list_id"].isdigit() or tasks["assignee"] and not tasks["assignee"].isdigit():
+        raise ValueError("ClickUp list and user: the numeric IDs")
+    if tasks["enabled"] and not tasks["list_id"]:
+        raise ValueError("ClickUp tasks: enter the list ID")
     return {
         "address": address,
         "name": _text(data.get("name"), "name", 100),
@@ -321,6 +332,8 @@ def validate_config(data: Any) -> dict[str, Any]:
         "drafts": data.get("drafts") is True,
         "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",
         "max_per_run": max_per_run,
+        "daily_at": daily_at,
+        "tasks": tasks,
         "categories": cats,
         "rules": rules,
     }

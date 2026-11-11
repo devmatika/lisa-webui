@@ -61,10 +61,27 @@ def test_server_only_keys_are_kept_and_hidden(home):
     {"only_from": "x@y.at"},
     {"facts": "x" * 2001},
     {"mail_url": "javascript:alert(1)"},
+    {"daily_at": "7.30"},
+    {"tasks": {"enabled": True, "list_id": ""}},
+    {"tasks": {"enabled": True, "list_id": "abc"}},
 ])
 def test_invalid_config_is_rejected(home, bad):
     with pytest.raises(ValueError):
         ea.save_email_assistant_config(good_config(**bad))
+
+
+def test_daily_summary_and_clickup_settings_survive_a_save(home):
+    d = home / "workspace/email-assistant"
+    d.mkdir(parents=True)
+    (d / "config.json").write_text(json.dumps({"address": "a@b.at", "timezone": "Europe/Vienna", "open_days": 7}))
+    ea.save_email_assistant_config(good_config(daily_at="08:15", timezone="UTC",
+                                               tasks={"enabled": True, "list_id": "901", "assignee": "66", "min_priority": "x"}))
+    saved = json.loads((d / "config.json").read_text())
+    assert saved["daily_at"] == "08:15" and saved["timezone"] == "Europe/Vienna" and saved["open_days"] == 7
+    assert saved["tasks"] == {"enabled": True, "list_id": "901", "assignee": "66", "min_priority": "high"}
+    assert json.loads((d / "config.json").read_text()) == saved
+    ea.save_email_assistant_config(good_config(daily_at=""))  # empty = off
+    assert json.loads((d / "config.json").read_text())["daily_at"] == ""
 
 
 def test_approve_moves_proposal_into_learned_md(home):

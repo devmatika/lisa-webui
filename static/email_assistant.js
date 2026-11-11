@@ -224,12 +224,20 @@
     const cron = EA.data.cron;
     const cronLine = cron ? `Background job: <b>${cron.enabled ? 'on' : 'paused'}</b> · ${esc(cron.schedule || '')} · last run ${esc(cron.last_run_at || '–')} (${esc(cron.last_status || '–')})`
       : 'Background job: <b>not installed yet</b> — your admin starts it once the mailbox is connected.';
+    const prio = (p) => (p === 'high' ? '<span class="ea-prio is-high">high</span>' : p ? `<span class="ea-prio">${esc(p)}</span>` : '');
+    const waiting = (s && s.open) || [];
+    const waitList = waiting.length ? `<div class="ea-card"><strong>Waiting for your reply (${waiting.length})</strong>
+        <ul class="ea-wait">${waiting.map((v) => `<li>${prio(v.priority)} <b>${esc(v.from)}</b> — ${esc(v.subject)}
+          <span class="ea-muted">· ${v.status === 'draft' ? 'draft ready' : 'needs your answer'}${v.due ? ` · due ${esc(v.due)}` : ''}</span></li>`).join('')}</ul>
+        <span class="ea-muted">Leaves the list as soon as you reply. Every morning this list also comes as a chat message.</span></div>`
+      : (s ? '<p class="ea-muted">Nothing is waiting for your reply. ✅</p>' : '');
     const rows = (s && s.log ? [...s.log].reverse() : []).map((it) => `<tr><td>${esc(it.at)}</td><td>${esc(it.from)}</td>
-      <td>${esc(it.subject)}</td><td>${esc(it.category)}</td><td>${esc(it.status)}${it.latency_s != null ? ` <span class="ea-muted">(${esc(it.latency_s)} s)</span>` : ''}</td></tr>`).join('');
+      <td>${esc(it.subject)}</td><td>${esc(it.category)}</td><td>${prio(it.priority)}</td><td>${esc(it.status)}${it.latency_s != null ? ` <span class="ea-muted">(${esc(it.latency_s)} s)</span>` : ''}</td></tr>`).join('');
     return `<p>${cronLine}</p>
       <p>Drafts: <b>${EA.draft.drafts ? 'ON' : 'OFF (shadow mode: summary only)'}</b>${s ? ` · ${esc(s.stats)}` : ''}</p>
       <p class="ea-muted">Drafts appear in the <b>Drafts</b> folder of your mailbox, inside the original conversation. Review, edit and send them there — Lisa never sends.</p>
-      ${rows ? `<div class="ea-table"><table><thead><tr><th>When (UTC)</th><th>From</th><th>Subject</th><th>Category</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      ${waitList}
+      ${rows ? `<h4>Recent mail</h4><div class="ea-table"><table><thead><tr><th>When (UTC)</th><th>From</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
              : '<p class="ea-muted">No email processed yet.</p>'}`;
   }
 
@@ -286,7 +294,18 @@
         <label>Chat messages (Telegram)<select id="ea_notify">
           <option value="actionable" ${EA.draft.notify !== 'all' && EA.draft.notify !== 'off' ? 'selected' : ''}>Only when I need to act (recommended)</option>
           <option value="all" ${EA.draft.notify === 'all' ? 'selected' : ''}>Every processed email</option>
-          <option value="off" ${EA.draft.notify === 'off' ? 'selected' : ''}>None — I check the Drafts folder myself</option></select></label>`,
+          <option value="off" ${EA.draft.notify === 'off' ? 'selected' : ''}>None — I check the Drafts folder myself</option></select></label>
+        <label>Daily summary at <small>— every morning: all mail still waiting for your reply, most important first. Empty = off.</small>
+          <input id="ea_daily_at" type="time" value="${esc(EA.draft.daily_at ?? '07:30')}" style="max-width:160px"></label>
+        <div class="ea-card"><label class="ea-switch"><input type="checkbox" id="ea_tasks_on" ${(EA.draft.tasks || {}).enabled ? 'checked' : ''}>
+            Create a ClickUp task for important emails</label>
+          <div class="ea-grid2">
+            <label>ClickUp list ID<input id="ea_tasks_list" inputmode="numeric" value="${esc((EA.draft.tasks || {}).list_id || '')}" placeholder="e.g. 901208765432">
+              <small>Open the list in ClickUp: the number in the address after /li/</small></label>
+            <label>Assign to (ClickUp user ID)<input id="ea_tasks_user" inputmode="numeric" value="${esc((EA.draft.tasks || {}).assignee || '')}" placeholder="empty = nobody"></label>
+            <label>For<select id="ea_tasks_prio"><option value="high" ${(EA.draft.tasks || {}).min_priority !== 'normal' ? 'selected' : ''}>High priority only</option>
+              <option value="normal" ${(EA.draft.tasks || {}).min_priority === 'normal' ? 'selected' : ''}>High and normal</option></select></label>
+          </div><span class="ea-muted">One task per email (never twice), with what they want, the due date and the webmail link.</span></div>`,
       categories: categoryCards, rules: rulesForm, learned: learnedView }[EA.tab]();
     foot.innerHTML = ['owner', 'categories', 'rules'].includes(EA.tab) ? '<button class="sm-btn ea-primary" data-ea-save>Save</button>' : '<button class="sm-btn" data-ea-refresh>Refresh</button>';
   }
@@ -295,6 +314,9 @@
     if (el('ea_address')) collectOwner();
     if (el('ea_drafts')) EA.draft.drafts = el('ea_drafts').checked;
     if (el('ea_notify')) EA.draft.notify = el('ea_notify').value;
+    if (el('ea_daily_at')) EA.draft.daily_at = el('ea_daily_at').value;
+    if (el('ea_tasks_on')) EA.draft.tasks = { enabled: el('ea_tasks_on').checked, list_id: el('ea_tasks_list').value.trim(),
+      assignee: el('ea_tasks_user').value.trim(), min_priority: el('ea_tasks_prio').value };
     if (document.querySelector('[data-ea-cat]')) collectCategories();
     if (document.querySelector('[data-ea-rule]') || el('eaBody').querySelector('[data-ea-rule-add]')) collectRules();
     const mode = document.querySelector('input[name="ea_mode"]:checked');
