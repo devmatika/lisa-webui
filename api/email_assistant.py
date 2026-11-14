@@ -24,7 +24,7 @@ EMAIL_RE = re.compile(r"^[^@\s<>\"]+@[^@\s<>\"]+\.[^@\s<>\"]+$")
 TEXT_FIELDS = ("description", "tone", "address", "greeting", "farewell", "do", "dont", "language")
 LOCKED_KEYS = ("himalaya", "himalaya_config", "account", "model", "watch_seconds", "watch_period", "watch_every",
                "telegram_chats", "timezone", "open_days", "learn_every", "skip_from",
-               "webui_url", "review_image", "review_ignore", "review_weekday")  # set on the server (admin or Connect mailbox), never by the browser
+               "webui_url", "review_image", "review_ignore", "review_weekday", "provider_routing")  # set on the server (admin or Connect mailbox), never by the browser
 MAX_CATEGORIES, MAX_RULES = 15, 50
 HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 PASS_ENV = "EMAIL_ASSISTANT_IMAP_PASSWORD"  # profile .env; the cron job's himalaya reads it via password.command
@@ -335,6 +335,7 @@ def validate_config(data: Any) -> dict[str, Any]:
         "mail_url": _url(data.get("mail_url")),
         "only_from": only_from,
         "drafts": data.get("drafts") is True,
+        "paused": data.get("paused") is True,  # kill switch: the cron job does not even read the mailbox
         "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",
         "max_per_run": max_per_run,
         "daily_at": daily_at,

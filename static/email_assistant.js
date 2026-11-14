@@ -233,7 +233,11 @@
       : (s ? '<p class="ea-muted">Nothing is waiting for your reply. ✅</p>' : '');
     const rows = (s && s.log ? [...s.log].reverse() : []).map((it) => `<tr><td>${esc(it.at)}</td><td>${esc(it.from)}</td>
       <td>${esc(it.subject)}</td><td>${esc(it.category)}</td><td>${prio(it.priority)}</td><td>${esc(it.status)}${it.latency_s != null ? ` <span class="ea-muted">(${esc(it.latency_s)} s)</span>` : ''}</td></tr>`).join('');
-    return `<p>${cronLine}</p>
+    const pause = EA.draft.paused
+      ? `<div class="ea-card ea-paused"><strong>⏸ Assistant paused</strong> — Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.
+          <div><button class="sm-btn" data-ea-pause="0">▶ Resume</button></div></div>`
+      : `<p><button class="sm-btn" data-ea-pause="1" title="Emergency stop: Lisa stops reading this mailbox immediately">⏸ Pause assistant</button></p>`;
+    return `${pause}<p>${cronLine}</p>
       <p>Drafts: <b>${EA.draft.drafts ? 'ON' : 'OFF (shadow mode: summary only)'}</b>${s ? ` · ${esc(s.stats)}` : ''}</p>
       <p class="ea-muted">Drafts appear in the <b>Drafts</b> folder of your mailbox, inside the original conversation. Review, edit and send them there — Lisa never sends.</p>
       ${waitList}
@@ -334,6 +338,11 @@
     if (ds.eaClose !== undefined) return close();
     collectCurrent();
     if (ds.eaTab) { EA.tab = ds.eaTab; return render(); }
+    if (ds.eaPause !== undefined) {
+      if (ds.eaPause === '1' && !confirm('Pause the email assistant? Lisa stops reading this mailbox until you resume.')) return;
+      if (await post('/api/email-assistant/config', { config: { ...(EA.data.config || {}), paused: ds.eaPause === '1' } })) render();
+      return;
+    }
     if (ds.eaReconnect !== undefined) { EA.reconnect = true; return render(); }
     if (ds.eaReconnectCancel !== undefined) { EA.reconnect = false; return render(); }
     if (ds.eaConnect !== undefined) {

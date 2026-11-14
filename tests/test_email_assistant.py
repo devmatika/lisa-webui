@@ -202,3 +202,12 @@ def test_browser_cannot_change_server_side_mailbox_settings(home):
     ea.save_email_assistant_config(good_config(account="evil", himalaya_config="/etc/passwd", telegram_chats=["999"]))
     saved = json.loads((d / "config.json").read_text())
     assert saved["account"] == "mailbox" and saved["himalaya_config"] == "himalaya/x.toml" and saved["telegram_chats"] == ["1"]
+
+
+def test_pause_is_saved_and_only_true_pauses(home):
+    d = home / "workspace/email-assistant"
+    d.mkdir(parents=True)
+    ea.save_email_assistant_config(good_config(paused=True))
+    assert json.loads((d / "config.json").read_text())["paused"] is True
+    ea.save_email_assistant_config(good_config(paused="yes"))
+    assert json.loads((d / "config.json").read_text())["paused"] is False

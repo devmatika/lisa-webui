@@ -23,6 +23,7 @@
 .ea-grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .ea-card{border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--surface-subtle)}
 .ea-card--proposal{border-color:var(--accent)}
+.ea-paused{border-color:#e0a24f;background:rgba(224,162,79,.10)}
 .ea-card-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .ea-card-head strong{font-size:15px;text-transform:capitalize}
 .ea-body .ea-switch{flex-direction:row;align-items:center;gap:6px;color:var(--text)}
