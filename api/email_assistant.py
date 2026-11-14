@@ -23,7 +23,8 @@ CATEGORY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,30}$")
 EMAIL_RE = re.compile(r"^[^@\s<>\"]+@[^@\s<>\"]+\.[^@\s<>\"]+$")
 TEXT_FIELDS = ("description", "tone", "address", "greeting", "farewell", "do", "dont", "language")
 LOCKED_KEYS = ("himalaya", "himalaya_config", "account", "model", "watch_seconds", "watch_period", "watch_every",
-               "telegram_chats", "timezone", "open_days", "learn_every", "skip_from")  # set on the server (admin or Connect mailbox), never by the browser
+               "telegram_chats", "timezone", "open_days", "learn_every", "skip_from",
+               "webui_url", "review_image", "review_ignore", "review_weekday")  # set on the server (admin or Connect mailbox), never by the browser
 MAX_CATEGORIES, MAX_RULES = 15, 50
 HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 PASS_ENV = "EMAIL_ASSISTANT_IMAP_PASSWORD"  # profile .env; the cron job's himalaya reads it via password.command
@@ -322,7 +323,11 @@ def validate_config(data: Any) -> dict[str, Any]:
         raise ValueError("ClickUp list and user: the numeric IDs")
     if tasks["enabled"] and not tasks["list_id"]:
         raise ValueError("ClickUp tasks: enter the list ID")
+    review_days = int(data.get("review_every_days") if data.get("review_every_days") is not None else 7)
+    if not 0 <= review_days <= 30:
+        raise ValueError("weekly review: 0 (off) to 30 days")
     return {
+        "review_every_days": review_days,
         "address": address,
         "name": _text(data.get("name"), "name", 100),
         "owner": _text(data.get("owner"), "owner", 400),

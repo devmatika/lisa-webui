@@ -84,6 +84,22 @@ def test_daily_summary_and_clickup_settings_survive_a_save(home):
     assert json.loads((d / "config.json").read_text())["daily_at"] == ""
 
 
+def test_coaching_settings_survive_a_save_and_review_can_be_switched_off(home):
+    d = home / "workspace/email-assistant"
+    d.mkdir(parents=True)
+    keep = {"address": "a@b.at", "webui_url": "https://lisa.example/#email", "review_image": "x.png",
+            "review_ignore": ["test@x.at"], "review_weekday": 0}
+    (d / "config.json").write_text(json.dumps(keep))
+    ea.save_email_assistant_config(good_config(review_every_days=0, webui_url="https://evil.example/"))
+    saved = json.loads((d / "config.json").read_text())
+    assert saved["review_every_days"] == 0
+    assert {k: saved[k] for k in keep if k != "address"} == {k: v for k, v in keep.items() if k != "address"}
+    ea.save_email_assistant_config(good_config())
+    assert json.loads((d / "config.json").read_text())["review_every_days"] == 7  # default on
+    with pytest.raises(ValueError):
+        ea.save_email_assistant_config(good_config(review_every_days=99))
+
+
 def test_approve_moves_proposal_into_learned_md(home):
     d = home / "workspace/email-assistant"
     d.mkdir(parents=True)

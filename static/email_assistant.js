@@ -295,6 +295,9 @@
           <option value="actionable" ${EA.draft.notify !== 'all' && EA.draft.notify !== 'off' ? 'selected' : ''}>Only when I need to act (recommended)</option>
           <option value="all" ${EA.draft.notify === 'all' ? 'selected' : ''}>Every processed email</option>
           <option value="off" ${EA.draft.notify === 'off' ? 'selected' : ''}>None — I check the Drafts folder myself</option></select></label>
+        <label>Weekly tips &amp; stats <small>— on Mondays: drafts used and unused, and how to make them better</small>
+          <select id="ea_review"><option value="7" ${(EA.draft.review_every_days ?? 7) > 0 ? 'selected' : ''}>On (Mondays, recommended)</option>
+            <option value="0" ${EA.draft.review_every_days === 0 ? 'selected' : ''}>Off</option></select></label>
         <label>Daily summary at <small>— every morning: all mail still waiting for your reply, most important first. Empty = off.</small>
           <input id="ea_daily_at" type="time" value="${esc(EA.draft.daily_at ?? '07:30')}" style="max-width:160px"></label>
         <div class="ea-card"><label class="ea-switch"><input type="checkbox" id="ea_tasks_on" ${(EA.draft.tasks || {}).enabled ? 'checked' : ''}>
@@ -315,6 +318,7 @@
     if (el('ea_drafts')) EA.draft.drafts = el('ea_drafts').checked;
     if (el('ea_notify')) EA.draft.notify = el('ea_notify').value;
     if (el('ea_daily_at')) EA.draft.daily_at = el('ea_daily_at').value;
+    if (el('ea_review')) EA.draft.review_every_days = Number(el('ea_review').value);
     if (el('ea_tasks_on')) EA.draft.tasks = { enabled: el('ea_tasks_on').checked, list_id: el('ea_tasks_list').value.trim(),
       assignee: el('ea_tasks_user').value.trim(), min_priority: el('ea_tasks_prio').value };
     if (document.querySelector('[data-ea-cat]')) collectCategories();
@@ -484,6 +488,11 @@
   }
 
   window.EmailAssistant = { open };
+  // /#email (link in LISA's Telegram messages) opens the panel directly
+  const openFromHash = () => { if (location.hash === '#email') open(); };
+  window.addEventListener('hashchange', openFromHash);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(openFromHash, 600));
+  else setTimeout(openFromHash, 600);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addRailButton);
   else addRailButton();
 })();
