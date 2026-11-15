@@ -16214,7 +16214,8 @@ def _dispatch_enterprise(handler, parsed, method: str) -> bool:
     from api.enterprise import enabled
     if not enabled():
         return False
-    if not (parsed.path.startswith("/api/enterprise/") or parsed.path in ("/login", "/set-password", "/lisa")):
+    if not (parsed.path.startswith("/api/enterprise/")
+            or parsed.path in ("/login", "/set-password", "/lisa", "/api/auth/oidc/start", "/api/auth/oidc/callback")):
         return False
     from api.enterprise.routes import handle
     return handle(handler, parsed, method)
