@@ -342,7 +342,7 @@
       <h3>Troubleshooting</h3>
       <ul>
         <li><b>Someone lost access</b> — send a new password link from <i>Users</i>. Disabling a person signs them out everywhere at once.</li>
-        <li><b>The setup wizard or AI settings are missing</b> — your account needs the <i>Operator (IT)</i> role. Lisa refuses changes that would leave nobody able to manage users or run setup. If you are locked out anyway, on the server run:<br><code>docker compose exec webui python -m api.enterprise.recover you@company.com</code></li>
+        <li><b>The setup wizard or AI settings are missing</b> — your account needs the <i>Operator (IT)</i> role. Lisa refuses changes that would leave nobody able to manage users or run setup. If you are locked out anyway, on the server run:<br><code>docker compose exec webui /app/venv/bin/python -m api.enterprise.recover you@company.com</code></li>
         <li><b>Lisa does not answer</b> — check <i>Status</i>: the gateway must be "ok". After the wizard's Apply it restarts for about 20 seconds.</li>
       </ul>
     </section>

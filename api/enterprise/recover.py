@@ -1,6 +1,6 @@
 """Break-glass: give a role back to a user from the server shell, when nobody signed in can.
 
-    docker compose exec webui python -m api.enterprise.recover <email> [role ...]   (default: admin operator)
+    docker compose exec webui /app/venv/bin/python -m api.enterprise.recover <email> [role ...]   (default: admin operator)
 
 Adds roles, never removes them, re-activates the account and records ``user.recovered`` in the
 audit log. Needs shell access to the host, which already implies full control of the stack.
