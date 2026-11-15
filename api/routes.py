@@ -16283,11 +16283,11 @@ def handle_get(handler, parsed) -> bool:
                 )
             )
             from api.enterprise import enabled as _enterprise_on
-            if _enterprise_on():  # account (Telegram link, sign out) + organisation admin
-                html = html.replace("</body>", '<a href="/lisa" id="lisa-org-link" style="position:fixed;'
-                                    'right:14px;bottom:14px;z-index:50;padding:6px 12px;border-radius:999px;'
-                                    'background:var(--accent,#006eb3);color:#fff;font:13px system-ui;'
-                                    'text-decoration:none">Organization</a></body>', 1)
+            if _enterprise_on():  # menu entries for My account + Organization, filtered by permission
+                from urllib.parse import quote as _quote
+                from api.updates import WEBUI_VERSION
+                html = html.replace("</body>", '<script src="static/enterprise_nav.js?v='
+                                    + _quote(WEBUI_VERSION, safe="") + '" defer></script></body>', 1)
             return t(
                 handler,
                 inject_extension_tags(html),
@@ -16849,7 +16849,12 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/api/customer-wizard/status":
         from api.customer_wizard import get_customer_wizard_status
-        return j(handler, get_customer_wizard_status())
+        from api.enterprise import enabled as _enterprise_on
+        status = get_customer_wizard_status()
+        if _enterprise_on():  # organisation checklist + which wizard steps apply to an organisation
+            from api.enterprise.org_setup import org_setup_status
+            status["enterprise"] = org_setup_status()
+        return j(handler, status)
 
     if parsed.path == "/api/customer-wizard/team":
         from api.customer_wizard import get_identity_mapping
@@ -20386,7 +20391,12 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, "Setup wizard is only available from local networks when auth is not enabled.", 403)
         try:
             from api.customer_wizard import apply_wizard_setup
-            return j(handler, apply_wizard_setup())
+            from api.enterprise import enabled as _enterprise_on
+            result = apply_wizard_setup()
+            if _enterprise_on() and result.get("ok"):  # every assistant picks up the new model / bot
+                from api.enterprise.org_setup import after_org_setup
+                result["organization"] = after_org_setup(handler)
+            return j(handler, result)
         except Exception as e:
             return bad(handler, str(e), 500)
 

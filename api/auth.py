@@ -907,7 +907,10 @@ def _auth_cookie_header(cookie_value, handler=None) -> str:
 
 def _clear_auth_cookie_header() -> str:
     cookie = http.cookies.SimpleCookie()
-    name = _resolve_cookie_name()
+    if _enterprise_on():
+        from api.enterprise.sessions import COOKIE_NAME as name
+    else:
+        name = _resolve_cookie_name()
     cookie[name] = ''
     cookie[name]['httponly'] = True
     cookie[name]['path'] = '/'
@@ -1140,6 +1143,10 @@ def verify_csrf_token(cookie_value: str, csrf_token: str) -> bool:
 
 def invalidate_session(cookie_value) -> None:
     """Remove a session token."""
+    if _enterprise_on():  # the WebUI's own Sign Out must end the Postgres session too
+        from api.enterprise import sessions
+        sessions.logout(cookie_value)
+        return
     if cookie_value and '.' in cookie_value:
         token = cookie_value.rsplit('.', 1)[0]
         with _SESSIONS_LOCK:

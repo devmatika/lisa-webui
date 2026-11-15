@@ -40,11 +40,19 @@ _CLICKUP_TOKEN = re.compile(r"^pk_[A-Za-z0-9_]{10,200}$")
 
 
 def _google_client() -> dict:
-    path = provisioner.root_home() / "google_client_secret.json"
-    if not path.is_file():
-        raise DirectoryError("Google is not set up for this organisation yet (no OAuth client). Ask IT.")
-    data = json.loads(path.read_text())
-    client = data.get("web") or data.get("installed") or {}
+    """The organisation's OAuth client: a client JSON saved in the default profile (by IT or the
+    setup wizard), or the client id + secret the wizard stored in its .env."""
+    from api.customer_wizard import _find_google_client_secret
+    root = provisioner.root_home()
+    path = _find_google_client_secret(root)
+    if path is not None:
+        data = json.loads(path.read_text())
+        client = data.get("web") or data.get("installed") or {}
+    else:
+        env = provisioner._read_env(root / ".env")
+        client = {"client_id": env.get("GOOGLE_CLIENT_ID"), "client_secret": env.get("GOOGLE_CLIENT_SECRET")}
+        if not client["client_id"]:
+            raise DirectoryError("Google is not set up for this organisation yet (no OAuth client). Ask IT.")
     if not client.get("client_id") or not client.get("client_secret"):
         raise DirectoryError("The organisation's Google OAuth client is incomplete. Ask IT.")
     return client

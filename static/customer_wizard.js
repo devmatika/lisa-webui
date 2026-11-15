@@ -40,6 +40,23 @@ const CUSTOMER_WIZARD = {
   applied: false,
 };
 
+// Lisa Enterprise: the wizard sets up the organisation (the template every user's assistant is built
+// from), so it shows only the steps that apply to everyone; the server sends that list.
+const CW_ORG_STEP_TITLES = {
+  company: 'Company & Assistant',
+  provider: 'AI Model (for everyone)',
+  services: 'Organisation Services',
+  organization: 'Team & Access',
+  finish: 'Validate & Finish',
+};
+const CW_ORG_LINKS = [
+  ['users', 'Users', 'Add people, choose their role, send the password link.', 'org.users.manage'],
+  ['roles', 'Roles', 'What each role may do: assistant tools, Google / Outlook / ClickUp access.', 'org.users.manage'],
+  ['knowledge', 'Knowledge', 'Company knowledge areas and who may read, contribute or approve.', 'knowledge.read'],
+  ['account', 'My account', 'Link your own Telegram and connect your own Google / ClickUp.', null],
+  ['audit', 'Audit log & status', 'Gateway health, logins, denied requests, every change.', 'org.audit.read'],
+];
+
 // ── Entry Points & Loading ────────────────────────────────────────────────────
 
 async function loadCustomerWizard(options = {}) {
@@ -47,6 +64,11 @@ async function loadCustomerWizard(options = {}) {
     const res = await api('/api/customer-wizard/status');
     if (!res) return false;
     CUSTOMER_WIZARD.status = res;
+    if (res.enterprise) {
+      CUSTOMER_WIZARD.steps = res.enterprise.steps;
+      CUSTOMER_WIZARD.stepTitles = res.enterprise.steps.map((s) => CW_ORG_STEP_TITLES[s] || s);
+      if (CUSTOMER_WIZARD.step >= CUSTOMER_WIZARD.steps.length) CUSTOMER_WIZARD.step = 0;
+    }
 
     // Initialize local draft from server status
     CUSTOMER_WIZARD.draft.company = { ...res.company };
@@ -133,7 +155,7 @@ async function runSetupWizardAgain() {
 let _wizardSaveChain = Promise.resolve();
 function _saveCurrentStepDraft() {
   const currentStepName = CUSTOMER_WIZARD.steps[CUSTOMER_WIZARD.step];
-  if (!currentStepName || currentStepName === 'finish') return _wizardSaveChain;
+  if (!currentStepName || currentStepName === 'finish' || currentStepName === 'organization') return _wizardSaveChain;
   _collectCurrentStepData(currentStepName);
   const body = JSON.stringify({ step: currentStepName, data: CUSTOMER_WIZARD.draft[currentStepName] || {} });
   _wizardSaveChain = _wizardSaveChain
@@ -326,6 +348,8 @@ function _renderCustomerWizardBody() {
     _renderStepKnowledge(body);
   } else if (stepName === 'briefing') {
     _renderStepBriefing(body);
+  } else if (stepName === 'organization') {
+    _renderStepOrganization(body);
   } else if (stepName === 'finish') {
     _renderStepFinish(body);
   }
@@ -638,15 +662,19 @@ function _handleServiceFileSelected(serviceId, inputEl) {
 // ── Step D: Connect Services ──────────────────────────────────────────────────
 
 function _renderStepServices(el) {
-  const services = (CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.services) || [];
+  const org = CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise;
+  const services = ((CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.services) || [])
+    .filter((s) => !org || org.services.includes(s.id));
   CUSTOMER_WIZARD.expandedServices = CUSTOMER_WIZARD.expandedServices || { google_workspace: true };
   CUSTOMER_WIZARD.stagedFiles = CUSTOMER_WIZARD.stagedFiles || {};
 
   el.innerHTML = `
     <div class="cw-step-pane">
       <div class="cw-pane-head">
-        <h3>Connect Business Services</h3>
-        <p>Configure credentials and upload token files directly below. Settings and keys are encrypted and saved to your private environment.</p>
+        <h3>${org ? 'Organisation Services' : 'Connect Business Services'}</h3>
+        <p>${org
+          ? 'Credentials the whole company shares: the company Telegram bot, the Google OAuth client (type <b>Web</b>, redirect URI <code>' + _escapeHtml(location.origin) + '/api/enterprise/google/callback</code>) and the Microsoft app registration. Each employee then connects their own Google account or ClickUp token under <b>My account</b>; who may use which service is set per role.'
+          : 'Configure credentials and upload token files directly below. Settings and keys are encrypted and saved to your private environment.'}</p>
       </div>
 
       <div class="cw-services-list">
@@ -1678,6 +1706,50 @@ function _renderStepBriefing(el) {
   `;
 }
 
+// ── Enterprise: Team & Access ─────────────────────────────────────────────────
+
+function _renderStepOrganization(el) {
+  const org = (CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise) || { checks: {}, counts: {} };
+  const c = org.checks, n = org.counts;
+  const row = (ok, title, detail) => `
+    <div class="cw-check-item ${ok ? 'passed' : 'skipped'}">
+      <span class="cw-check-icon">${ok ? '✓' : '—'}</span>
+      <div class="cw-check-info"><strong>${title}</strong><small>${detail}</small></div>
+    </div>`;
+  const perms = window.LISA_ME ? window.LISA_ME.permissions : null;  // the Organization page enforces it anyway
+  const links = CW_ORG_LINKS.filter(([, , , perm]) => !perm || !perms || perms.includes(perm));
+  el.innerHTML = `
+    <div class="cw-step-pane">
+      <div class="cw-pane-head">
+        <h3>Team & Access</h3>
+        <p>People, roles and company knowledge are managed on the Organization page (also in the menu under
+          <b>Organization</b>). Each link opens in a new tab; this wizard keeps your progress.</p>
+      </div>
+      <div class="cw-checks-list">
+        ${row(c.model, 'AI model for everyone', c.model ? _escapeHtml(org.model) : 'Set it in the "AI Model" step; every assistant uses it.')}
+        ${row(n.users > 1, 'Users', `${n.users} user(s)${n.users_waiting_for_password ? `, ${n.users_waiting_for_password} have not set a password yet` : ''}`)}
+        ${row(n.roles > 0, 'Roles', `${n.roles} role(s): viewer, staff, manager, admin, operator and your own`)}
+        ${row(n.knowledge_areas > 0, 'Company knowledge', `${n.knowledge_areas} knowledge area(s)`)}
+        ${row(c.telegram_bot, 'Company Telegram bot', c.telegram_bot
+          ? `${n.telegram_links} user(s) linked. Each user links under My account with a pairing code from the bot.`
+          : 'Add the bot token in "Organisation Services".')}
+        ${row(c.google_client, 'Google sign-in for users', c.google_client ? 'OAuth client ready' : 'Optional: add the OAuth client in "Organisation Services".')}
+        ${row(c.outlook_app, 'Outlook (Microsoft app)', c.outlook_app ? 'App registration ready' : 'Optional.')}
+        ${row(c.email, 'E-mailed invitations', c.email ? 'SMTP configured' : 'Optional: set LISA_SMTP_* and LISA_PUBLIC_URL in the stack .env; until then copy password links by hand.')}
+        ${row(c.public_url, 'Public address', c.public_url ? 'LISA_PUBLIC_URL set' : 'Needed for e-mailed links and Google: set LISA_PUBLIC_URL in the stack .env.')}
+        ${row(c.voice, 'Voice', c.voice ? 'Enabled' : 'Optional: LISA_VOICE_SECRET + DEEPGRAM_API_KEY, then start the voice profile.')}
+      </div>
+      <div class="cw-services-list" style="margin-top:16px">
+        ${links.map(([tab, title, hint]) => `
+          <a class="cw-service-card" href="/lisa#${tab}" target="_blank" rel="noopener"
+             style="display:block;text-decoration:none;color:inherit;padding:12px 14px">
+            <strong>${title} ↗</strong><br><small class="cw-muted">${hint}</small>
+          </a>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
 // ── Step G: Validate & Finish ─────────────────────────────────────────────────
 
 async function _renderStepFinish(el) {
@@ -1739,11 +1811,16 @@ function _renderValidationBox(res) {
     <div class="cw-summary-card">
       <h4>Setup Summary</h4>
       <ul>
+        ${CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise ? `
+        <li><strong>Company:</strong> ${_escapeHtml(CUSTOMER_WIZARD.draft.company.company_name || '')}</li>
+        <li><strong>AI Model:</strong> ${_escapeHtml(CUSTOMER_WIZARD.draft.provider.model || 'Configured')}</li>
+        <li><strong>Users:</strong> ${CUSTOMER_WIZARD.status.enterprise.counts.users} — Apply refreshes every user's assistant and restarts the gateway (about 20 s).</li>
+      </ul>` : `
         <li><strong>Company:</strong> ${_escapeHtml(CUSTOMER_WIZARD.draft.company.company_name || 'Matika')} (${_escapeHtml(CUSTOMER_WIZARD.draft.company.assistant_name || 'Lisa')})</li>
         <li><strong>AI Model:</strong> ${_escapeHtml(CUSTOMER_WIZARD.draft.provider.model || 'Configured')}</li>
         <li><strong>Active Capabilities:</strong> ${(CUSTOMER_WIZARD.draft.capabilities || []).join(', ') || 'None selected'}</li>
         <li><strong>Daily Briefing:</strong> ${CUSTOMER_WIZARD.draft.briefing.enabled ? `Scheduled at ${CUSTOMER_WIZARD.draft.briefing.time}` : 'Disabled'}</li>
-      </ul>
+      </ul>`}
     </div>
   `;
 }
@@ -1759,7 +1836,10 @@ async function _applyCustomerWizard() {
     const res = await api('/api/customer-wizard/apply', { method: 'POST', body: '{}' });
     if (res && res.ok) {
       CUSTOMER_WIZARD.applied = true;
-      _showWizardNotice('✓ Setup successfully applied and saved!', 'success');
+      const org = res.organization;
+      _showWizardNotice(org
+        ? `✓ Organisation settings saved. Refreshing ${org.refreshing} assistant(s) and restarting the gateway — chat and Telegram are back in about 20 seconds.`
+        : '✓ Setup successfully applied and saved!', 'success');
       _renderCustomerWizardSteps();
     } else {
       _showWizardNotice('Failed to apply setup: ' + ((res && res.message) || 'Unknown error'), 'error');

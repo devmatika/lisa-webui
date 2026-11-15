@@ -14,6 +14,7 @@ import time
 from collections import deque
 
 logger = logging.getLogger(__name__)
+ORG_SETUP_PREFIX = "/api/customer-wizard/"
 
 PUBLIC_EXACT = frozenset({
     "/login", "/health", "/favicon.ico", "/sw.js", "/manifest.json", "/manifest.webmanifest",
@@ -126,6 +127,9 @@ def check(handler, parsed) -> bool:
     if not _within_limit(user.user_id, parsed.path):
         return _send(handler, 429, {"error": "Too many requests; slow down a little"}, {"Retry-After": "30"})
     from api.profiles import bind_request_profile
-    bind_request_profile(user.hermes_profile)
+    # The setup wizard configures the organisation: the default profile every assistant is built
+    # from (model, provider keys, Telegram bot, Google / Microsoft app credentials). Only
+    # operator.setup reaches these routes; everything else stays on the user's own profile.
+    bind_request_profile("default" if parsed.path.startswith(ORG_SETUP_PREFIX) else user.hermes_profile)
     handler._lisa_user = user
     return True

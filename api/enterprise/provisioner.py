@@ -50,8 +50,11 @@ INTEGRATIONS = {
 }
 MEDIA_POLICY = {"profile_isolation": True, "strict": True, "trust_recent_files": False}
 COPIED_CONFIG_KEYS = ("model", "providers", "custom_providers", "fallback_providers", "auxiliary", "timezone")
+# The setup wizard stores the Microsoft app under these names; the Outlook plugin reads MS_GRAPH_*.
+ENV_ALIASES = {"MICROSOFT_TENANT_ID": "MS_GRAPH_TENANT_ID", "MICROSOFT_CLIENT_ID": "MS_GRAPH_CLIENT_ID",
+               "MICROSOFT_CLIENT_SECRET": "MS_GRAPH_CLIENT_SECRET"}
 PROVIDER_KEY = re.compile(r"^(OPENROUTER|OPENAI|ANTHROPIC|GOOGLE|GEMINI|DEEPSEEK|MISTRAL|GROQ|XAI|TOGETHER|"
-                          r"FIREWORKS|AZURE_OPENAI|NOUS|CEREBRAS)_API_KEY$|^OPENAI_BASE_URL$")
+                          r"FIREWORKS|AZURE_OPENAI|NOUS|CEREBRAS|XIAOMI|GLM|NVIDIA|OLLAMA|LM)_API_KEY$|^OPENAI_BASE_URL$")
 
 
 def profile_name_for(user_id: str) -> str:
@@ -172,9 +175,10 @@ def provision(user_id: str, toolsets: list[str], permissions=(), email: str = ""
     return name
 
 
-def ensure_front_desk() -> None:
-    """Catch-all profile for Telegram senders who are not linked: no tools, no memory of anyone."""
-    if not (_home(FRONT_DESK) / "lisa-owner.json").exists():
+def ensure_front_desk(refresh: bool = False) -> None:
+    """Catch-all profile for Telegram senders who are not linked: no tools, no memory of anyone.
+    ``refresh`` rebuilds it after the organisation's model settings changed."""
+    if refresh or not (_home(FRONT_DESK) / "lisa-owner.json").exists():
         _build(FRONT_DESK, [], owner=FRONT_DESK)
 
 
@@ -189,6 +193,12 @@ def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str
     (home / "config.yaml").write_text(yaml.safe_dump(
         render_config(default_cfg or {}, toolsets, name, integrations, email), sort_keys=False))
     root_env = _read_env(root / ".env")
+    for alias, name in ENV_ALIASES.items():
+        if root_env.get(alias) and not root_env.get(name):
+            root_env[name] = root_env[alias]
+    if root_env.get("MS_GRAPH_CLIENT_SECRET"):
+        # each user's mailbox is pinned by address, which only app (client-credentials) auth allows
+        root_env.setdefault("MS_GRAPH_AUTH_MODE", "app")
     granted_env = {k for i in integrations for k in INTEGRATIONS[i]["env"]}
     env = {k: v for k, v in root_env.items() if PROVIDER_KEY.match(k) or k in granted_env}
     # Credentials the user connected themselves survive re-provisioning only while still granted.
