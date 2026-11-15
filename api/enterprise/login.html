@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lisa — Sign in</title>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --text:#1d2430; --muted:#5b6575; --line:#d7dce3; --accent:#006eb3; --err:#b42318; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12161c; --card:#1b2129; --text:#e6e9ee; --muted:#9aa4b2; --line:#2c3440; --accent:#3aa0e6; --err:#f97066; } }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--text);
+         font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding:16px; }
+  main { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:28px; }
+  h1 { font-size:20px; margin:0 0 4px; } p.sub { color:var(--muted); margin:0 0 20px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 4px; }
+  input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); font:inherit; }
+  input:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  button { width:100%; margin-top:20px; padding:11px; border:0; border-radius:8px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .err { color:var(--err); font-size:14px; min-height:20px; margin-top:12px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <form id="login" hidden>
+    <h1>Sign in to Lisa</h1><p class="sub">Use the account your administrator created for you.</p>
+    <label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" required>
+    <label for="l-pw">Password</label><input id="l-pw" type="password" autocomplete="current-password" required>
+    <button type="submit">Sign in</button>
+  </form>
+  <form id="setup" hidden>
+    <h1>Set up Lisa</h1><p class="sub">Create your organisation and the first administrator account.</p>
+    <label for="s-org">Organisation name</label><input id="s-org" required>
+    <label for="s-name">Your name</label><input id="s-name" autocomplete="name" required>
+    <label for="s-email">E-mail</label><input id="s-email" type="email" autocomplete="username" required>
+    <label for="s-pw">Password (at least 10 characters)</label><input id="s-pw" type="password" minlength="10" autocomplete="new-password" required>
+    <button type="submit">Create organisation</button>
+  </form>
+  <form id="password" hidden>
+    <h1>Choose your password</h1><p class="sub">This link works once.</p>
+    <label for="p-pw">New password (at least 10 characters)</label><input id="p-pw" type="password" minlength="10" autocomplete="new-password" required>
+    <button type="submit">Save and sign in</button>
+  </form>
+  <div class="err" id="err" role="alert"></div>
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => { $(id).hidden = false; $(id).querySelector('input').focus(); };
+  async function post(url, body, form) {
+    const btn = form.querySelector('button'); btn.disabled = true; $('err').textContent = '';
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                   credentials: 'same-origin', body: JSON.stringify(body) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
+      location.replace('/');
+    } catch (e) { $('err').textContent = e.message; btn.disabled = false; }
+  }
+  $('login').addEventListener('submit', (e) => { e.preventDefault();
+    post('/api/enterprise/login', { email: $('l-email').value, password: $('l-pw').value }, e.target); });
+  $('setup').addEventListener('submit', (e) => { e.preventDefault();
+    post('/api/enterprise/setup', { org_name: $('s-org').value, display_name: $('s-name').value,
+                                    email: $('s-email').value, password: $('s-pw').value }, e.target); });
+  $('password').addEventListener('submit', (e) => { e.preventDefault();
+    const token = new URLSearchParams(location.search).get('token') || '';
+    post('/api/enterprise/password', { token: token, password: $('p-pw').value }, e.target); });
+  if (location.pathname === '/set-password') return show('password');
+  fetch('/api/enterprise/setup/status', { credentials: 'same-origin' })
+    .then((r) => r.json()).then((s) => show(s.needs_setup ? 'setup' : 'login'))
+    .catch(() => { $('err').textContent = 'Lisa is not reachable. Try again shortly.'; });
+})();
+</script>
+</body>
+</html>

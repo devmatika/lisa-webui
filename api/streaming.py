@@ -15405,7 +15405,10 @@ def _run_agent_streaming(
                     # (Opus pre-release advisor finding for v0.50.257.)
                     _override = getattr(_session_meta, 'enabled_toolsets', None) if _session_meta else None
                     if _override:
-                        _toolsets = _override
+                        from api.enterprise import enabled as _enterprise_on
+                        # Lisa Enterprise: the profile's own toolsets are the user's entitlement;
+                        # a session override may only narrow them, never add (Phase 0 finding).
+                        _toolsets = [t for t in _override if t in _toolsets] if _enterprise_on() else _override
             except Exception as _ts_err:
                 print(f"[webui] WARNING: failed to read per-session toolsets for {session_id}: {_ts_err}", flush=True)
 

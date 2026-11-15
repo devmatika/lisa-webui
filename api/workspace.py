@@ -649,6 +649,9 @@ def get_profile_default_workspace(profile: str | Path | None = None) -> str:
 
 
 def get_last_workspace(profile: str | Path | None = None) -> str:
+    enterprise_root = _enterprise_workspace_root()
+    if enterprise_root is not None:
+        return _enterprise_last_workspace(enterprise_root, profile)
     try:
         remote_cwd = _remote_terminal_cwd(profile=profile) if profile is not None else _remote_terminal_cwd()
     except TypeError:
@@ -1092,10 +1095,14 @@ def resolve_trusted_workspace(path: str | Path | None = None, profile: str | Pat
     None/empty path falls back to the boot-time DEFAULT_WORKSPACE, which is always
     trusted (it was validated at server startup).
     """
+    enterprise_root = _enterprise_workspace_root()
     if path in (None, ""):
+        if enterprise_root is not None:
+            return enterprise_root
         return _resolve_path(_BOOT_DEFAULT_WORKSPACE, profile) if profile is not None else _resolve_path(_BOOT_DEFAULT_WORKSPACE)
 
     candidate = _resolve_path(path, profile) if profile is not None else _resolve_path(path)
+    _confine_to_enterprise_root(candidate)
 
     access_error = _workspace_access_error(candidate)
     remote_candidate = _remote_terminal_workspace_candidate(path, profile=profile)
@@ -1255,6 +1262,36 @@ def _strip_surrounding_quotes(path: str) -> str:
     return s
 
 
+def _enterprise_workspace_root() -> Path | None:
+    """Lisa Enterprise: a signed-in user's only workspace root is their own profile's ``workspace/``.
+    The ordinary trust rule (anything under the WebUI home) would cover every colleague's profile,
+    because all profiles live under ``~/.hermes/profiles``. None outside enterprise or unbound."""
+    from api.enterprise import enabled
+    from api.profiles import get_active_hermes_home, request_profile_is_bound
+    if not (enabled() and request_profile_is_bound()):
+        return None
+    root = Path(get_active_hermes_home()) / "workspace"
+    root.mkdir(parents=True, exist_ok=True)
+    return root.resolve()
+
+
+def _enterprise_last_workspace(root: Path, profile) -> str:
+    """The saved last workspace when it is still inside the user's root, else the root itself."""
+    lw_file = _last_workspace_file_for_profile(profile)
+    if lw_file is not None and lw_file.exists():
+        raw = lw_file.read_text(encoding='utf-8').strip()
+        if raw and Path(raw).is_dir() and _is_within(Path(raw).resolve(), root):
+            return raw
+    return str(root)
+
+
+def _confine_to_enterprise_root(candidate: Path) -> Path:
+    root = _enterprise_workspace_root()
+    if root is not None and not _is_within(candidate.resolve(), root):
+        raise ValueError("Workspaces must be inside your own Lisa workspace")
+    return candidate
+
+
 def validate_workspace_to_add(path: str, profile: str | Path | None = None) -> Path:
     """Validate a path for *adding* to the workspace list (less restrictive than resolve_trusted_workspace).
 
@@ -1271,6 +1308,7 @@ def validate_workspace_to_add(path: str, profile: str | Path | None = None) -> P
     """
     path = _strip_surrounding_quotes(path)
     candidate = _resolve_path(path, profile) if profile is not None else _resolve_path(path)
+    _confine_to_enterprise_root(candidate)
 
     access_error = _workspace_access_error(candidate)
     remote_candidate = _remote_terminal_workspace_candidate(path, profile=profile)

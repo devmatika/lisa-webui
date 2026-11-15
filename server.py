@@ -552,6 +552,38 @@ def _abort_if_already_serving(host: str, port: int) -> None:
         pass
 
 
+def _start_enterprise() -> None:
+    """Lisa Enterprise: migrate Postgres before serving. Waits up to 120 s for the database
+    (it may still be starting in Compose); exits rather than serve unauthenticated."""
+    from api.enterprise import enabled
+    if not enabled():
+        return
+    if os.environ.get("HERMES_WEBUI_GATEWAY_BASE_URL", "").strip():
+        # Upstream lets a launcher-exported URL outrank every profile's own route, which would run
+        # every employee's chat in the default profile. Lisa writes the shared URL into config instead.
+        print('[!!] Lisa Enterprise: unset HERMES_WEBUI_GATEWAY_BASE_URL (Lisa manages gateway URLs)', flush=True)
+        raise SystemExit(78)
+    from api.enterprise import db as edb
+    from api.enterprise.directory import seed
+    deadline = time.time() + 120
+    while True:
+        try:
+            revision = edb.migrate()
+            with edb.session() as db:
+                seed(db)
+            from api.enterprise.provisioner import ensure_front_desk, ensure_root_gateway_url
+            ensure_root_gateway_url()
+            ensure_front_desk()
+            print(f'[ok] Lisa Enterprise: database at revision {revision}', flush=True)
+            return
+        except Exception as exc:
+            if time.time() > deadline:
+                print(f'[!!] Lisa Enterprise: database unavailable, refusing to start: {exc}', flush=True)
+                raise SystemExit(78)
+            print(f'[..] Lisa Enterprise: waiting for database ({type(exc).__name__})', flush=True)
+            time.sleep(3)
+
+
 def main() -> None:
     from api.config import print_startup_config, verify_hermes_imports, _HERMES_FOUND, _AGENT_DIR
 
@@ -576,6 +608,7 @@ def main() -> None:
         print(f"[!!] WARNING: Could not raise file descriptor limit: {fd_limit.get('error')}", flush=True)
 
     fix_credential_permissions()
+    _start_enterprise()
 
     try:
         from api.models import _active_state_db_path

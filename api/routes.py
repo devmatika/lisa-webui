@@ -495,6 +495,9 @@ def _all_profiles_query_flag(parsed_url) -> bool:
     Centralizes the opt-in parsing so /api/sessions and /api/projects use
     the same shape. Accepts 1/true/yes (case-insensitive) for ergonomics.
     """
+    from api.profiles import request_profile_is_bound
+    if request_profile_is_bound():
+        return False  # a bound identity owns one profile and never reads across
     qs = parse_qs(parsed_url.query)
     raw = qs.get('all_profiles', [''])[0].strip().lower()
     return raw in ('1', 'true', 'yes', 'on')
@@ -2005,8 +2008,13 @@ def _ensure_agent_cron_import_path() -> None:
                     sys.modules.pop(name, None)
 
 
+def _bound() -> bool:
+    from api.profiles import request_profile_is_bound
+    return request_profile_is_bound()
+
+
 def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict]]:
-    """Return active-profile rows plus foreign rows for the Tasks panel.
+    """Return active-profile rows plus foreign rows for the Tasks panel (none for a bound request).
 
     Row ownership is intentionally distinct from a cron job's persisted
     ``profile`` field. The persisted field controls where the job executes;
@@ -2039,7 +2047,7 @@ def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict
         names.append(name)
 
     _add_name(active_profile)
-    for row in list_profiles_api():
+    for row in ([] if _bound() else list_profiles_api()):
         if not isinstance(row, dict):
             continue
         name = str(row.get("name") or "").strip()
@@ -2981,7 +2989,7 @@ def _build_session_list_cache_payload(
         other_profile_count = 0
     else:
         scoped = [s for s in merged if _profiles_match(s.get("profile"), active_profile)]
-        other_profile_count = 0 if _is_isolated_profile_mode() else len(merged) - len(scoped)
+        other_profile_count = 0 if _is_isolated_profile_mode() or _bound() else len(merged) - len(scoped)
     diag_stage("messaging_dedupe")
     archived_scoped = _keep_latest_messaging_session_per_source(
         list(scoped),
@@ -10326,7 +10334,8 @@ def _claim_or_synthesize_cli_session(sid: str, cli_meta: dict = None):
 
 
 def _request_wants_all_profiles_import(body) -> bool:
-    if not isinstance(body, dict):
+    from api.profiles import request_profile_is_bound
+    if not isinstance(body, dict) or request_profile_is_bound():
         return False
     value = body.get("all_profiles")
     if isinstance(value, str):
@@ -16200,8 +16209,21 @@ def _handle_session_get(handler, parsed) -> bool:
         return j(handler, {"session": public_session_projection(sess)})
 
 
+def _dispatch_enterprise(handler, parsed, method: str) -> bool:
+    """Lisa Enterprise owns /api/enterprise/*, /login and /set-password when it is on."""
+    from api.enterprise import enabled
+    if not enabled():
+        return False
+    if not (parsed.path.startswith("/api/enterprise/") or parsed.path in ("/login", "/set-password", "/lisa")):
+        return False
+    from api.enterprise.routes import handle
+    return handle(handler, parsed, method)
+
+
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
+    if _dispatch_enterprise(handler, parsed, "GET"):
+        return True
     if _dispatch_voice_embed(handler, parsed, "GET"):
         return True
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
@@ -16259,6 +16281,12 @@ def handle_get(handler, parsed) -> bool:
                     json.dumps(csp_img_extra_sources(extra_img_src)).replace("<", "\\u003c"),
                 )
             )
+            from api.enterprise import enabled as _enterprise_on
+            if _enterprise_on():  # account (Telegram link, sign out) + organisation admin
+                html = html.replace("</body>", '<a href="/lisa" id="lisa-org-link" style="position:fixed;'
+                                    'right:14px;bottom:14px;z-index:50;padding:6px 12px;border-radius:999px;'
+                                    'background:var(--accent,#006eb3);color:#fff;font:13px system-ui;'
+                                    'text-decoration:none">Organization</a></body>', 1)
             return t(
                 handler,
                 inject_extension_tags(html),
@@ -17010,7 +17038,7 @@ def handle_get(handler, parsed) -> bool:
         else:
             scoped = [p for p in all_projects
                       if _profiles_match(p.get("profile"), active_profile)]
-            other_profile_count = 0 if isolated_profile_mode else len(all_projects) - len(scoped)
+            other_profile_count = 0 if isolated_profile_mode or _bound() else len(all_projects) - len(scoped)
         return j(handler, {
             "projects": scoped,
             "all_profiles": all_profiles,
@@ -17495,6 +17523,9 @@ def handle_get(handler, parsed) -> bool:
         try:
             diag.stage("list_profiles_api") if diag else None
             profiles_payload = profiles_api.list_profiles_api()
+            if _bound():  # a bound identity sees its own profile only, never colleagues' names
+                own = profiles_api.get_active_profile_name()
+                profiles_payload = [p for p in profiles_payload if _profiles_match(p.get("name"), own)]
             diag.stage("active_profile_lookup") if diag else None
             active = profiles_api.get_active_profile_name()
             diag.stage("isolated_mode_check") if diag else None
@@ -17884,6 +17915,8 @@ def _llm_update_summary(system_prompt: str, user_prompt: str, active_profile: st
 
 def handle_post(handler, parsed) -> bool:
     """Handle all POST routes. Returns True if handled, False for 404."""
+    if _dispatch_enterprise(handler, parsed, "POST"):
+        return True
     if _dispatch_voice_embed(handler, parsed, "POST"):
         return True
     diag = RequestDiagnostics.maybe_start("POST", parsed.path, logger=logger, print_fn=getattr(handler, '_safe_webui_print', None))
@@ -24772,6 +24805,13 @@ def _handle_media(handler, parsed):
                 except Exception:
                     pass
 
+    from api.enterprise import enabled as _enterprise_on
+    if _enterprise_on() and _bound():
+        # Lisa Enterprise: ~/.hermes holds every colleague's profile and /tmp is shared, so a
+        # signed-in user's media roots are their own profile home (workspace included) only.
+        from api.profiles import get_active_hermes_home
+        allowed_roots = [Path(get_active_hermes_home()).resolve()]
+
     _INLINE_IMAGE_TYPES = {
         "image/png", "image/jpeg", "image/gif", "image/webp",
         "image/x-icon", "image/bmp",
@@ -24806,7 +24846,7 @@ def _handle_media(handler, parsed):
         qs.get("session_id", [""])[0],
         target,
         _SESSION_MEDIA_TOKEN_TYPES,
-    )
+    ) and not (_enterprise_on() and _bound() and not within_allowed)  # a MEDIA: token never crosses profiles
 
     # ── #3234: hard-deny Hermes's own state + secret/config files ────────────
     # The allowlist above grants the whole Hermes home (and base ~/.hermes), so

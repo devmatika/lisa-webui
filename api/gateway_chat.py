@@ -1963,6 +1963,15 @@ def _same_profile_home(a, b) -> bool:
 
 
 def _gateway_endpoint_for_profile(profile_name) -> tuple[str, str]:
+    url, key = _resolve_gateway_endpoint_for_profile(profile_name)
+    from api.enterprise import enabled
+    if enabled():
+        from api.enterprise.provisioner import assert_own_gateway_route
+        assert_own_gateway_route(profile_name, url)
+    return url, key
+
+
+def _resolve_gateway_endpoint_for_profile(profile_name) -> tuple[str, str]:
     """URL and key for a session's profile, never those of the process-active profile.
 
     The shared pair is what the WebUI process was given (launcher environment, default profile's .env, ambient

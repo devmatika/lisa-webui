@@ -207,10 +207,22 @@ def proxy_voice_embed(handler, parsed, method: str) -> None:
     target = origin + upstream_path
     if query:
         target += "?" + query
+    headers = _forward_headers(handler, origin, ui_prefix)
+    from api.enterprise import enabled as _enterprise_on
+    if _enterprise_on():
+        # Bind the voice session to the signed-in user's own profile; pipecat refuses offers without it.
+        from api.enterprise import voice
+        from api.enterprise.gate import current_user
+        user = current_user(handler)
+        try:
+            headers[voice.HEADER] = voice.ticket_for(user)
+        except (AttributeError, RuntimeError):
+            _send_unavailable(handler, 503, api=_is_api(path))
+            return
     request = urllib.request.Request(
         target,
         data=body if method in {"POST", "PATCH"} else None,
-        headers=_forward_headers(handler, origin, ui_prefix),
+        headers=headers,
         method=method,
     )
     try:

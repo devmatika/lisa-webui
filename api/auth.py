@@ -666,8 +666,16 @@ def get_oidc_startup_warning() -> str | None:
     return "\n".join(warnings) if warnings else None
 
 
+def _enterprise_on() -> bool:
+    """Lisa Enterprise replaces every single-operator login with per-user sessions (api/enterprise)."""
+    from api.enterprise import enabled
+    return enabled()
+
+
 def is_auth_enabled() -> bool:
     """True if password auth, passkeys, OIDC login, or trusted-header auth is configured."""
+    if _enterprise_on():
+        return True
     return (
         is_password_auth_enabled()
         or are_passkeys_enabled()
@@ -741,6 +749,9 @@ def _prune_expired_sessions():
 
 def verify_session(cookie_value: str) -> bool:
     """Verify a signed session cookie. Returns True if valid and not expired."""
+    if _enterprise_on():
+        from api.enterprise import sessions
+        return sessions.verify(cookie_value) is not None
     if not cookie_value or '.' not in cookie_value:
         return False
     _prune_expired_sessions()  # lazy cleanup on every verification attempt
@@ -994,9 +1005,9 @@ def _apply_trusted_session_profile(handler, bound_profile: str | None, cookie_va
     if bound_profile is None:
         return
     from api.helpers import get_profile_cookie
-    from api.profiles import set_request_profile
+    from api.profiles import bind_request_profile
 
-    set_request_profile(bound_profile)
+    bind_request_profile(bound_profile)
     if get_profile_cookie(handler) != bound_profile:
         _queue_pending_cookie(handler, _build_profile_cookie_header(bound_profile, cookie_value))
 
@@ -1113,7 +1124,7 @@ def csrf_token_for_session(cookie_value: str) -> str | None:
     rotates on login and is invalidated when the auth session expires or logs
     out. Callers must still verify the auth session before trusting it.
     """
-    token = _session_token_from_cookie_value(cookie_value)
+    token = cookie_value if _enterprise_on() else _session_token_from_cookie_value(cookie_value)
     if not token:
         return None
     return hmac.new(_signing_key(), f"csrf:{token}".encode(), hashlib.sha256).hexdigest()
@@ -1165,6 +1176,9 @@ def read_cookie(handler, name: str) -> str | None:
 
 def parse_cookie(handler) -> str | None:
     """Extract the auth cookie from the request headers."""
+    if _enterprise_on():
+        from api.enterprise.sessions import COOKIE_NAME
+        return read_cookie(handler, COOKIE_NAME)
     return read_cookie(handler, _resolve_cookie_name())
 
 
@@ -1211,6 +1225,9 @@ def _safe_login_inner_next(query: str | None) -> str:
 def check_auth(handler, parsed) -> bool:
     """Check if request is authorized. Returns True if OK.
     If not authorized, sends 401 (API) or 302 redirect (page) and returns False."""
+    if _enterprise_on():
+        from api.enterprise.gate import check
+        return check(handler, parsed)
     if not is_auth_enabled():
         return True
     # Public paths don't require auth

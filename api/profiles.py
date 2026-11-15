@@ -543,6 +543,18 @@ def set_request_profile(name: str) -> None:
     _tls.profile = name
 
 
+def bind_request_profile(name: str) -> None:
+    """Pin this request to *name* because the signed-in identity owns exactly that profile
+    (Lisa Enterprise user, or a trusted-header session with a bound profile). A bound request
+    never reads across profiles: ``all_profiles`` aggregates and cross-profile imports are refused."""
+    _tls.profile = name
+    _tls.bound = True
+
+
+def request_profile_is_bound() -> bool:
+    return bool(getattr(_tls, "bound", False))
+
+
 def clear_request_profile() -> None:
     """Clear the per-request profile context for this thread.
 
@@ -550,6 +562,7 @@ def clear_request_profile() -> None:
     Safe to call even if set_request_profile() was never called.
     """
     _tls.profile = None
+    _tls.bound = False
 
 
 def _resolve_profile_home_for_name(name: str) -> Path:

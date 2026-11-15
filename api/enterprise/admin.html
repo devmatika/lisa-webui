@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lisa Organization</title>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --text:#1d2430; --muted:#5b6575; --line:#d7dce3; --accent:#006eb3;
+          --ok:#067647; --err:#b42318; --chip:#eef2f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12161c; --card:#1b2129; --text:#e6e9ee; --muted:#9aa4b2;
+          --line:#2c3440; --accent:#3aa0e6; --ok:#47cd89; --err:#f97066; --chip:#242c37; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; } header .who { color:var(--muted); font-size:13px; margin-left:auto; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; }
+  nav button { background:none; border:0; padding:8px 12px; border-radius:6px; color:var(--muted); font:inherit; cursor:pointer; }
+  nav button[aria-selected="true"] { background:var(--chip); color:var(--text); font-weight:600; }
+  main { max-width:1000px; margin:0 auto; padding:16px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:500; font-size:13px; }
+  .scroll { overflow-x:auto; }
+  .chip { display:inline-block; background:var(--chip); border-radius:999px; padding:1px 8px; font-size:12px; margin:1px 2px 1px 0; }
+  .ok { color:var(--ok); } .err { color:var(--err); } .muted { color:var(--muted); font-size:13px; }
+  input, select { padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--text); font:inherit; }
+  button.act { padding:7px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:4px 12px; }
+  label.check { display:flex; gap:6px; align-items:center; font-size:14px; }
+  code { background:var(--chip); padding:1px 5px; border-radius:4px; font-size:13px; word-break:break-all; }
+  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:8px 14px; border-radius:8px; display:none; max-width:90vw; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Lisa Organization</h1>
+  <nav id="tabs" role="tablist"></nav>
+  <span class="who" id="who"></span>
+  <a class="act" href="/" style="text-decoration:none">← Chat</a>
+</header>
+<main>
+  <div id="account" data-tab="My account">
+    <section>
+      <h2>Telegram</h2>
+      <div id="tg-status" class="muted">Loading…</div>
+      <ol class="muted" id="tg-steps">
+        <li>Open the company Lisa bot in Telegram and send any message.</li>
+        <li>The bot answers with a pairing code. Enter it here.</li>
+      </ol>
+      <div class="row" id="tg-link-row">
+        <input id="tg-code" placeholder="Pairing code" maxlength="12" autocomplete="off">
+        <button class="act primary" id="tg-link">Link Telegram</button>
+      </div>
+      <button class="act" id="tg-unlink" hidden>This is not my Telegram account — unlink</button>
+    </section>
+    <section><h2>Session</h2><button class="act" id="logout">Sign out</button></section>
+  </div>
+
+  <div id="users" data-tab="Users" data-perm="org.users.manage" hidden>
+    <section>
+      <h2>Add a user</h2>
+      <div class="row">
+        <input id="nu-email" type="email" placeholder="email@company.com">
+        <input id="nu-name" placeholder="Full name">
+        <input id="nu-dept" placeholder="Department (optional)">
+        <select id="nu-role"></select>
+        <button class="act primary" id="nu-add">Add user</button>
+      </div>
+      <p class="muted" id="nu-result"></p>
+    </section>
+    <section><h2>Users</h2><div class="scroll"><table id="user-table"></table></div></section>
+  </div>
+
+  <div id="roles" data-tab="Roles" data-perm="org.users.manage" hidden>
+    <section>
+      <h2>Role</h2>
+      <div class="row"><select id="role-pick"></select><button class="act" id="role-new">New role</button></div>
+      <div class="row" style="margin-top:10px">
+        <input id="role-key" placeholder="key (e.g. sales)"><input id="role-name" placeholder="Display name">
+      </div>
+      <h2 style="margin-top:14px">Permissions</h2><div class="grid" id="role-perms"></div>
+      <h2 style="margin-top:14px">Assistant tools</h2>
+      <p class="muted">What this role's assistant may use. File, terminal and code tools are never available to organisation users.</p>
+      <div class="grid" id="role-tools"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="act primary" id="role-save">Save role</button>
+        <button class="act" id="role-delete">Delete role</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="knowledge" data-tab="Knowledge" data-perm="knowledge.read" hidden>
+    <section>
+      <h2>Search company knowledge</h2>
+      <div class="row"><input id="k-q" placeholder="e.g. milking robot cleaning" style="flex:1;min-width:200px"><button class="act primary" id="k-search">Search</button></div>
+      <div id="k-results" class="muted" style="margin-top:10px"></div>
+    </section>
+    <section data-need="knowledge.contribute">
+      <h2>Teach Lisa</h2>
+      <p class="muted">Describe a workflow. An approver of the area publishes it before anyone can find it.</p>
+      <div class="row"><select id="k-area"></select><input id="k-title" placeholder="Title" style="flex:1;min-width:200px"></div>
+      <textarea id="k-body" rows="6" style="width:100%;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);font:inherit" placeholder="Purpose, steps, owner, exceptions"></textarea>
+      <button class="act primary" id="k-submit">Submit for approval</button>
+    </section>
+    <section data-need="knowledge.approve"><h2>Drafts to approve</h2><div id="k-drafts" class="muted"></div></section>
+    <section data-need="knowledge.manage">
+      <h2>Areas and access</h2>
+      <p class="muted">One line per grant: <code>role:staff=read</code>, <code>department:Farm=contribute</code>, <code>user:&lt;user id&gt;=approve</code>. Administrators get nothing unless granted here.</p>
+      <div class="row"><input id="ka-key" placeholder="area key (folder)"><input id="ka-name" placeholder="Name"></div>
+      <textarea id="ka-grants" rows="4" style="width:100%;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);font:13px ui-monospace,monospace"></textarea>
+      <button class="act primary" id="ka-save">Save area</button>
+      <div class="scroll" style="margin-top:12px"><table id="ka-table"></table></div>
+      <h2 style="margin-top:14px">Questions Lisa could not answer</h2><div id="k-gaps" class="muted"></div>
+    </section>
+  </div>
+
+  <div id="audit" data-tab="Audit log" data-perm="org.audit.read" hidden>
+    <section><h2>Recent events</h2><div class="scroll"><table id="audit-table"></table></div></section>
+  </div>
+</main>
+<div id="toast" role="status"></div>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 3500); };
+  async function api(path, body) {
+    const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } :
+      { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Hermes-CSRF-Token': window.__csrf || '' }, body: JSON.stringify(body) });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) { location.href = '/login'; throw new Error('signed out'); }
+    if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
+    return data;
+  }
+  let me, rolesData;
+
+  function showTab(id) {
+    document.querySelectorAll('[data-tab]').forEach((el) => { el.hidden = el.id !== id; });
+    document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.for === id)));
+    ({ users: loadUsers, roles: loadRoles, audit: loadAudit, account: loadTelegram, knowledge: loadKnowledge })[id]?.();
+  }
+
+  async function loadTelegram() {
+    const s = await api('/api/enterprise/telegram');
+    $('tg-status').innerHTML = s.linked ? `<span class="ok">Linked</span> to Telegram account <b>${esc(s.telegram_name || s.telegram_user_id)}</b> (id ${esc(s.telegram_user_id)})` : 'Not linked yet.';
+    $('tg-unlink').hidden = !s.linked; $('tg-link-row').hidden = s.linked; $('tg-steps').hidden = s.linked;
+  }
+  $('tg-link').onclick = async () => {
+    try { const r = await api('/api/enterprise/telegram/link', { code: $('tg-code').value.trim() });
+      toast(r.gateway_restarting ? 'Linked. Lisa on Telegram is ready in about a minute.' : 'Linked.'); $('tg-code').value = ''; loadTelegram();
+    } catch (e) { toast(e.message); }
+  };
+  $('tg-unlink').onclick = async () => { await api('/api/enterprise/telegram/unlink', {}); toast('Telegram unlinked.'); loadTelegram(); };
+  $('logout').onclick = async () => { await api('/api/enterprise/logout', {}); location.href = '/login'; };
+
+  async function loadUsers() {
+    const [{ users }, roles] = await Promise.all([api('/api/enterprise/users'), api('/api/enterprise/roles')]);
+    rolesData = roles;
+    $('nu-role').innerHTML = roles.roles.map((r) => `<option value="${esc(r.key)}"${r.key === 'staff' ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
+    $('user-table').innerHTML = '<tr><th>User</th><th>Roles</th><th>Status</th><th></th></tr>' + users.map((u) => `
+      <tr><td><b>${esc(u.display_name || u.email)}</b><br><span class="muted">${esc(u.email)}</span></td>
+      <td>${u.roles.map((r) => `<span class="chip">${esc(r)}</span>`).join('')}<br>
+        <select data-roles="${esc(u.id)}" aria-label="Change role"><option value="">change role…</option>${roles.roles.map((r) => `<option value="${esc(r.key)}">${esc(r.name)}</option>`).join('')}</select></td>
+      <td class="${u.status === 'active' ? 'ok' : 'err'}">${esc(u.status)}${u.has_password ? '' : '<br><span class="muted">invited</span>'}</td>
+      <td class="row">${u.id === me.id ? '<span class="muted">you</span>' : `
+        <button class="act" data-status="${esc(u.id)}" data-to="${u.status === 'active' ? 'disabled' : 'active'}">${u.status === 'active' ? 'Disable' : 'Enable'}</button>`}
+        <button class="act" data-link="${esc(u.id)}">Password link</button></td></tr>`).join('');
+  }
+  $('user-table').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    try {
+      if (b.dataset.status) { await api('/api/enterprise/users/status', { user_id: b.dataset.status, status: b.dataset.to }); toast('Saved.'); loadUsers(); }
+      if (b.dataset.link) { const r = await api('/api/enterprise/users/password-link', { user_id: b.dataset.link });
+        $('nu-result').innerHTML = `Send this single-use link (valid 48 h): <code>${esc(location.origin + r.password_link)}</code>`; }
+    } catch (err) { toast(err.message); }
+  });
+  $('user-table').addEventListener('change', async (e) => {
+    const s = e.target.closest('select[data-roles]'); if (!s || !s.value) return;
+    try { await api('/api/enterprise/users/roles', { user_id: s.dataset.roles, roles: [s.value] }); toast('Role changed; it applies from the next conversation.'); loadUsers(); }
+    catch (err) { toast(err.message); }
+  });
+  $('nu-add').onclick = async () => {
+    try {
+      const r = await api('/api/enterprise/users', { email: $('nu-email').value, display_name: $('nu-name').value,
+        department: $('nu-dept').value || null, roles: [$('nu-role').value] });
+      $('nu-result').innerHTML = `User added. Send this single-use link so they choose a password (valid 48 h): <code>${esc(location.origin + r.password_link)}</code>`;
+      ['nu-email', 'nu-name', 'nu-dept'].forEach((id) => $(id).value = ''); loadUsers();
+    } catch (e) { toast(e.message); }
+  };
+
+  async function loadRoles() {
+    rolesData = await api('/api/enterprise/roles');
+    $('role-pick').innerHTML = rolesData.roles.map((r) => `<option value="${esc(r.key)}">${esc(r.name)}${r.builtin ? '' : ' (custom)'}</option>`).join('');
+    fillRole(rolesData.roles[0]);
+  }
+  function fillRole(role) {
+    const canEdit = me.permissions.includes('org.roles.manage');
+    $('role-key').value = role ? role.key : ''; $('role-key').disabled = !!role; $('role-name').value = role ? role.name : '';
+    $('role-perms').innerHTML = Object.entries(rolesData.catalog).map(([k, label]) =>
+      `<label class="check"><input type="checkbox" value="${esc(k)}" ${role && role.permissions.includes(k) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>${esc(label)}</label>`).join('');
+    $('role-tools').innerHTML = rolesData.toolsets.map((t) =>
+      `<label class="check"><input type="checkbox" value="${esc(t)}" ${role && role.toolsets.includes(t) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>${esc(t)}</label>`).join('');
+    $('role-save').hidden = $('role-new').hidden = !canEdit; $('role-delete').hidden = !canEdit || !role || role.builtin;
+  }
+  $('role-pick').onchange = () => fillRole(rolesData.roles.find((r) => r.key === $('role-pick').value));
+  $('role-new').onclick = () => fillRole(null);
+  $('role-save').onclick = async () => {
+    const checked = (id) => [...document.querySelectorAll(`#${id} input:checked`)].map((i) => i.value);
+    try { const r = await api('/api/enterprise/roles', { key: $('role-key').value, name: $('role-name').value,
+        permissions: checked('role-perms'), toolsets: checked('role-tools') });
+      toast(`Role saved; ${r.profiles_updated} assistant(s) updated.`); loadRoles(); } catch (e) { toast(e.message); }
+  };
+  $('role-delete').onclick = async () => { try { await api('/api/enterprise/roles/delete', { key: $('role-key').value }); toast('Role deleted.'); loadRoles(); } catch (e) { toast(e.message); } };
+
+  const can = (p) => me.permissions.includes(p);
+  async function loadKnowledge() {
+    document.querySelectorAll('#knowledge [data-need]').forEach((el) => { el.hidden = !can(el.dataset.need); });
+    const areas = await api('/api/enterprise/knowledge/areas');
+    $('k-area').innerHTML = Object.entries(areas.mine).filter(([, lv]) => lv !== 'read')
+      .map(([k]) => `<option>${esc(k)}</option>`).join('') || '<option value="">no area to contribute to</option>';
+    if (can('knowledge.approve')) {
+      const { drafts } = await api('/api/enterprise/knowledge/drafts');
+      $('k-drafts').innerHTML = drafts.length ? drafts.map((d) => `<div style="border-top:1px solid var(--line);padding:8px 0">
+        <b>${esc(d.title)}</b> <span class="chip">${esc(d.area)}</span><pre style="white-space:pre-wrap;color:var(--text)">${esc(d.body)}</pre>
+        <button class="act primary" data-decide="${esc(d.id)}" data-approve="1">Approve &amp; publish</button>
+        <button class="act" data-decide="${esc(d.id)}" data-approve="">Reject</button></div>`).join('') : 'Nothing waiting.';
+    }
+    if (can('knowledge.manage') && areas.all) {
+      $('ka-table').innerHTML = '<tr><th>Area</th><th>Access</th></tr>' + areas.all.map((a) => `<tr><td><b>${esc(a.key)}</b><br><span class="muted">${esc(a.name)}</span></td>
+        <td>${a.grants.map((g) => `<span class="chip">${esc(g.principal_type)}:${esc(g.principal_id)}=${esc(g.level)}</span>`).join('') || '<span class="err">nobody</span>'}</td></tr>`).join('');
+      const { gaps } = await api('/api/enterprise/knowledge/gaps');
+      $('k-gaps').innerHTML = gaps.slice(0, 30).map((g) => `<div>${esc(g.question)} <span class="muted">· ${esc(new Date(g.at).toLocaleDateString())}</span></div>`).join('') || 'None yet.';
+    }
+  }
+  $('k-search').onclick = async () => {
+    try { const r = await api('/api/enterprise/knowledge/search?q=' + encodeURIComponent($('k-q').value));
+      $('k-results').innerHTML = r.results.length ? r.results.map((h) => `<div style="padding:6px 0"><b>${esc(h.title)}</b> <code>${esc(h.path)}</code><br>${esc(h.snippet)}</div>`).join('')
+        : 'Nothing found in the areas you can read. The question was recorded so the knowledge base can be completed.';
+    } catch (e) { toast(e.message); }
+  };
+  $('k-submit').onclick = async () => {
+    try { await api('/api/enterprise/knowledge/drafts', { area: $('k-area').value, title: $('k-title').value, body: $('k-body').value });
+      toast('Submitted for approval.'); $('k-title').value = $('k-body').value = ''; } catch (e) { toast(e.message); }
+  };
+  $('k-drafts').addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-decide]'); if (!b) return;
+    try { const r = await api('/api/enterprise/knowledge/drafts/decide', { id: b.dataset.decide, approve: !!b.dataset.approve });
+      toast(r.status === 'approved' ? `Published as ${r.published_path}` : 'Rejected.'); loadKnowledge(); } catch (err) { toast(err.message); }
+  });
+  $('ka-save').onclick = async () => {
+    try {
+      const grants = $('ka-grants').value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
+        const m = l.match(/^(user|role|department):(.+)=(read|contribute|approve)$/); if (!m) throw new Error('Cannot read grant: ' + l);
+        return { principal_type: m[1], principal_id: m[2].trim(), level: m[3] }; });
+      await api('/api/enterprise/knowledge/areas', { key: $('ka-key').value, name: $('ka-name').value, grants });
+      toast('Area saved.'); loadKnowledge(); } catch (e) { toast(e.message); }
+  };
+
+  async function loadAudit() {
+    const { events } = await api('/api/enterprise/audit');
+    $('audit-table').innerHTML = '<tr><th>When</th><th>Action</th><th>Target</th><th>Details</th></tr>' + events.map((e) =>
+      `<tr><td class="muted">${esc(new Date(e.at).toLocaleString())}</td><td>${esc(e.action)}</td><td class="muted">${esc(e.target)}</td><td class="muted">${esc(JSON.stringify(e.detail))}</td></tr>`).join('');
+  }
+
+  api('/api/enterprise/me').then((m) => {
+    me = m; $('who').textContent = `${m.display_name || m.email} · ${m.roles.join(', ')}`;
+    const tabs = [...document.querySelectorAll('[data-tab]')].filter((el) => !el.dataset.perm || m.permissions.includes(el.dataset.perm));
+    $('tabs').innerHTML = tabs.map((el) => `<button role="tab" data-for="${el.id}">${esc(el.dataset.tab)}</button>`).join('');
+    $('tabs').onclick = (e) => { const b = e.target.closest('button'); if (b) showTab(b.dataset.for); };
+    showTab(location.hash === '#admin' && tabs.some((t) => t.id === 'users') ? 'users' : 'account');
+  });
+})();
+</script>
+</body>
+</html>
