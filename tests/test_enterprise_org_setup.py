@@ -119,6 +119,9 @@ def test_organisation_checklist_reflects_the_template_and_directory(ent):
     (root / ".env").write_text("OPENROUTER_API_KEY=k\nTELEGRAM_BOT_TOKEN=t\n")
     status = org_setup_status()
     assert status["checks"]["model"] and status["checks"]["telegram_bot"] and status["model"] == "some/model"
+    (root / ".env").write_text("")
+    (root / "config.yaml").write_text("model:\n  default: local\n  provider: custom\n  base_url: http://llm:8000/v1\n")
+    assert org_setup_status()["checks"]["model"]  # a custom / local endpoint needs no key in .env
 
 
 def test_apply_refreshes_every_assistant_and_the_front_desk_then_restarts(ent, monkeypatch):

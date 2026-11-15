@@ -58,7 +58,9 @@ def org_setup_status() -> dict:
             "telegram_links": count(TelegramLink),
         }
     checks = {
-        "model": bool(model_name) and any(provisioner.PROVIDER_KEY.match(k) for k in root_env),
+        # a provider key in .env, or a custom / local endpoint configured inline (copied with ``model``)
+        "model": bool(model_name) and (any(provisioner.PROVIDER_KEY.match(k) for k in root_env)
+                                       or (isinstance(model, dict) and bool(model.get("api_key") or model.get("base_url")))),
         "telegram_bot": bool(root_env.get("TELEGRAM_BOT_TOKEN")),
         "google_client": _google_ready(),
         "outlook_app": any(root_env.get(k) for k in ("MS_GRAPH_CLIENT_ID", "MICROSOFT_CLIENT_ID")),
