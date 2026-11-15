@@ -58,6 +58,20 @@
       </div>
       <button class="act" id="tg-unlink" hidden>This is not my Telegram account — unlink</button>
     </section>
+    <section id="integrations" hidden>
+      <h2>Your connected accounts</h2>
+      <p class="muted">Lisa only ever uses your own accounts. Nobody else's assistant can use them.</p>
+      <div id="int-google" class="row" hidden style="margin-bottom:10px">
+        <b>Google</b> <span id="g-state" class="muted"></span>
+        <a class="act primary" id="g-connect" href="/api/enterprise/google/start" style="text-decoration:none">Connect Google</a>
+        <button class="act" id="g-disconnect" hidden>Disconnect</button>
+      </div>
+      <div id="int-clickup" class="row" hidden>
+        <b>ClickUp</b> <span id="c-state" class="muted"></span>
+        <input id="c-token" placeholder="Personal token (pk_…)" autocomplete="off">
+        <button class="act primary" id="c-save">Save</button><button class="act" id="c-remove" hidden>Remove</button>
+      </div>
+    </section>
     <section><h2>Session</h2><button class="act" id="logout">Sign out</button></section>
   </div>
 
@@ -120,6 +134,7 @@
   </div>
 
   <div id="audit" data-tab="Audit log" data-perm="org.audit.read" hidden>
+    <section><h2>Status</h2><div class="grid" id="ops"></div></section>
     <section><h2>Recent events</h2><div class="scroll"><table id="audit-table"></table></div></section>
   </div>
 </main>
@@ -142,7 +157,8 @@
   function showTab(id) {
     document.querySelectorAll('[data-tab]').forEach((el) => { el.hidden = el.id !== id; });
     document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.for === id)));
-    ({ users: loadUsers, roles: loadRoles, audit: loadAudit, account: loadTelegram, knowledge: loadKnowledge })[id]?.();
+    ({ users: loadUsers, roles: loadRoles, audit: loadAudit, knowledge: loadKnowledge,
+       account: () => { loadTelegram(); loadIntegrations(); } })[id]?.();
   }
 
   async function loadTelegram() {
@@ -156,6 +172,22 @@
     } catch (e) { toast(e.message); }
   };
   $('tg-unlink').onclick = async () => { await api('/api/enterprise/telegram/unlink', {}); toast('Telegram unlinked.'); loadTelegram(); };
+  async function loadIntegrations() {
+    const s = await api('/api/enterprise/integrations');
+    $('integrations').hidden = !(s.google_allowed || s.clickup_allowed);
+    $('int-google').hidden = !s.google_allowed; $('int-clickup').hidden = !s.clickup_allowed;
+    $('g-state').innerHTML = s.google ? '<span class="ok">connected</span>' : 'not connected';
+    $('g-connect').textContent = s.google ? 'Reconnect' : 'Connect Google'; $('g-disconnect').hidden = !s.google;
+    $('c-state').innerHTML = s.clickup ? '<span class="ok">connected</span>' : 'not connected'; $('c-remove').hidden = !s.clickup;
+  }
+  $('g-disconnect').onclick = async () => { await api('/api/enterprise/google/disconnect', {}); toast('Google disconnected.'); loadIntegrations(); };
+  $('c-save').onclick = async () => { try { await api('/api/enterprise/integrations/clickup', { token: $('c-token').value.trim() });
+    $('c-token').value = ''; toast('ClickUp connected.'); loadIntegrations(); } catch (e) { toast(e.message); } };
+  $('c-remove').onclick = async () => { await api('/api/enterprise/integrations/clickup', { token: null }); toast('ClickUp removed.'); loadIntegrations(); };
+  { const q = new URLSearchParams(location.search);
+    if (q.get('error')) setTimeout(() => toast(q.get('error')), 300);
+    if (q.get('connected') === 'google') setTimeout(() => toast('Google connected.'), 300); }
+
   $('logout').onclick = async () => { await api('/api/enterprise/logout', {}); location.href = '/login'; };
 
   async function loadUsers() {
@@ -262,6 +294,12 @@
   };
 
   async function loadAudit() {
+    const o = await api('/api/enterprise/ops');
+    const cells = [['Gateway', o.gateway], ['Active users', o.users.active], ['Disabled users', o.users.disabled],
+      ['Open sessions', o.open_sessions], ['Telegram linked', o.telegram_linked], ['Drafts waiting', o.drafts_pending],
+      ['Unanswered questions (7 days)', o.knowledge_gaps_7d], ['Failed logins (24 h)', o.last_24h.failed_logins],
+      ['Throttled logins (24 h)', o.last_24h.throttled_logins], ['Denied requests (24 h)', o.last_24h.denied_requests]];
+    $('ops').innerHTML = cells.map(([k, v]) => `<div><span class="muted">${esc(k)}</span><br><b class="${v === 'ok' ? 'ok' : ''}">${esc(v)}</b></div>`).join('');
     const { events } = await api('/api/enterprise/audit');
     $('audit-table').innerHTML = '<tr><th>When</th><th>Action</th><th>Target</th><th>Details</th></tr>' + events.map((e) =>
       `<tr><td class="muted">${esc(new Date(e.at).toLocaleString())}</td><td>${esc(e.action)}</td><td class="muted">${esc(e.target)}</td><td class="muted">${esc(JSON.stringify(e.detail))}</td></tr>`).join('');

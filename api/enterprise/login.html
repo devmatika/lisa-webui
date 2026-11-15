@@ -18,6 +18,9 @@
   button { width:100%; margin-top:20px; padding:11px; border:0; border-radius:8px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
   button:disabled { opacity:.6; cursor:default; }
   .err { color:var(--err); font-size:14px; min-height:20px; margin-top:12px; }
+  a.alt { display:block; text-align:center; margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:8px; color:var(--text); text-decoration:none; }
+  a.small { display:block; margin-top:12px; font-size:13px; color:var(--muted); }
+  .note { color:var(--muted); font-size:14px; margin-top:12px; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -28,6 +31,14 @@
     <label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" required>
     <label for="l-pw">Password</label><input id="l-pw" type="password" autocomplete="current-password" required>
     <button type="submit">Sign in</button>
+    <a id="sso" class="alt" href="/api/auth/oidc/start" hidden>Sign in with your company account</a>
+    <a id="forgot-link" class="small" href="#" hidden>Forgot password?</a>
+  </form>
+  <form id="forgot" hidden>
+    <h1>Reset your password</h1><p class="sub">We send a one-time link to your e-mail address.</p>
+    <label for="f-email">E-mail</label><input id="f-email" type="email" autocomplete="username" required>
+    <button type="submit">Send link</button>
+    <a class="small" href="/login">Back to sign in</a>
   </form>
   <form id="setup" hidden>
     <h1>Set up Lisa</h1><p class="sub">Create your organisation and the first administrator account.</p>
@@ -66,9 +77,19 @@
   $('password').addEventListener('submit', (e) => { e.preventDefault();
     const token = new URLSearchParams(location.search).get('token') || '';
     post('/api/enterprise/password', { token: token, password: $('p-pw').value }, e.target); });
+  $('forgot').addEventListener('submit', async (e) => { e.preventDefault();
+    const r = await fetch('/api/enterprise/password/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('f-email').value }) }).then((x) => x.json()).catch(() => ({}));
+    $('err').textContent = ''; $('forgot').innerHTML = '<h1>Check your e-mail</h1><p class="note">' + (r.message || 'Done.') + '</p><a class="small" href="/login">Back to sign in</a>'; });
+  $('forgot-link').addEventListener('click', (e) => { e.preventDefault(); $('login').hidden = true; show('forgot'); });
+  const sso = new URLSearchParams(location.search).get('sso');
+  const ssoText = { 'no-account': 'Your company account is not set up in Lisa yet. Ask your administrator.',
+                    failed: 'Single sign-on did not complete. Try again.', unavailable: 'Single sign-on is not available right now.' };
+  if (sso && ssoText[sso]) $('err').textContent = ssoText[sso];
   if (location.pathname === '/set-password') return show('password');
   fetch('/api/enterprise/setup/status', { credentials: 'same-origin' })
-    .then((r) => r.json()).then((s) => show(s.needs_setup ? 'setup' : 'login'))
+    .then((r) => r.json()).then((s) => { show(s.needs_setup ? 'setup' : 'login');
+      $('sso').hidden = !(s.sso && !s.needs_setup); $('forgot-link').hidden = !(s.password_reset && !s.needs_setup); })
     .catch(() => { $('err').textContent = 'Lisa is not reachable. Try again shortly.'; });
 })();
 </script>

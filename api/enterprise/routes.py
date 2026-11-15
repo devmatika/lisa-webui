@@ -68,8 +68,15 @@ def _provision(user_id: str) -> str:
 # ── public ─────────────────────────────────────────────────────────────────────────────────────
 def _setup_status(handler, _body):
     from api.helpers import j
+    from api.enterprise import mailer
     with edb.session() as db:
-        return j(handler, {"needs_setup": directory.needs_setup(db)})
+        return j(handler, {"needs_setup": directory.needs_setup(db), "password_reset": mailer.configured(),
+                           "sso": _sso_configured()})
+
+
+def _sso_configured() -> bool:
+    from api.auth_oidc import is_oidc_enabled
+    return is_oidc_enabled()
 
 
 def _setup(handler, body):
@@ -112,6 +119,91 @@ def _set_password(handler, body):
     return j(handler, {"ok": True}, extra_headers={"Set-Cookie": _cookie(handler, sessions.start_session_for(user_id, ip))})
 
 
+def _forgot_password(handler, body):
+    """Same answer whether or not the address exists; mail goes only to active accounts."""
+    from api.helpers import j
+    from api.enterprise import mailer
+    from api.enterprise.models import LoginAttempt
+    ip, email = _ip(handler), str(body.get("email", "")).strip().lower()
+    send = None
+    with edb.session() as db:
+        if sessions._failures(db, f"reset-ip:{ip}") < 10 and sessions._failures(db, f"reset:{email}") < 3:
+            db.add_all([LoginAttempt(key=f"reset-ip:{ip}"), LoginAttempt(key=f"reset:{email}")])
+            user = db.scalar(select(User).where(User.email == email))
+            if user is not None and user.status == "active" and mailer.configured():
+                token = directory.issue_password_link(db, Actor(None, ip), user.id, ttl=directory.RESET_LINK_TTL)
+                send = (user.email, user.display_name, token)
+    if send:
+        try:
+            mailer.send_password_link(*send, invitation=False)
+        except Exception:
+            logger.exception("Password reset e-mail failed")
+    return j(handler, {"ok": True, "message": "If this address belongs to an active account, an e-mail is on its way."})
+
+
+def _redirect(handler, location: str, cookie: str | None = None) -> bool:
+    handler.send_response(302)
+    handler.send_header("Location", location)
+    if cookie:
+        handler.send_header("Set-Cookie", cookie)
+    handler.send_header("Content-Length", "0")
+    handler.end_headers()
+    return True
+
+
+def _oidc_start(handler, _body):
+    from api.auth_oidc import OIDCAuthError, OIDCConfigError, build_authorization_redirect
+    from api.routes import _request_base_url
+    try:
+        return _redirect(handler, build_authorization_redirect(_request_base_url(handler), "/"))
+    except (OIDCAuthError, OIDCConfigError):
+        logger.exception("Single sign-on start failed")
+        return _redirect(handler, "/login?sso=unavailable")
+
+
+def oidc_user_for(db, claims: dict, ip: str) -> User | None:
+    """The existing, active Lisa user these verified claims belong to. No self-registration: an
+    organisation account must exist first. Bound by issuer+subject after the first sign-in; the
+    first match uses the e-mail the tenant-restricted IdP asserted (allow_claim is mandatory)."""
+    subject = f"{claims.get('iss', '')}|{claims.get('sub', '')}"
+    user = db.scalar(select(User).where(User.oidc_subject == subject)) if claims.get("sub") else None
+    if user is None:
+        email = str(claims.get("email") or claims.get("preferred_username") or "").strip().lower()
+        if claims.get("email_verified") is False or not email:
+            return None
+        user = db.scalar(select(User).where(User.email == email, User.oidc_subject.is_(None)))
+        if user is not None:
+            user.oidc_subject = subject
+            directory.audit(db, Actor(user.id, ip), "sso.linked", user.id, issuer=claims.get("iss", ""))
+    if user is None or user.status != "active":
+        return None
+    directory.audit(db, Actor(user.id, ip), "login.succeeded", user.id, method="sso")
+    return user
+
+
+def _oidc_callback(handler, _body):
+    from urllib.parse import parse_qs
+    from api.auth_oidc import OIDCAuthError, OIDCConfigError, complete_authorization_code_flow
+    from api.routes import _request_base_url
+    query = parse_qs(handler._lisa_parsed.query or "")
+    ip = _ip(handler)
+    try:
+        result = complete_authorization_code_flow(_request_base_url(handler), (query.get("state") or [""])[0],
+                                                  (query.get("code") or [""])[0])
+    except (OIDCAuthError, OIDCConfigError):
+        logger.warning("Single sign-on callback rejected", exc_info=True)
+        return _redirect(handler, "/login?sso=failed")
+    with edb.session() as db:
+        user = oidc_user_for(db, result.get("claims") or {}, ip)
+        user_id = user.id if user else None
+        if user is None:
+            directory.audit(db, Actor(None, ip), "login.failed", str((result.get("claims") or {}).get("email", "")),
+                            method="sso")
+    if user_id is None:
+        return _redirect(handler, "/login?sso=no-account")
+    return _redirect(handler, "/", _cookie(handler, sessions.start_session_for(user_id, ip)))
+
+
 # ── signed in ──────────────────────────────────────────────────────────────────────────────────
 def _logout(handler, _body):
     from api.auth import parse_cookie
@@ -147,12 +239,20 @@ def _create_user(handler, body):
                                          display_name=body.get("display_name", ""),
                                          role_keys=list(body.get("roles") or ["staff"]),
                                          department=body.get("department") or None)
-            user_id = user.id
+            user_id, email, name = user.id, user.email, user.display_name
             link = directory.issue_password_link(db, _actor(handler), user_id)
     except DirectoryError as exc:
         return bad(handler, str(exc), 400)
     profile = _provision(user_id)
-    return j(handler, {"ok": True, "user_id": user_id, "hermes_profile": profile,
+    from api.enterprise import mailer
+    emailed = False
+    if mailer.configured():
+        try:
+            mailer.send_password_link(email, name, link, invitation=True)
+            emailed = True
+        except Exception:
+            logger.exception("Invitation e-mail failed; the admin can copy the link instead")
+    return j(handler, {"ok": True, "user_id": user_id, "hermes_profile": profile, "invitation_emailed": emailed,
                        "password_link": f"/set-password?token={link}"})
 
 
@@ -245,6 +345,97 @@ def _delete_role(handler, body):
             directory.delete_role(db, _actor(handler), body.get("key", ""))
     except DirectoryError as exc:
         return bad(handler, str(exc), 400)
+    return j(handler, {"ok": True})
+
+
+def _ops(handler, _body):
+    """Operational status for administrators (and for an external monitor polling it)."""
+    import urllib.request
+    from datetime import timedelta
+    from sqlalchemy import func
+    from api.helpers import j
+    from api.enterprise.models import AuthSession, KnowledgeDraft, KnowledgeGap, TelegramLink, utcnow
+    now = utcnow()
+    day, week = now - timedelta(days=1), now - timedelta(days=7)
+
+    def count(q):
+        return db.scalar(q) or 0
+    def events(action):
+        return count(select(func.count()).select_from(AuditEvent).where(AuditEvent.action == action,
+                                                                        AuditEvent.at > day))
+    with edb.session() as db:
+        out = {
+            "users": {"active": count(select(func.count()).select_from(User).where(User.status == "active")),
+                      "disabled": count(select(func.count()).select_from(User).where(User.status == "disabled"))},
+            "open_sessions": count(select(func.count()).select_from(AuthSession).where(
+                AuthSession.revoked_at.is_(None), AuthSession.expires_at > now)),
+            "telegram_linked": count(select(func.count()).select_from(TelegramLink).where(TelegramLink.revoked_at.is_(None))),
+            "drafts_pending": count(select(func.count()).select_from(KnowledgeDraft).where(KnowledgeDraft.status == "pending")),
+            "knowledge_gaps_7d": count(select(func.count()).select_from(KnowledgeGap).where(KnowledgeGap.at > week)),
+            "last_24h": {"failed_logins": events("login.failed"), "throttled_logins": events("login.throttled"),
+                         "denied_requests": events("authz.denied")},
+        }
+    try:
+        with urllib.request.urlopen(provisioner.gateway_url() + "/health", timeout=3) as r:
+            out["gateway"] = "ok" if r.status == 200 else f"http {r.status}"
+    except OSError as exc:
+        out["gateway"] = f"down ({type(exc).__name__})"
+    return j(handler, out)
+
+
+# ── Integrations (each user connects their own accounts) ─────────────────────────────────────────
+def _integrations(handler, _body):
+    from api.helpers import j
+    from api.enterprise import integrations
+    u = current_user(handler)
+    return j(handler, {**integrations.status(u.hermes_profile),
+                       "google_allowed": u.can("integration.google"), "clickup_allowed": u.can("integration.clickup")})
+
+
+def _google_start(handler, _body):
+    from api.enterprise import integrations
+    try:
+        return _redirect(handler, integrations.google_start(current_user(handler).user_id))
+    except DirectoryError as exc:
+        from urllib.parse import quote
+        return _redirect(handler, "/lisa?error=" + quote(str(exc)))
+
+
+def _google_callback(handler, _body):
+    from urllib.parse import parse_qs, quote
+    from api.enterprise import integrations
+    q = parse_qs(handler._lisa_parsed.query or "")
+    u = current_user(handler)
+    try:
+        integrations.google_finish(u.user_id, u.hermes_profile, (q.get("state") or [""])[0], (q.get("code") or [""])[0])
+    except (DirectoryError, OSError, ValueError) as exc:
+        msg = str(exc) if isinstance(exc, DirectoryError) else "Google did not accept the sign-in. Try again."
+        return _redirect(handler, "/lisa?error=" + quote(msg))
+    with edb.session() as db:
+        directory.audit(db, _actor(handler), "integration.google_connected", u.user_id)
+    return _redirect(handler, "/lisa?connected=google")
+
+
+def _google_disconnect(handler, _body):
+    from api.helpers import j
+    from api.enterprise import integrations
+    integrations.google_disconnect(current_user(handler).hermes_profile)
+    with edb.session() as db:
+        directory.audit(db, _actor(handler), "integration.google_disconnected", current_user(handler).user_id)
+    return j(handler, {"ok": True})
+
+
+def _clickup_token(handler, body):
+    from api.helpers import bad, j
+    from api.enterprise import integrations
+    token = body.get("token")
+    try:
+        integrations.clickup_set(current_user(handler).hermes_profile, str(token) if token else None)
+    except DirectoryError as exc:
+        return bad(handler, str(exc), 400)
+    with edb.session() as db:
+        directory.audit(db, _actor(handler), "integration.clickup_" + ("connected" if token else "removed"),
+                        current_user(handler).user_id)
     return j(handler, {"ok": True})
 
 
@@ -384,6 +575,7 @@ ROUTES = {
     ("POST", "/api/enterprise/setup"): (_setup, None),
     ("POST", "/api/enterprise/login"): (_login, None),
     ("POST", "/api/enterprise/password"): (_set_password, None),
+    ("POST", "/api/enterprise/password/forgot"): (_forgot_password, None),
     ("POST", "/api/enterprise/logout"): (_logout, "signed-in"),
     ("GET", "/api/enterprise/me"): (_me, "signed-in"),
     ("GET", "/api/enterprise/users"): (_users, "org.users.manage"),
@@ -396,6 +588,12 @@ ROUTES = {
     ("POST", "/api/enterprise/roles"): (_save_role, "org.roles.manage"),
     ("POST", "/api/enterprise/roles/delete"): (_delete_role, "org.roles.manage"),
     ("GET", "/api/enterprise/audit"): (_audit, "org.audit.read"),
+    ("GET", "/api/enterprise/ops"): (_ops, "org.audit.read"),
+    ("GET", "/api/enterprise/integrations"): (_integrations, "chat.use"),
+    ("GET", "/api/enterprise/google/start"): (_google_start, "integration.google"),
+    ("GET", "/api/enterprise/google/callback"): (_google_callback, "integration.google"),
+    ("POST", "/api/enterprise/google/disconnect"): (_google_disconnect, "integration.google"),
+    ("POST", "/api/enterprise/integrations/clickup"): (_clickup_token, "integration.clickup"),
     ("GET", "/api/enterprise/telegram"): (_telegram_status, "chat.use"),
     ("POST", "/api/enterprise/telegram/link"): (_telegram_link, "chat.use"),
     ("POST", "/api/enterprise/telegram/unlink"): (_telegram_unlink, "chat.use"),
@@ -417,6 +615,11 @@ ROUTES = {
 def handle(handler, parsed, method: str) -> bool:
     """Serve an enterprise route; False when the path is not one of ours."""
     from api.helpers import bad, read_body
+    handler._lisa_parsed = parsed
+    if method == "GET" and parsed.path == "/api/auth/oidc/start":
+        return _oidc_start(handler, {})
+    if method == "GET" and parsed.path == "/api/auth/oidc/callback":
+        return _oidc_callback(handler, {})
     if method == "GET" and parsed.path in ("/login", "/set-password"):
         return _html(handler, _PAGE.read_text())
     if method == "GET" and parsed.path == "/lisa":
@@ -435,6 +638,8 @@ def handle(handler, parsed, method: str) -> bool:
     if need is not None and user is None:
         return bad(handler, "Authentication required", 401)
     if need not in (None, "signed-in") and not user.can(need):
+        from api.enterprise.gate import _audit_denied
+        _audit_denied(user, method, parsed.path)
         return bad(handler, "Not allowed", 403)
     if method == "POST" and need is not None:
         from api.routes import _check_csrf  # same-origin + session-bound token, like every WebUI write

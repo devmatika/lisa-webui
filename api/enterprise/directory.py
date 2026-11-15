@@ -29,6 +29,7 @@ PERMISSIONS = {
     "integration.email": "Use the e-mail assistant on their own mailbox",
     "integration.google": "Use Google Calendar/Docs/Drive with their own connected Google account",
     "integration.outlook": "Use Outlook mail tools on their own mailbox (Microsoft 365)",
+    "integration.clickup": "Use ClickUp with their own personal ClickUp token",
     "knowledge.read": "Search company knowledge areas they are granted",
     "knowledge.contribute": "Submit knowledge drafts",
     "knowledge.approve": "Approve and publish knowledge drafts",
@@ -171,7 +172,10 @@ def set_status(db: Session, actor: Actor, user_id: str, status: str) -> User:
     return user
 
 
-def issue_password_link(db: Session, actor: Actor, user_id: str) -> str:
+RESET_LINK_TTL = timedelta(hours=1)
+
+
+def issue_password_link(db: Session, actor: Actor, user_id: str, ttl: timedelta = PASSWORD_LINK_TTL) -> str:
     """Single-use token to set a password (invitation or reset). Earlier unused links are voided."""
     user = get_user(db, user_id)
     now = utcnow()
@@ -181,7 +185,7 @@ def issue_password_link(db: Session, actor: Actor, user_id: str) -> str:
         old.used_at = now
     token = security.new_token()
     db.add(OneTimeToken(token_hash=security.token_hash(token), purpose="password", user_id=user.id,
-                        expires_at=now + PASSWORD_LINK_TTL))
+                        expires_at=now + ttl))
     audit(db, actor, "user.password_link_issued", user.id)
     return token
 

@@ -41,6 +41,13 @@ def is_voice_embed_path(path: str) -> bool:
     )
 
 
+def _stack_service_host(host: str) -> bool:
+    """Lisa Enterprise stack: plain HTTP to a single-label Docker service name (``voice``) stays on the
+    stack's internal network, like localhost does for a single-host install."""
+    from api.enterprise import enabled
+    return enabled() and bool(re.fullmatch(r"[a-z][a-z0-9-]{0,62}", host or ""))
+
+
 def parse_upstream(raw: str) -> tuple[str, str]:
     """Parse an upstream URL into ``(origin, ui_prefix)``.
 
@@ -59,7 +66,7 @@ def parse_upstream(raw: str) -> tuple[str, str]:
         raise ValueError("invalid voice upstream")
     if parsed.scheme == "https" and host:
         origin = f"https://{parsed.netloc}"
-    elif parsed.scheme == "http" and host in {"127.0.0.1", "localhost"}:
+    elif parsed.scheme == "http" and (host in {"127.0.0.1", "localhost"} or _stack_service_host(host)):
         origin = f"http://{parsed.netloc}"
     else:
         raise ValueError("invalid voice upstream")

@@ -31,14 +31,20 @@ PLUGIN_SOURCE = Path("/opt/lisa/plugins")  # mounted read-only by the Lisa stack
 REQUIRED_PLUGINS = ("org-authz",)
 # Role toolsets that are provided by Lisa plugins rather than Hermes core.
 PLUGIN_TOOLSETS = {"knowledge": "lisa_knowledge"}
+GOOGLE_SCRIPT = "/opt/hermes/skills/productivity/google-workspace/scripts/google_api.py"
 # Integration permission -> plugin, its toolset, the secrets it may receive, per-user settings.
 # A user only ever gets an integration's credentials when one of their roles grants it.
 INTEGRATIONS = {
     "integration.google": {"plugin": "google-workspace-tools", "toolset": "google_workspace_tools",
-                           "env": (), "settings": None},
+                           "env": (), "user_files": ("google_token.json",), "user_env": (),
+                           # shared Google libraries baked into the Lisa Hermes image; the token is the user's
+                           "settings": lambda email: {"python_path": "/opt/lisa/gws-venv/bin/python",
+                                                      "script_path": GOOGLE_SCRIPT, "account_label": email}},
+    "integration.clickup": {"plugin": "clickup-personal", "toolset": "clickup_personal",
+                            "env": (), "user_files": (), "user_env": ("CLICKUP_API_TOKEN",), "settings": None},
     "integration.outlook": {"plugin": "microsoft-outlook-tools", "toolset": "microsoft_outlook_tools",
                             "env": ("MS_GRAPH_TENANT_ID", "MS_GRAPH_CLIENT_ID", "MS_GRAPH_CLIENT_SECRET",
-                                    "MS_GRAPH_AUTH_MODE"),
+                                    "MS_GRAPH_AUTH_MODE"), "user_files": (), "user_env": (),
                             # app-level Graph access can read any mailbox: pin it to the user's own
                             "settings": lambda email: {"account_address": email}},
 }
@@ -185,6 +191,15 @@ def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str
     root_env = _read_env(root / ".env")
     granted_env = {k for i in integrations for k in INTEGRATIONS[i]["env"]}
     env = {k: v for k, v in root_env.items() if PROVIDER_KEY.match(k) or k in granted_env}
+    # Credentials the user connected themselves survive re-provisioning only while still granted.
+    own_env = _read_env(home / ".env")
+    kept_user_env = {k for i in integrations for k in INTEGRATIONS[i]["user_env"]}
+    env.update({k: v for k, v in own_env.items() if k in kept_user_env})
+    kept_files = {f for i in integrations for f in INTEGRATIONS[i]["user_files"]}
+    for spec in INTEGRATIONS.values():
+        for f in spec["user_files"]:
+            if f not in kept_files:
+                (home / f).unlink(missing_ok=True)
     env["API_SERVER_KEY"] = _read_env(home / ".env").get("API_SERVER_KEY") or secrets.token_urlsafe(32)
     if "knowledge" in toolsets:  # where the knowledge tools ask; the WebUI checks the user's area grants
         env["LISA_KNOWLEDGE_URL"] = webui_internal_url()
