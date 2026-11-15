@@ -110,6 +110,22 @@ def test_enterprise_default_workspace_is_the_users_own(enterprise_home):
     assert Path(get_last_workspace()).resolve() == own
 
 
+def test_a_new_chat_offers_only_the_users_own_workspace(enterprise_home, monkeypatch):
+    """The composer sends the first listed workspace with the first message; the server-wide
+    default (/workspace) there made every staff user's first message fail."""
+    from api import workspace
+    _, anna, _ = enterprise_home
+    own = str((anna / "workspace").resolve())
+    monkeypatch.setattr(workspace, "_load_workspaces_unconfined",
+                        lambda profile=None: [{"path": "/workspace", "name": "Home"},
+                                              {"path": str(anna / "workspace" / "notes"), "name": "Notes"}])
+    assert [w["name"] for w in workspace.load_workspaces()] == ["Notes"]
+    monkeypatch.setattr(workspace, "_load_workspaces_unconfined",
+                        lambda profile=None: [{"path": "/workspace", "name": "Home"}])
+    assert workspace.load_workspaces() == [{"path": own, "name": "Home"}]
+    assert workspace._profile_default_workspace() == own
+
+
 def test_voice_ticket_round_trip_and_tamper_resistance(monkeypatch):
     from api.enterprise import voice
     monkeypatch.setenv("LISA_VOICE_SECRET", "v" * 40)

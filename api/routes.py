@@ -16765,6 +16765,10 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/api/settings":
         settings = load_settings()
+        from api.workspace import _enterprise_workspace_root
+        enterprise_root = _enterprise_workspace_root()
+        if enterprise_root is not None:  # a Lisa user starts new chats in their own workspace
+            settings["default_workspace"] = str(enterprise_root)
         settings["persisted_speech_keys"] = persisted_speech_settings_keys()
         # Never expose the stored password hash to clients
         settings.pop("password_hash", None)

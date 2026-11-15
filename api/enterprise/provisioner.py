@@ -40,8 +40,10 @@ INTEGRATIONS = {
                            # shared Google libraries baked into the Lisa Hermes image; the token is the user's
                            "settings": lambda email: {"python_path": "/opt/lisa/gws-venv/bin/python",
                                                       "script_path": GOOGLE_SCRIPT, "account_label": email}},
+    # the company account (setup wizard) finds each user's own tasks by e-mail; a personal token wins
     "integration.clickup": {"plugin": "clickup-personal", "toolset": "clickup_personal",
-                            "env": (), "user_files": (), "user_env": ("CLICKUP_API_TOKEN",), "settings": None},
+                            "env": ("CLICKUP_COMPANY_TOKEN",), "user_files": (), "user_env": ("CLICKUP_API_TOKEN",),
+                            "settings": lambda email: {"account_email": email}},
     "integration.outlook": {"plugin": "microsoft-outlook-tools", "toolset": "microsoft_outlook_tools",
                             "env": ("MS_GRAPH_TENANT_ID", "MS_GRAPH_CLIENT_ID", "MS_GRAPH_CLIENT_SECRET",
                                     "MS_GRAPH_AUTH_MODE"), "user_files": (), "user_env": (),
@@ -50,9 +52,10 @@ INTEGRATIONS = {
 }
 MEDIA_POLICY = {"profile_isolation": True, "strict": True, "trust_recent_files": False}
 COPIED_CONFIG_KEYS = ("model", "providers", "custom_providers", "fallback_providers", "auxiliary", "timezone")
-# The setup wizard stores the Microsoft app under these names; the Outlook plugin reads MS_GRAPH_*.
+# The setup wizard stores the Microsoft app and the company ClickUp token under these names; the
+# Outlook plugin reads MS_GRAPH_*, and CLICKUP_API_KEY in a user's profile would read as their own.
 ENV_ALIASES = {"MICROSOFT_TENANT_ID": "MS_GRAPH_TENANT_ID", "MICROSOFT_CLIENT_ID": "MS_GRAPH_CLIENT_ID",
-               "MICROSOFT_CLIENT_SECRET": "MS_GRAPH_CLIENT_SECRET"}
+               "MICROSOFT_CLIENT_SECRET": "MS_GRAPH_CLIENT_SECRET", "CLICKUP_API_KEY": "CLICKUP_COMPANY_TOKEN"}
 PROVIDER_KEY = re.compile(r"^(OPENROUTER|OPENAI|ANTHROPIC|GOOGLE|GEMINI|DEEPSEEK|MISTRAL|GROQ|XAI|TOGETHER|"
                           r"FIREWORKS|AZURE_OPENAI|NOUS|CEREBRAS|XIAOMI|GLM|NVIDIA|OLLAMA|LM)_API_KEY$|^OPENAI_BASE_URL$")
 

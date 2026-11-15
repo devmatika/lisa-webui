@@ -5,146 +5,358 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lisa Organization</title>
 <style>
-  :root { --bg:#f4f6f8; --card:#fff; --text:#1d2430; --muted:#5b6575; --line:#d7dce3; --accent:#006eb3;
-          --ok:#067647; --err:#b42318; --chip:#eef2f6; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#12161c; --card:#1b2129; --text:#e6e9ee; --muted:#9aa4b2;
-          --line:#2c3440; --accent:#3aa0e6; --ok:#47cd89; --err:#f97066; --chip:#242c37; } }
+  /* Tokens: trust blue on slate, AA contrast in both themes. System fonts on purpose: no third-party
+     font requests from a company install. */
+  :root {
+    --bg:#f1f5f9; --surface:#ffffff; --surface-2:#f8fafc; --text:#0f172a; --muted:#475569; --line:#e2e8f0;
+    --line-strong:#cbd5e1; --primary:#2563eb; --primary-hover:#1d4ed8; --on-primary:#ffffff;
+    --primary-soft:#eff6ff; --primary-soft-text:#1e40af; --ok:#047857; --ok-soft:#ecfdf5; --warn:#b45309;
+    --warn-soft:#fffbeb; --err:#b91c1c; --err-soft:#fef2f2; --ring:#2563eb; --shadow:0 1px 2px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.08);
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#0b1120; --surface:#111827; --surface-2:#0f172a; --text:#e5e7eb; --muted:#9ca3af; --line:#1f2937;
+    --line-strong:#374151; --primary:#3b82f6; --primary-hover:#60a5fa; --on-primary:#ffffff;
+    --primary-soft:#172554; --primary-soft-text:#bfdbfe; --ok:#34d399; --ok-soft:#052e1f; --warn:#fbbf24;
+    --warn-soft:#2b1d05; --err:#f87171; --err-soft:#2a0f0f; --ring:#60a5fa; --shadow:none; } }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
-  header { display:flex; align-items:center; gap:16px; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
-  header h1 { font-size:17px; margin:0; } header .who { color:var(--muted); font-size:13px; margin-left:auto; }
-  nav { display:flex; gap:4px; flex-wrap:wrap; }
-  nav button { background:none; border:0; padding:8px 12px; border-radius:6px; color:var(--muted); font:inherit; cursor:pointer; }
-  nav button[aria-selected="true"] { background:var(--chip); color:var(--text); font-weight:600; }
-  main { max-width:1000px; margin:0 auto; padding:16px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
-  h2 { font-size:15px; margin:0 0 12px; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--muted); font-weight:500; font-size:13px; }
-  .scroll { overflow-x:auto; }
-  .chip { display:inline-block; background:var(--chip); border-radius:999px; padding:1px 8px; font-size:12px; margin:1px 2px 1px 0; }
-  .ok { color:var(--ok); } .err { color:var(--err); } .muted { color:var(--muted); font-size:13px; }
-  input, select { padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--text); font:inherit; }
-  button.act, a.act { padding:7px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); font:inherit; cursor:pointer; }
-  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:4px 12px; }
-  label.check { display:flex; gap:6px; align-items:center; font-size:14px; }
-  code { background:var(--chip); padding:1px 5px; border-radius:4px; font-size:13px; word-break:break-all; }
-  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:8px 14px; border-radius:8px; display:none; max-width:90vw; }
+  html, body { margin:0; }
+  body { background:var(--bg); color:var(--text); font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:var(--primary); }
+  :focus-visible { outline:2px solid var(--ring); outline-offset:2px; border-radius:6px; }
   [hidden] { display:none !important; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  svg.i { width:18px; height:18px; flex:none; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* Shell */
+  .top { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:10px 20px; background:var(--surface); border-bottom:1px solid var(--line); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:16px; white-space:nowrap; }
+  .brand-mark { width:30px; height:30px; border-radius:8px; background:var(--primary); color:var(--on-primary); display:grid; place-items:center; }
+  .top .spacer { flex:1; }
+  .who { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; min-width:0; }
+  .who b { color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
+  .layout { display:grid; grid-template-columns:232px minmax(0,1fr); gap:24px; max-width:1240px; margin:0 auto; padding:24px 20px 64px; }
+  .side { position:sticky; top:76px; align-self:start; display:flex; flex-direction:column; gap:2px; }
+  .side .group-label { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:14px 12px 6px; }
+  .side button { display:flex; align-items:center; gap:10px; width:100%; min-height:40px; padding:8px 12px; border:0; border-radius:8px; background:none; color:var(--muted); font:inherit; font-weight:500; text-align:left; cursor:pointer; transition:background .15s,color .15s; }
+  .side button:hover { background:var(--surface); color:var(--text); }
+  .side button[aria-selected="true"] { background:var(--primary-soft); color:var(--primary-soft-text); font-weight:600; }
+  main { min-width:0; }
+  .page-head { margin:0 0 18px; }
+  .page-head h1 { font-size:22px; line-height:1.3; margin:0 0 4px; }
+  .page-head p { margin:0; color:var(--muted); max-width:70ch; }
+
+  /* Cards, forms */
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow); }
+  .card > h2 { font-size:16px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .card > .sub { color:var(--muted); margin:0 0 16px; font-size:14px; max-width:75ch; }
+  .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px 14px; align-items:end; }
+  .field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .field > label, .label { font-size:13px; font-weight:600; color:var(--text); }
+  .hint { font-size:13px; color:var(--muted); }
+  input, select, textarea { width:100%; min-height:40px; padding:8px 12px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; transition:border-color .15s,box-shadow .15s; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--ring); box-shadow:0 0 0 3px color-mix(in srgb,var(--ring) 25%,transparent); }
+  textarea { min-height:140px; resize:vertical; line-height:1.5; }
+  input[type=checkbox] { width:18px; height:18px; min-height:0; accent-color:var(--primary); margin:0; flex:none; cursor:pointer; }
+  input[type=file] { padding:7px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:8px 16px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-weight:600; font-size:14px; cursor:pointer; text-decoration:none; white-space:nowrap; transition:background .15s,border-color .15s; }
+  .btn:hover { background:var(--surface-2); border-color:var(--muted); }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:var(--on-primary); }
+  .btn.primary:hover { background:var(--primary-hover); border-color:var(--primary-hover); }
+  .btn.danger { color:var(--err); }
+  .btn.sm { min-height:34px; padding:5px 12px; font-size:13px; }
+  .btn:disabled { opacity:.55; cursor:not-allowed; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:16px; }
+
+  /* Tables */
+  .table-wrap { overflow-x:auto; margin:0 -4px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  tr:last-child td { border-bottom:0; }
+  .person b { display:block; }
+  .person span { color:var(--muted); font-size:13px; }
+
+  /* Badges & callouts */
+  .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; background:var(--surface-2); color:var(--muted); border:1px solid var(--line); white-space:nowrap; margin:2px 4px 2px 0; }
+  .badge.ok { background:var(--ok-soft); color:var(--ok); border-color:transparent; }
+  .badge.warn { background:var(--warn-soft); color:var(--warn); border-color:transparent; }
+  .badge.err { background:var(--err-soft); color:var(--err); border-color:transparent; }
+  .badge.role { background:var(--primary-soft); color:var(--primary-soft-text); border-color:transparent; }
+  .callout { display:flex; gap:10px; padding:12px 14px; border-radius:10px; background:var(--primary-soft); color:var(--primary-soft-text); font-size:14px; margin-top:14px; }
+  .callout.ok { background:var(--ok-soft); color:var(--ok); }
+  .callout.err { background:var(--err-soft); color:var(--err); }
+  .callout code, .copy-line code { background:transparent; padding:0; color:inherit; font-size:13px; word-break:break-all; }
+  .copy-line { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; background:var(--surface-2); border:1px solid var(--line); padding:1px 6px; border-radius:5px; }
+  .empty { text-align:center; padding:28px 12px; color:var(--muted); }
+  .empty b { display:block; color:var(--text); margin-bottom:4px; }
+
+  /* Connected account rows */
+  .conn { display:flex; align-items:center; gap:14px; padding:14px 0; border-top:1px solid var(--line); flex-wrap:wrap; }
+  .conn:first-of-type { border-top:0; }
+  .conn .what { flex:1 1 240px; min-width:0; }
+  .conn .what b { display:block; }
+  .conn .what span { color:var(--muted); font-size:13px; }
+  .conn .how { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .conn .how input { width:240px; }
+
+  /* Role editor */
+  .perm-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px; }
+  fieldset.perm-group { border:1px solid var(--line); border-radius:10px; padding:12px 14px 6px; margin:0; background:var(--surface-2); min-width:0; }
+  fieldset.perm-group legend { padding:0 6px; font-weight:700; font-size:14px; }
+  fieldset.perm-group .gdesc { color:var(--muted); font-size:13px; margin:-2px 0 8px; }
+  label.check { display:flex; gap:10px; align-items:flex-start; padding:7px 0; font-size:14px; cursor:pointer; line-height:1.4; }
+  label.check input { margin-top:1px; }
+  label.check small { display:block; color:var(--muted); font-size:12px; }
+  details.roles-edit summary { cursor:pointer; list-style:none; display:inline-flex; flex-wrap:wrap; align-items:center; gap:2px; }
+  details.roles-edit summary::-webkit-details-marker { display:none; }
+  details.roles-edit summary .edit { font-size:12px; color:var(--primary); font-weight:600; margin-left:4px; }
+  details.roles-edit[open] .pop { margin-top:8px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); min-width:220px; }
+
+  /* Grant editor */
+  .grant-row { display:grid; grid-template-columns:150px minmax(0,1fr) 150px 40px; gap:8px; margin-bottom:8px; }
+  .icon-btn { width:40px; min-height:40px; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--muted); cursor:pointer; display:grid; place-items:center; }
+  .icon-btn:hover { color:var(--err); border-color:var(--err); }
+
+  /* Status tiles */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+  .tile { border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:var(--surface-2); }
+  .tile span { color:var(--muted); font-size:13px; }
+  .tile b { display:block; font-size:20px; margin-top:2px; }
+
+  /* Guide */
+  .guide h3 { font-size:15px; margin:18px 0 6px; }
+  .guide ol, .guide ul { margin:6px 0 0; padding-left:22px; }
+  .guide li { margin:5px 0; }
+  .guide .steps { counter-reset:s; list-style:none; padding:0; }
+  .guide .steps li { counter-increment:s; position:relative; padding-left:40px; min-height:28px; margin:12px 0; }
+  .guide .steps li::before { content:counter(s); position:absolute; left:0; top:-1px; width:28px; height:28px; border-radius:50%; background:var(--primary-soft); color:var(--primary-soft-text); font-weight:700; font-size:13px; display:grid; place-items:center; }
+
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(8px); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:10px; max-width:min(560px,90vw); opacity:0; pointer-events:none; transition:opacity .2s,transform .2s; z-index:20; font-size:14px; box-shadow:0 8px 24px rgba(0,0,0,.2); }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #toast.err { background:var(--err); color:#fff; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns:1fr; padding:16px 16px 48px; gap:12px; }
+    .side { position:static; flex-direction:row; overflow-x:auto; gap:4px; padding-bottom:4px; scrollbar-width:none; }
+    .side .group-label { display:none; }
+    .side button { width:auto; white-space:nowrap; }
+    .top { padding:10px 16px; flex-wrap:wrap; }
+    .who b { max-width:140px; }
+    .grant-row { grid-template-columns:1fr 1fr; }
+    .conn .how input { width:100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Lisa Organization</h1>
-  <nav id="tabs" role="tablist"></nav>
-  <span class="who" id="who"></span>
-  <a class="act" id="setup-link" href="/#setup" style="text-decoration:none" hidden>Setup wizard</a>
-  <a class="act" href="/" style="text-decoration:none">← Chat</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-org" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M8 10h.01M16 10h.01M12 10h.01M8 14h.01M16 14h.01M12 14h.01"/></symbol>
+  <symbol id="i-account" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-roles" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="i-audit" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="brand"><span class="brand-mark"><svg class="i"><use href="#i-org"/></svg></span><span id="brand-name">Lisa Organization</span></div>
+  <span class="spacer"></span>
+  <span class="who"><svg class="i"><use href="#i-account"/></svg><b id="who-name"></b><span id="who-roles"></span></span>
+  <a class="btn sm" id="setup-link" href="/#setup" hidden><svg class="i"><use href="#i-wand"/></svg>Setup wizard</a>
+  <a class="btn sm primary" href="/"><svg class="i"><use href="#i-chat"/></svg>Back to chat</a>
 </header>
-<main>
-  <div id="account" data-tab="My account">
-    <section>
+
+<div class="layout">
+  <nav class="side" id="tabs" role="tablist" aria-label="Organization sections"></nav>
+  <main>
+
+  <!-- ── My account ─────────────────────────────────────────── -->
+  <div id="account" data-tab="My account" data-icon="account" data-group="You" hidden>
+    <div class="page-head"><h1>My account</h1><p>Your private assistant. Your chats, memory and connected accounts are visible only to you — administrators cannot read them.</p></div>
+    <section class="card">
       <h2>Telegram</h2>
-      <div id="tg-status" class="muted">Loading…</div>
-      <ol class="muted" id="tg-steps">
-        <li>Open the company Lisa bot in Telegram and send any message.</li>
-        <li>The bot answers with a pairing code. Enter it here.</li>
+      <p class="sub">Talk to your assistant from your phone through the company bot.</p>
+      <div id="tg-status"></div>
+      <ol class="hint" id="tg-steps" style="padding-left:20px;margin:8px 0 12px">
+        <li>In Telegram, open the company bot and send it any message.</li>
+        <li>The bot replies with a pairing code. Enter it here.</li>
       </ol>
-      <div class="row" id="tg-link-row">
-        <input id="tg-code" placeholder="Pairing code" maxlength="12" autocomplete="off">
-        <button class="act primary" id="tg-link">Link Telegram</button>
+      <div class="fields" id="tg-link-row" style="max-width:480px">
+        <div class="field"><label for="tg-code">Pairing code</label><input id="tg-code" maxlength="12" autocomplete="off" inputmode="text"></div>
+        <div class="field" style="flex:0"><button class="btn primary" id="tg-link">Link Telegram</button></div>
       </div>
-      <button class="act" id="tg-unlink" hidden>This is not my Telegram account — unlink</button>
+      <button class="btn danger sm" id="tg-unlink" hidden>This is not my Telegram account — unlink</button>
     </section>
-    <section id="integrations" hidden>
-      <h2>Your connected accounts</h2>
-      <p class="muted">Lisa only ever uses your own accounts. Nobody else's assistant can use them.</p>
-      <div id="int-google" class="row" hidden style="margin-bottom:10px">
-        <b>Google</b> <span id="g-state" class="muted"></span>
-        <a class="act primary" id="g-connect" href="/api/enterprise/google/start" style="text-decoration:none">Connect Google</a>
-        <button class="act" id="g-disconnect" hidden>Disconnect</button>
+    <section class="card" id="integrations" hidden>
+      <h2>Connected accounts</h2>
+      <p class="sub">Lisa only ever uses your own accounts, and nobody else's assistant can use them.</p>
+      <div class="conn" id="int-google" hidden>
+        <div class="what"><b>Google</b><span id="g-state"></span></div>
+        <div class="how"><a class="btn primary sm" id="g-connect" href="/api/enterprise/google/start">Connect Google</a><button class="btn sm" id="g-disconnect" hidden>Disconnect</button></div>
       </div>
-      <div id="int-clickup" class="row" hidden>
-        <b>ClickUp</b> <span id="c-state" class="muted"></span>
-        <input id="c-token" placeholder="Personal token (pk_…)" autocomplete="off">
-        <button class="act primary" id="c-save">Save</button><button class="act" id="c-remove" hidden>Remove</button>
+      <div class="conn" id="int-clickup" hidden>
+        <div class="what"><b>ClickUp</b><span id="c-state"></span></div>
+        <div class="how"><label class="hint" for="c-token" hidden id="c-token-label">Personal token</label>
+          <input id="c-token" placeholder="pk_…" aria-label="Personal ClickUp token" autocomplete="off">
+          <button class="btn primary sm" id="c-save">Save</button><button class="btn sm" id="c-remove" hidden>Remove</button></div>
       </div>
     </section>
-    <section><h2>Session</h2><button class="act" id="logout">Sign out</button></section>
+    <section class="card"><h2>Session</h2><p class="sub">Sign out on this device.</p><button class="btn" id="logout">Sign out</button></section>
   </div>
 
-  <div id="users" data-tab="Users" data-perm="org.users.manage" hidden>
-    <section>
-      <h2>Add a user</h2>
-      <div class="row">
-        <input id="nu-email" type="email" placeholder="email@company.com">
-        <input id="nu-name" placeholder="Full name">
-        <input id="nu-dept" placeholder="Department (optional)">
-        <select id="nu-role"></select>
-        <button class="act primary" id="nu-add">Add user</button>
+  <!-- ── Users ─────────────────────────────────────────────── -->
+  <div id="users" data-tab="Users" data-icon="users" data-group="Organization" data-perm="org.users.manage" hidden>
+    <div class="page-head"><h1>Users</h1><p>Everyone who uses Lisa. Each person gets a private assistant; their role decides what it may do.</p></div>
+    <section class="card">
+      <h2>Add a person</h2>
+      <p class="sub">They receive a single-use link (valid 48 h) to choose their own password.</p>
+      <div class="fields">
+        <div class="field"><label for="nu-name">Full name</label><input id="nu-name" autocomplete="off"></div>
+        <div class="field"><label for="nu-email">E-mail</label><input id="nu-email" type="email" autocomplete="off"></div>
+        <div class="field"><label for="nu-role">Role</label><select id="nu-role"></select></div>
+        <div class="field"><label for="nu-dept">Department <span class="hint">(optional)</span></label><input id="nu-dept"></div>
       </div>
-      <p class="muted" id="nu-result"></p>
+      <div class="actions"><button class="btn primary" id="nu-add"><svg class="i"><use href="#i-plus"/></svg>Add person</button></div>
+      <div id="nu-result"></div>
     </section>
-    <section><h2>Users</h2><div class="scroll"><table id="user-table"></table></div></section>
-  </div>
-
-  <div id="roles" data-tab="Roles" data-perm="org.users.manage" hidden>
-    <section>
-      <h2>Role</h2>
-      <div class="row"><select id="role-pick"></select><button class="act" id="role-new">New role</button></div>
-      <div class="row" style="margin-top:10px">
-        <input id="role-key" placeholder="key (e.g. sales)"><input id="role-name" placeholder="Display name">
-      </div>
-      <h2 style="margin-top:14px">Permissions</h2><div class="grid" id="role-perms"></div>
-      <h2 style="margin-top:14px">Assistant tools</h2>
-      <p class="muted">What this role's assistant may use. File, terminal and code tools are never available to organisation users.</p>
-      <div class="grid" id="role-tools"></div>
-      <div class="row" style="margin-top:14px">
-        <button class="act primary" id="role-save">Save role</button>
-        <button class="act" id="role-delete">Delete role</button>
-      </div>
+    <section class="card">
+      <h2>People <span class="badge" id="user-count"></span></h2>
+      <div class="table-wrap"><table id="user-table"></table></div>
     </section>
   </div>
 
-  <div id="knowledge" data-tab="Knowledge" data-perm="knowledge.read" hidden>
-    <section>
-      <h2>Search company knowledge</h2>
-      <div class="row"><input id="k-q" placeholder="e.g. milking robot cleaning" style="flex:1;min-width:200px"><button class="act primary" id="k-search">Search</button></div>
-      <div id="k-results" class="muted" style="margin-top:10px"></div>
+  <!-- ── Roles ─────────────────────────────────────────────── -->
+  <div id="roles" data-tab="Roles" data-icon="roles" data-group="Organization" data-perm="org.users.manage" hidden>
+    <div class="page-head"><h1>Roles</h1><p>A role is a set of permissions. Changes apply to every person with that role from their next message.</p></div>
+    <section class="card">
+      <div class="fields">
+        <div class="field"><label for="role-pick">Role</label><select id="role-pick"></select></div>
+        <div class="field"><label for="role-name">Display name</label><input id="role-name"></div>
+        <div class="field"><label for="role-key">Key <span class="hint">(fixed once created)</span></label><input id="role-key" placeholder="e.g. sales"></div>
+        <div class="field" style="flex:0"><button class="btn" id="role-new"><svg class="i"><use href="#i-plus"/></svg>New role</button></div>
+      </div>
+      <p class="hint" id="role-desc" style="margin:12px 0 0"></p>
     </section>
-    <section data-need="knowledge.contribute">
+    <div class="perm-groups" id="role-perms"></div>
+    <section class="card" style="margin-top:16px">
+      <h2>Assistant abilities</h2>
+      <p class="sub">What the assistant of this role may use. File, terminal and code tools are never available to organisation users.</p>
+      <div class="perm-groups" id="role-tools" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))"></div>
+      <div class="actions">
+        <button class="btn primary" id="role-save">Save role</button>
+        <button class="btn danger" id="role-delete">Delete role</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── Knowledge ─────────────────────────────────────────── -->
+  <div id="knowledge" data-tab="Knowledge" data-icon="book" data-group="Organization" data-perm="knowledge.read" hidden>
+    <div class="page-head"><h1>Company knowledge</h1><p>Shared workflows, guidelines and know-how. Lisa answers from the areas a person may read.</p></div>
+    <section class="card">
+      <h2>Search</h2>
+      <div class="fields"><div class="field" style="grid-column:1/-1"><label for="k-q">What are you looking for?</label>
+        <div style="display:flex;gap:8px"><input id="k-q" placeholder="e.g. milking robot cleaning"><button class="btn primary" id="k-search">Search</button></div></div></div>
+      <div id="k-results" style="margin-top:12px"></div>
+    </section>
+    <section class="card" data-need="knowledge.contribute">
       <h2>Teach Lisa</h2>
-      <p class="muted">Describe a workflow. An approver of the area publishes it before anyone can find it.</p>
-      <div class="row"><select id="k-area"></select><input id="k-title" placeholder="Title" style="flex:1;min-width:200px"></div>
-      <textarea id="k-body" rows="6" style="width:100%;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);font:inherit" placeholder="Purpose, steps, owner, exceptions"></textarea>
-      <button class="act primary" id="k-submit">Submit for approval</button>
+      <p class="sub">Describe a workflow or answer. An approver of the area checks it before anyone can find it.</p>
+      <div class="fields">
+        <div class="field"><label for="k-area">Area</label><select id="k-area"></select></div>
+        <div class="field" style="grid-column:span 2"><label for="k-title">Title</label><input id="k-title"></div>
+      </div>
+      <div class="field" style="margin-top:12px"><label for="k-body">Content</label><textarea id="k-body" placeholder="Purpose, steps, who is responsible, exceptions"></textarea></div>
+      <div class="actions"><button class="btn primary" id="k-submit">Submit for approval</button></div>
     </section>
-    <section data-need="knowledge.approve"><h2>Drafts to approve</h2><div id="k-drafts" class="muted"></div></section>
-    <section data-need="knowledge.manage">
+    <section class="card" data-need="knowledge.approve"><h2>Waiting for approval</h2><div id="k-drafts"></div></section>
+    <section class="card" data-need="knowledge.manage">
       <h2>Areas and access</h2>
-      <p class="muted">One line per grant: <code>role:staff=read</code>, <code>department:Farm=contribute</code>, <code>user:&lt;user id&gt;=approve</code>. Administrators get nothing unless granted here.</p>
-      <div class="row"><input id="ka-key" placeholder="area key (folder)"><input id="ka-name" placeholder="Name"></div>
-      <textarea id="ka-grants" rows="4" style="width:100%;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);font:13px ui-monospace,monospace"></textarea>
-      <button class="act primary" id="ka-save">Save area</button>
-      <div class="scroll" style="margin-top:12px"><table id="ka-table"></table></div>
-      <h2 style="margin-top:14px">Questions Lisa could not answer</h2><div id="k-gaps" class="muted"></div>
+      <p class="sub">An area is a folder of notes. Choose who may <b>read</b> it, <b>contribute</b> (suggest changes) or <b>approve</b> (publish). Administrators see nothing unless they are listed here too.</p>
+      <div class="table-wrap"><table id="ka-table"></table></div>
+      <h3 style="font-size:15px;margin:20px 0 10px" id="ka-form-title">New area</h3>
+      <div class="fields">
+        <div class="field"><label for="ka-name">Name</label><input id="ka-name" placeholder="Company handbook"></div>
+        <div class="field"><label for="ka-key">Folder</label><input id="ka-key" placeholder="company-handbook"></div>
+      </div>
+      <div class="label" style="margin:14px 0 8px">Who has access</div>
+      <div id="ka-grants"></div>
+      <button class="btn sm" id="ka-add-grant"><svg class="i"><use href="#i-plus"/></svg>Add access</button>
+      <div class="field" style="margin-top:14px"><label for="ka-zip">Import notes <span class="hint">(optional: a zipped Obsidian vault or folder of .md files)</span></label><input type="file" id="ka-zip" accept=".zip,application/zip"></div>
+      <div class="actions"><button class="btn primary" id="ka-save">Save area</button><button class="btn" id="ka-reset" hidden>Cancel editing</button></div>
+      <h3 style="font-size:15px;margin:24px 0 8px">Questions Lisa could not answer</h3>
+      <p class="hint" style="margin:0 0 8px">Good candidates for new knowledge.</p>
+      <div id="k-gaps"></div>
     </section>
   </div>
 
-  <div id="audit" data-tab="Audit log" data-perm="org.audit.read" hidden>
-    <section><h2>Status</h2><div class="grid" id="ops"></div></section>
-    <section><h2>Recent events</h2><div class="scroll"><table id="audit-table"></table></div></section>
+  <!-- ── Audit ─────────────────────────────────────────────── -->
+  <div id="audit" data-tab="Status & audit log" data-icon="audit" data-group="Organization" data-perm="org.audit.read" hidden>
+    <div class="page-head"><h1>Status & audit log</h1><p>Health of the system and every change made in the organisation.</p></div>
+    <section class="card"><h2>Status</h2><div class="tiles" id="ops"></div></section>
+    <section class="card"><h2>Recent events</h2><div class="table-wrap"><table id="audit-table"></table></div></section>
   </div>
-</main>
-<div id="toast" role="status"></div>
+
+  <!-- ── Guide ─────────────────────────────────────────────── -->
+  <div id="guide" data-tab="Guide" data-icon="help" data-group="Help" hidden>
+    <div class="page-head"><h1>Guide</h1><p>How to work with Lisa.</p></div>
+    <section class="card guide">
+      <h2>For everyone</h2>
+      <ol class="steps">
+        <li><b>Sign in</b> with the link you received by e-mail or from your admin, and choose a password. Forgot it? Use "Forgot password" on the sign-in page.</li>
+        <li><b>Chat</b> — click <i>Back to chat</i>. Your assistant is private: your conversations, memory and files are never visible to colleagues or administrators.</li>
+        <li><b>Telegram</b> (optional) — under <i>My account</i>, link your Telegram with the pairing code the company bot sends you. Then you can talk to Lisa from your phone.</li>
+        <li><b>Your accounts</b> — if your role allows it, connect Google (mail, calendar, docs) under <i>My account</i>. ClickUp usually works without setup: Lisa finds the tasks assigned to your e-mail address.</li>
+        <li><b>Company knowledge</b> — ask Lisa "how do we …?". She answers from the areas you may read and tells you when she does not know. Under <i>Knowledge</i> you can search yourself and <i>Teach Lisa</i>: your suggestion is published after an approver checks it.</li>
+      </ol>
+      <h3>Good to know</h3>
+      <ul>
+        <li>Lisa remembers things you tell her ("remember that …"); you can review that memory in the chat settings.</li>
+        <li>Before Lisa sends an e-mail or creates something in another system, she asks you to confirm.</li>
+        <li>Missing something? Ask your administrator — your role decides which features you see.</li>
+      </ul>
+    </section>
+    <section class="card guide" data-need="org.users.manage">
+      <h2>For administrators</h2>
+      <ol class="steps">
+        <li><b>Run the setup wizard</b> (button at the top) once: company, AI model for everyone, company tools (Telegram bot, Google, Microsoft 365, ClickUp), company knowledge and your team. Press <i>Apply</i> at the end: every assistant is refreshed and Lisa is back within about 20 seconds.</li>
+        <li><b>Add people</b> under <i>Users</i> with a role. Send them the password link (or it is e-mailed automatically when e-mail is configured).</li>
+        <li><b>Adjust roles</b> under <i>Roles</i>: what each role's assistant may do and which company tools it may use. The built-in roles are a good start: <i>Staff</i> for most people, <i>Manager</i> to approve knowledge, <i>Administrator</i> for people management, <i>Operator (IT)</i> for the setup wizard, AI model and server settings.</li>
+        <li><b>Build the knowledge base</b> under <i>Knowledge</i>: create areas (e.g. Handbook, Sales, Production), choose who may read them, and import an existing Obsidian vault as a zip. Nobody needs their own Obsidian.</li>
+        <li><b>Watch</b> <i>Status & audit log</i>: failed logins, denied requests and every change are recorded.</li>
+      </ol>
+      <h3>How shared tools work</h3>
+      <ul>
+        <li><b>Telegram</b>: one company bot; each person links their own Telegram and gets their own private chat.</li>
+        <li><b>Google</b>: the company provides the sign-in app; each person connects their own Google account.</li>
+        <li><b>Microsoft 365 / Outlook</b>: one company app; each assistant reaches only its owner's mailbox.</li>
+        <li><b>ClickUp</b>: connected once with a company token; each person sees the tasks assigned to their e-mail. A personal token is optional.</li>
+        <li><b>Knowledge</b>: one company vault, split into areas with their own access.</li>
+      </ul>
+      <h3>Troubleshooting</h3>
+      <ul>
+        <li><b>Someone lost access</b> — send a new password link from <i>Users</i>. Disabling a person signs them out everywhere at once.</li>
+        <li><b>The setup wizard or AI settings are missing</b> — your account needs the <i>Operator (IT)</i> role. Lisa refuses changes that would leave nobody able to manage users or run setup. If you are locked out anyway, on the server run:<br><code>docker compose exec webui python -m api.enterprise.recover you@company.com</code></li>
+        <li><b>Lisa does not answer</b> — check <i>Status</i>: the gateway must be "ok". After the wizard's Apply it restarts for about 20 seconds.</li>
+      </ul>
+    </section>
+  </div>
+  </main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 3500); };
+  const icon = (n) => `<svg class="i" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+  const toast = (msg, isErr) => { const t = $('toast'); t.textContent = msg; t.className = 'show' + (isErr ? ' err' : '');
+    clearTimeout(toast.h); toast.h = setTimeout(() => { t.className = ''; }, isErr ? 6000 : 3500); };
   async function api(path, body) {
     const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } :
       { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Hermes-CSRF-Token': window.__csrf || '' }, body: JSON.stringify(body) });
@@ -153,171 +365,286 @@
     if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
     return data;
   }
-  let me, rolesData;
+  // Run an action from a button: disable it while it runs, show errors as a toast.
+  async function busy(btn, fn) {
+    if (btn) btn.disabled = true;
+    try { return await fn(); } catch (e) { toast(e.message, true); } finally { if (btn) btn.disabled = false; }
+  }
+  const empty = (title, text) => `<div class="empty"><b>${esc(title)}</b>${esc(text)}</div>`;
+  const copyLine = (url) => `<div class="copy-line"><code>${esc(url)}</code><button class="btn sm" data-copy="${esc(url)}">Copy link</button></div>`;
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (!b) return;
+    navigator.clipboard.writeText(b.dataset.copy).then(() => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy link'; }, 2000); }); });
+
+  let me, rolesData, usersCache = [];
+  const can = (p) => me.permissions.includes(p);
+  const roleName = (k) => ((rolesData && rolesData.roles.find((r) => r.key === k)) || { name: k }).name;
 
   function showTab(id) {
-    if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);  // every tab has its own link
+    if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);  // every section has its own link
     document.querySelectorAll('[data-tab]').forEach((el) => { el.hidden = el.id !== id; });
     document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.for === id)));
+    document.querySelectorAll(`#${id} [data-need]`).forEach((el) => { el.hidden = !can(el.dataset.need); });
+    window.scrollTo(0, 0);
     ({ users: loadUsers, roles: loadRoles, audit: loadAudit, knowledge: loadKnowledge,
-       account: () => { loadTelegram(); loadIntegrations(); } })[id]?.();
+       account: () => { loadTelegram(); loadIntegrations(); } })[id]?.()?.catch?.((e) => toast(e.message, true));
   }
 
+  // ── My account ──
   async function loadTelegram() {
     const s = await api('/api/enterprise/telegram');
-    $('tg-status').innerHTML = s.linked ? `<span class="ok">Linked</span> to Telegram account <b>${esc(s.telegram_name || s.telegram_user_id)}</b> (id ${esc(s.telegram_user_id)})` : 'Not linked yet.';
+    $('tg-status').innerHTML = s.linked
+      ? `<span class="badge ok">Linked</span> Telegram account <b>${esc(s.telegram_name || s.telegram_user_id)}</b> <span class="hint">(id ${esc(s.telegram_user_id)})</span>`
+      : '<span class="badge">Not linked</span>';
     $('tg-unlink').hidden = !s.linked; $('tg-link-row').hidden = s.linked; $('tg-steps').hidden = s.linked;
   }
-  $('tg-link').onclick = async () => {
-    try { const r = await api('/api/enterprise/telegram/link', { code: $('tg-code').value.trim() });
-      toast(r.gateway_restarting ? 'Linked. Lisa on Telegram is ready in about a minute.' : 'Linked.'); $('tg-code').value = ''; loadTelegram();
-    } catch (e) { toast(e.message); }
-  };
-  $('tg-unlink').onclick = async () => { await api('/api/enterprise/telegram/unlink', {}); toast('Telegram unlinked.'); loadTelegram(); };
+  $('tg-link').onclick = (e) => busy(e.currentTarget, async () => {
+    const r = await api('/api/enterprise/telegram/link', { code: $('tg-code').value.trim() });
+    toast(r.gateway_restarting ? 'Linked. Lisa on Telegram is ready in about a minute.' : 'Linked.'); $('tg-code').value = ''; loadTelegram();
+  });
+  $('tg-unlink').onclick = (e) => busy(e.currentTarget, async () => { await api('/api/enterprise/telegram/unlink', {}); toast('Telegram unlinked.'); loadTelegram(); });
   async function loadIntegrations() {
     const s = await api('/api/enterprise/integrations');
     $('integrations').hidden = !(s.google_allowed || s.clickup_allowed);
     $('int-google').hidden = !s.google_allowed; $('int-clickup').hidden = !s.clickup_allowed;
-    $('g-state').innerHTML = s.google ? '<span class="ok">connected</span>' : 'not connected';
+    $('g-state').innerHTML = s.google ? '<span class="badge ok">Connected</span>'
+      : (s.google_ready === false ? 'Not available yet — the administrator has to add Google in the setup wizard.' : 'Mail, calendar and documents from your own Google account.');
+    $('g-connect').hidden = s.google_ready === false;
     $('g-connect').textContent = s.google ? 'Reconnect' : 'Connect Google'; $('g-disconnect').hidden = !s.google;
-    $('c-state').innerHTML = s.clickup ? '<span class="ok">connected</span>' : 'not connected'; $('c-remove').hidden = !s.clickup;
+    $('c-state').innerHTML = s.clickup ? '<span class="badge ok">Your own token</span> Lisa uses your personal ClickUp token.'
+      : (s.clickup_company ? '<span class="badge ok">Ready</span> Through the company ClickUp: Lisa shows the tasks assigned to your e-mail. A personal token is optional.'
+        : 'Paste your personal ClickUp token (ClickUp → Settings → Apps).');
+    $('c-remove').hidden = !s.clickup;
   }
-  $('g-disconnect').onclick = async () => { await api('/api/enterprise/google/disconnect', {}); toast('Google disconnected.'); loadIntegrations(); };
-  $('c-save').onclick = async () => { try { await api('/api/enterprise/integrations/clickup', { token: $('c-token').value.trim() });
-    $('c-token').value = ''; toast('ClickUp connected.'); loadIntegrations(); } catch (e) { toast(e.message); } };
-  $('c-remove').onclick = async () => { await api('/api/enterprise/integrations/clickup', { token: null }); toast('ClickUp removed.'); loadIntegrations(); };
+  $('g-disconnect').onclick = (e) => busy(e.currentTarget, async () => { await api('/api/enterprise/google/disconnect', {}); toast('Google disconnected.'); loadIntegrations(); });
+  $('c-save').onclick = (e) => busy(e.currentTarget, async () => { await api('/api/enterprise/integrations/clickup', { token: $('c-token').value.trim() });
+    $('c-token').value = ''; toast('ClickUp connected.'); loadIntegrations(); });
+  $('c-remove').onclick = (e) => busy(e.currentTarget, async () => { await api('/api/enterprise/integrations/clickup', { token: null }); toast('Personal ClickUp token removed.'); loadIntegrations(); });
   { const q = new URLSearchParams(location.search);
-    if (q.get('error')) setTimeout(() => toast(q.get('error')), 300);
+    if (q.get('error')) setTimeout(() => toast(q.get('error'), true), 300);
     if (q.get('connected') === 'google') setTimeout(() => toast('Google connected.'), 300); }
-
   $('logout').onclick = async () => { await api('/api/enterprise/logout', {}); location.href = '/login'; };
 
+  // ── Users ──
+  function inviteResult(r, email) {
+    $('nu-result').innerHTML = `<div class="callout ok">${icon('info')}<div>${r.invitation_emailed
+      ? `Added. The invitation was e-mailed to <b>${esc(email)}</b>.`
+      : `Added. Send this single-use link so they choose a password (valid 48 h):${copyLine(location.origin + r.password_link)}`}</div></div>`;
+  }
   async function loadUsers() {
     const [{ users }, roles] = await Promise.all([api('/api/enterprise/users'), api('/api/enterprise/roles')]);
-    rolesData = roles;
+    rolesData = roles; usersCache = users;
     $('nu-role').innerHTML = roles.roles.map((r) => `<option value="${esc(r.key)}"${r.key === 'staff' ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
-    $('user-table').innerHTML = '<tr><th>User</th><th>Roles</th><th>Status</th><th></th></tr>' + users.map((u) => `
-      <tr><td><b>${esc(u.display_name || u.email)}</b><br><span class="muted">${esc(u.email)}</span></td>
-      <td>${u.roles.map((r) => `<span class="chip">${esc(r)}</span>`).join('')}<br>
-        <select data-roles="${esc(u.id)}" aria-label="Change role"><option value="">change role…</option>${roles.roles.map((r) => `<option value="${esc(r.key)}">${esc(r.name)}</option>`).join('')}</select></td>
-      <td class="${u.status === 'active' ? 'ok' : 'err'}">${esc(u.status)}${u.has_password ? '' : '<br><span class="muted">invited</span>'}</td>
-      <td class="row">${u.id === me.id ? '<span class="muted">you</span>' : `
-        <button class="act" data-status="${esc(u.id)}" data-to="${u.status === 'active' ? 'disabled' : 'active'}">${u.status === 'active' ? 'Disable' : 'Enable'}</button>`}
-        <button class="act" data-link="${esc(u.id)}">Password link</button></td></tr>`).join('');
+    $('user-count').textContent = users.length;
+    if (!users.length) { $('user-table').innerHTML = `<tr><td>${empty('Nobody yet', 'Add the first person above.')}</td></tr>`; return; }
+    $('user-table').innerHTML = '<thead><tr><th>Person</th><th>Roles</th><th>Status</th><th><span class="sr">Actions</span></th></tr></thead><tbody>' + users.map((u) => {
+      const status = u.status !== 'active' ? '<span class="badge err">Disabled</span>'
+        : (u.has_password ? '<span class="badge ok">Active</span>' : '<span class="badge warn">Invited</span>');
+      return `<tr>
+      <td class="person"><b>${esc(u.display_name || u.email)}${u.id === me.id ? ' <span class="badge">you</span>' : ''}</b><span>${esc(u.email)}</span></td>
+      <td><details class="roles-edit"><summary>${u.roles.map((r) => `<span class="badge role">${esc(roleName(r))}</span>`).join('')}<span class="edit">Change</span></summary>
+        <div class="pop">${roles.roles.map((r) => `<label class="check"><input type="checkbox" value="${esc(r.key)}" ${u.roles.includes(r.key) ? 'checked' : ''}>${esc(r.name)}</label>`).join('')}
+        <button class="btn primary sm" data-save-roles="${esc(u.id)}">Save roles</button></div></details></td>
+      <td>${status}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn sm" data-link="${esc(u.id)}" data-email="${esc(u.email)}">${u.has_password ? 'Password reset link' : 'New invitation link'}</button>
+        ${u.id === me.id ? '' : `<button class="btn sm ${u.status === 'active' ? 'danger' : ''}" data-status="${esc(u.id)}" data-to="${u.status === 'active' ? 'disabled' : 'active'}">${u.status === 'active' ? 'Disable' : 'Enable'}</button>`}
+      </td></tr>`; }).join('') + '</tbody>';
   }
-  $('user-table').addEventListener('click', async (e) => {
+  $('user-table').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    try {
-      if (b.dataset.status) { await api('/api/enterprise/users/status', { user_id: b.dataset.status, status: b.dataset.to }); toast('Saved.'); loadUsers(); }
-      if (b.dataset.link) { const r = await api('/api/enterprise/users/password-link', { user_id: b.dataset.link });
-        $('nu-result').innerHTML = `Send this single-use link (valid 48 h): <code>${esc(location.origin + r.password_link)}</code>`; }
-    } catch (err) { toast(err.message); }
+    if (b.dataset.status) busy(b, async () => {
+      if (b.dataset.to === 'disabled' && !confirm('Disable this person? They are signed out everywhere and their assistant stops.')) return;
+      await api('/api/enterprise/users/status', { user_id: b.dataset.status, status: b.dataset.to }); toast('Saved.'); loadUsers(); });
+    if (b.dataset.link) busy(b, async () => { const r = await api('/api/enterprise/users/password-link', { user_id: b.dataset.link });
+      $('nu-result').innerHTML = `<div class="callout">${icon('info')}<div>Single-use link for <b>${esc(b.dataset.email)}</b> (valid 48 h):${copyLine(location.origin + r.password_link)}</div></div>`;
+      $('nu-result').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+    if (b.dataset.saveRoles) busy(b, async () => {
+      const keys = [...b.closest('.pop').querySelectorAll('input:checked')].map((i) => i.value);
+      if (!keys.length) throw new Error('Choose at least one role.');
+      await api('/api/enterprise/users/roles', { user_id: b.dataset.saveRoles, roles: keys });
+      toast('Roles saved. They apply from the next message.'); loadUsers(); });
   });
-  $('user-table').addEventListener('change', async (e) => {
-    const s = e.target.closest('select[data-roles]'); if (!s || !s.value) return;
-    try { await api('/api/enterprise/users/roles', { user_id: s.dataset.roles, roles: [s.value] }); toast('Role changed; it applies from the next conversation.'); loadUsers(); }
-    catch (err) { toast(err.message); }
+  $('nu-add').onclick = (e) => busy(e.currentTarget, async () => {
+    const email = $('nu-email').value.trim();
+    const r = await api('/api/enterprise/users', { email, display_name: $('nu-name').value.trim(),
+      department: $('nu-dept').value.trim() || null, roles: [$('nu-role').value] });
+    inviteResult(r, email); ['nu-email', 'nu-name', 'nu-dept'].forEach((id) => { $(id).value = ''; }); loadUsers();
   });
-  $('nu-add').onclick = async () => {
-    try {
-      const r = await api('/api/enterprise/users', { email: $('nu-email').value, display_name: $('nu-name').value,
-        department: $('nu-dept').value || null, roles: [$('nu-role').value] });
-      $('nu-result').innerHTML = `User added. Send this single-use link so they choose a password (valid 48 h): <code>${esc(location.origin + r.password_link)}</code>`;
-      ['nu-email', 'nu-name', 'nu-dept'].forEach((id) => $(id).value = ''); loadUsers();
-    } catch (e) { toast(e.message); }
-  };
 
+  // ── Roles ──
+  const ROLE_DESC = { viewer: 'Asks questions and reads company knowledge.', staff: 'The everyday assistant for most people.',
+    manager: 'Staff, plus approving company knowledge.', admin: 'Manages people, roles and company knowledge. No server access.',
+    operator: 'IT: setup wizard, AI model, plugins and server settings.' };
+  const GROUPS = [
+    ['Assistant', 'What every assistant of this role can do.', (k) => ['chat.use', 'memory.own', 'files.workspace', 'cron.own', 'share.create', 'kanban.use'].includes(k)],
+    ['Connected tools', 'Company tools this role may use, each with the person\'s own account.', (k) => k.startsWith('integration.')],
+    ['Company knowledge', 'Reading and maintaining the shared knowledge base.', (k) => k.startsWith('knowledge.')],
+    ['Organization management', 'Administration of people, roles and settings.', (k) => k.startsWith('org.')],
+    ['IT / Operator', 'Server-level settings. Give these only to IT.', (k) => k.startsWith('operator.')],
+  ];
+  const OPERATOR_LABELS = { setup: 'Run the setup wizard', providers: 'Change AI providers and keys', settings: 'Change server settings',
+    extensions: 'Manage plugins and extensions', skills: 'Manage skills', gateway: 'Restart and configure the gateway', logs: 'Read server logs',
+    system: 'System status and shutdown', updates: 'Install updates', profiles: 'Switch Hermes profiles', mcp: 'Manage MCP servers',
+    terminal: 'Host terminal', git: 'Git on the server' };
+  const TOOL_LABELS = { memory: ['Memory', 'Remembers what the person tells it'], todo: ['To-do list', 'Keeps track of multi-step work'],
+    session_search: ['Past conversations', 'Searches the person\'s own earlier chats'], web: ['Web search', 'Looks things up on the internet'],
+    delegation: ['Sub-agents', 'Splits big jobs into parallel work'], clarify: ['Clarifying questions', 'Asks before guessing'],
+    knowledge: ['Company knowledge', 'Answers from the areas the person may read'] };
   async function loadRoles() {
     rolesData = await api('/api/enterprise/roles');
     $('role-pick').innerHTML = rolesData.roles.map((r) => `<option value="${esc(r.key)}">${esc(r.name)}${r.builtin ? '' : ' (custom)'}</option>`).join('');
     fillRole(rolesData.roles[0]);
   }
   function fillRole(role) {
-    const canEdit = me.permissions.includes('org.roles.manage');
+    const canEdit = can('org.roles.manage'), dis = canEdit ? '' : 'disabled';
     $('role-key').value = role ? role.key : ''; $('role-key').disabled = !!role; $('role-name').value = role ? role.name : '';
-    $('role-perms').innerHTML = Object.entries(rolesData.catalog).map(([k, label]) =>
-      `<label class="check"><input type="checkbox" value="${esc(k)}" ${role && role.permissions.includes(k) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>${esc(label)}</label>`).join('');
-    $('role-tools').innerHTML = rolesData.toolsets.map((t) =>
-      `<label class="check"><input type="checkbox" value="${esc(t)}" ${role && role.toolsets.includes(t) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>${esc(t)}</label>`).join('');
+    $('role-name').disabled = !canEdit;
+    $('role-desc').textContent = role ? (ROLE_DESC[role.key] || '') : 'A new role starts empty: tick what it may do, then save.';
+    const keys = Object.keys(rolesData.catalog);
+    $('role-perms').innerHTML = GROUPS.map(([title, desc, match]) => {
+      const items = keys.filter(match); if (!items.length) return '';
+      return `<fieldset class="perm-group"><legend>${esc(title)}</legend><p class="gdesc">${esc(desc)}</p>${items.map((k) => {
+        const label = k.startsWith('operator.') ? (OPERATOR_LABELS[k.slice(9)] || rolesData.catalog[k]) : rolesData.catalog[k];
+        return `<label class="check"><input type="checkbox" value="${esc(k)}" ${role && role.permissions.includes(k) ? 'checked' : ''} ${dis}><span>${esc(label)}</span></label>`; }).join('')}</fieldset>`;
+    }).join('');
+    $('role-tools').innerHTML = rolesData.toolsets.map((t) => { const [name, hint] = TOOL_LABELS[t] || [t, ''];
+      return `<label class="check"><input type="checkbox" value="${esc(t)}" ${role && role.toolsets.includes(t) ? 'checked' : ''} ${dis}><span>${esc(name)}<small>${esc(hint)}</small></span></label>`; }).join('');
     $('role-save').hidden = $('role-new').hidden = !canEdit; $('role-delete').hidden = !canEdit || !role || role.builtin;
+    if (!role) $('role-key').focus();
   }
   $('role-pick').onchange = () => fillRole(rolesData.roles.find((r) => r.key === $('role-pick').value));
   $('role-new').onclick = () => fillRole(null);
-  $('role-save').onclick = async () => {
+  $('role-save').onclick = (e) => busy(e.currentTarget, async () => {
     const checked = (id) => [...document.querySelectorAll(`#${id} input:checked`)].map((i) => i.value);
-    try { const r = await api('/api/enterprise/roles', { key: $('role-key').value, name: $('role-name').value,
-        permissions: checked('role-perms'), toolsets: checked('role-tools') });
-      toast(`Role saved; ${r.profiles_updated} assistant(s) updated.`); loadRoles(); } catch (e) { toast(e.message); }
-  };
-  $('role-delete').onclick = async () => { try { await api('/api/enterprise/roles/delete', { key: $('role-key').value }); toast('Role deleted.'); loadRoles(); } catch (e) { toast(e.message); } };
+    const r = await api('/api/enterprise/roles', { key: $('role-key').value.trim(), name: $('role-name').value.trim(),
+      permissions: checked('role-perms'), toolsets: checked('role-tools') });
+    toast(`Role saved. ${r.profiles_updated} assistant(s) updated.`); const key = $('role-key').value.trim();
+    await loadRoles(); $('role-pick').value = key; $('role-pick').onchange();
+  });
+  $('role-delete').onclick = (e) => busy(e.currentTarget, async () => {
+    if (!confirm('Delete this role?')) return;
+    await api('/api/enterprise/roles/delete', { key: $('role-key').value }); toast('Role deleted.'); loadRoles(); });
 
-  const can = (p) => me.permissions.includes(p);
+  // ── Knowledge ──
+  const LEVEL_TEXT = { read: 'Can read', contribute: 'Can contribute', approve: 'Can approve' };
+  function grantRow(g = { principal_type: 'role', principal_id: '', level: 'read' }) {
+    const who = (type, id) => {
+      if (type === 'role' && rolesData) return `<select data-g="id" aria-label="Role">${rolesData.roles.map((r) => `<option value="${esc(r.key)}" ${r.key === id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>`;
+      if (type === 'user' && usersCache.length) return `<select data-g="id" aria-label="Person">${usersCache.map((u) => `<option value="${esc(u.id)}" ${u.id === id ? 'selected' : ''}>${esc(u.display_name || u.email)}</option>`).join('')}</select>`;
+      return `<input data-g="id" value="${esc(id)}" aria-label="${type === 'department' ? 'Department name' : 'User id'}" placeholder="${type === 'department' ? 'e.g. Sales' : 'user id'}">`;
+    };
+    const row = document.createElement('div'); row.className = 'grant-row';
+    row.innerHTML = `<select data-g="type" aria-label="Who">${['role', 'department', 'user'].map((t) => `<option value="${t}" ${t === g.principal_type ? 'selected' : ''}>${{ role: 'Role', department: 'Department', user: 'Person' }[t]}</option>`).join('')}</select>
+      <span data-slot>${who(g.principal_type, g.principal_id)}</span>
+      <select data-g="level" aria-label="Access">${Object.entries(LEVEL_TEXT).map(([k, v]) => `<option value="${k}" ${k === g.level ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <button class="icon-btn" type="button" aria-label="Remove access">${icon('x')}</button>`;
+    row.querySelector('[data-g=type]').onchange = (e) => { row.querySelector('[data-slot]').innerHTML = who(e.target.value, ''); };
+    row.querySelector('.icon-btn').onclick = () => row.remove();
+    $('ka-grants').appendChild(row);
+  }
+  function resetAreaForm(area) {
+    $('ka-form-title').textContent = area ? `Edit "${area.name}"` : 'New area';
+    $('ka-name').value = area ? area.name : ''; $('ka-key').value = area ? area.key : ''; $('ka-key').disabled = !!area;
+    $('ka-grants').innerHTML = ''; (area ? area.grants : [{ principal_type: 'role', principal_id: 'staff', level: 'read' },
+      { principal_type: 'role', principal_id: 'admin', level: 'approve' }]).forEach(grantRow);
+    $('ka-zip').value = ''; $('ka-reset').hidden = !area;
+  }
+  let areasCache = [];
   async function loadKnowledge() {
-    document.querySelectorAll('#knowledge [data-need]').forEach((el) => { el.hidden = !can(el.dataset.need); });
     const areas = await api('/api/enterprise/knowledge/areas');
-    $('k-area').innerHTML = Object.entries(areas.mine).filter(([, lv]) => lv !== 'read')
-      .map(([k]) => `<option>${esc(k)}</option>`).join('') || '<option value="">no area to contribute to</option>';
+    const contrib = Object.entries(areas.mine).filter(([, lv]) => lv !== 'read');
+    $('k-area').innerHTML = contrib.map(([k]) => `<option>${esc(k)}</option>`).join('') || '<option value="">No area you may contribute to</option>';
+    $('k-submit').disabled = !contrib.length;
     if (can('knowledge.approve')) {
       const { drafts } = await api('/api/enterprise/knowledge/drafts');
-      $('k-drafts').innerHTML = drafts.length ? drafts.map((d) => `<div style="border-top:1px solid var(--line);padding:8px 0">
-        <b>${esc(d.title)}</b> <span class="chip">${esc(d.area)}</span><pre style="white-space:pre-wrap;color:var(--text)">${esc(d.body)}</pre>
-        <button class="act primary" data-decide="${esc(d.id)}" data-approve="1">Approve &amp; publish</button>
-        <button class="act" data-decide="${esc(d.id)}" data-approve="">Reject</button></div>`).join('') : 'Nothing waiting.';
+      $('k-drafts').innerHTML = drafts.length ? drafts.map((d) => `<div style="border-top:1px solid var(--line);padding:14px 0">
+        <b>${esc(d.title)}</b> <span class="badge role">${esc(d.area)}</span><pre style="white-space:pre-wrap;font:inherit;margin:8px 0">${esc(d.body)}</pre>
+        <div class="actions" style="margin-top:8px"><button class="btn primary sm" data-decide="${esc(d.id)}" data-approve="1">Approve &amp; publish</button>
+        <button class="btn sm danger" data-decide="${esc(d.id)}" data-approve="">Reject</button></div></div>`).join('') : empty('Nothing waiting', 'Suggestions from "Teach Lisa" appear here.');
     }
     if (can('knowledge.manage') && areas.all) {
-      $('ka-table').innerHTML = '<tr><th>Area</th><th>Access</th></tr>' + areas.all.map((a) => `<tr><td><b>${esc(a.key)}</b><br><span class="muted">${esc(a.name)}</span></td>
-        <td>${a.grants.map((g) => `<span class="chip">${esc(g.principal_type)}:${esc(g.principal_id)}=${esc(g.level)}</span>`).join('') || '<span class="err">nobody</span>'}</td></tr>`).join('');
+      areasCache = areas.all;
+      if (!rolesData) rolesData = await api('/api/enterprise/roles').catch(() => null);
+      if (!usersCache.length && can('org.users.manage')) usersCache = (await api('/api/enterprise/users').catch(() => ({ users: [] }))).users;
+      const who = (g) => g.principal_type === 'role' ? roleName(g.principal_id) : g.principal_type === 'user'
+        ? ((usersCache.find((u) => u.id === g.principal_id) || {}).display_name || g.principal_id) : `${g.principal_id} (department)`;
+      $('ka-table').innerHTML = areas.all.length ? '<thead><tr><th>Area</th><th>Access</th><th></th></tr></thead><tbody>' + areas.all.map((a) => `<tr>
+        <td class="person"><b>${esc(a.name)}</b><span>${esc(a.key)}</span></td>
+        <td>${a.grants.map((g) => `<span class="badge ${g.level === 'approve' ? 'role' : ''}">${esc(who(g))} · ${esc(g.level)}</span>`).join('') || '<span class="badge warn">Nobody can read it</span>'}</td>
+        <td style="text-align:right"><button class="btn sm" data-edit-area="${esc(a.key)}">Edit</button></td></tr>`).join('') + '</tbody>'
+        : `<tr><td>${empty('No areas yet', 'Create the first one below — for example "Company handbook", readable by everyone.')}</td></tr>`;
+      if (!$('ka-grants').children.length) [{ principal_type: 'role', principal_id: 'staff', level: 'read' },  // keep what was typed
+        { principal_type: 'role', principal_id: 'admin', level: 'approve' }].forEach(grantRow);
       const { gaps } = await api('/api/enterprise/knowledge/gaps');
-      $('k-gaps').innerHTML = gaps.slice(0, 30).map((g) => `<div>${esc(g.question)} <span class="muted">· ${esc(new Date(g.at).toLocaleDateString())}</span></div>`).join('') || 'None yet.';
+      $('k-gaps').innerHTML = gaps.slice(0, 10).map((g) => `<div style="padding:6px 0;border-top:1px solid var(--line)">${esc(g.question)} <span class="hint">· ${esc(new Date(g.at).toLocaleDateString())}</span></div>`).join('') || '<p class="hint">None yet.</p>';
     }
   }
-  $('k-search').onclick = async () => {
-    try { const r = await api('/api/enterprise/knowledge/search?q=' + encodeURIComponent($('k-q').value));
-      $('k-results').innerHTML = r.results.length ? r.results.map((h) => `<div style="padding:6px 0"><b>${esc(h.title)}</b> <code>${esc(h.path)}</code><br>${esc(h.snippet)}</div>`).join('')
-        : 'Nothing found in the areas you can read. The question was recorded so the knowledge base can be completed.';
-    } catch (e) { toast(e.message); }
-  };
-  $('k-submit').onclick = async () => {
-    try { await api('/api/enterprise/knowledge/drafts', { area: $('k-area').value, title: $('k-title').value, body: $('k-body').value });
-      toast('Submitted for approval.'); $('k-title').value = $('k-body').value = ''; } catch (e) { toast(e.message); }
-  };
-  $('k-drafts').addEventListener('click', async (e) => {
-    const b = e.target.closest('button[data-decide]'); if (!b) return;
-    try { const r = await api('/api/enterprise/knowledge/drafts/decide', { id: b.dataset.decide, approve: !!b.dataset.approve });
-      toast(r.status === 'approved' ? `Published as ${r.published_path}` : 'Rejected.'); loadKnowledge(); } catch (err) { toast(err.message); }
+  $('ka-table').addEventListener('click', (e) => { const b = e.target.closest('[data-edit-area]'); if (!b) return;
+    resetAreaForm(areasCache.find((a) => a.key === b.dataset.editArea)); $('ka-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  $('ka-add-grant').onclick = () => grantRow();
+  $('ka-reset').onclick = () => resetAreaForm(null);
+  $('ka-name').addEventListener('input', () => { if (!$('ka-key').disabled) $('ka-key').value = $('ka-name').value.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); });
+  $('k-search').onclick = (e) => busy(e.currentTarget, async () => {
+    const r = await api('/api/enterprise/knowledge/search?q=' + encodeURIComponent($('k-q').value));
+    $('k-results').innerHTML = r.results.length ? r.results.map((h) => `<div style="padding:10px 0;border-top:1px solid var(--line)"><b>${esc(h.title)}</b> <span class="hint">${esc(h.path)}</span><br>${esc(h.snippet)}</div>`).join('')
+      : empty('Nothing found', 'Nothing in the areas you may read. The question was recorded so the knowledge base can be completed.');
   });
-  $('ka-save').onclick = async () => {
-    try {
-      const grants = $('ka-grants').value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
-        const m = l.match(/^(user|role|department):(.+)=(read|contribute|approve)$/); if (!m) throw new Error('Cannot read grant: ' + l);
-        return { principal_type: m[1], principal_id: m[2].trim(), level: m[3] }; });
-      await api('/api/enterprise/knowledge/areas', { key: $('ka-key').value, name: $('ka-name').value, grants });
-      toast('Area saved.'); loadKnowledge(); } catch (e) { toast(e.message); }
-  };
+  $('k-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('k-search').click(); });
+  $('k-submit').onclick = (e) => busy(e.currentTarget, async () => {
+    await api('/api/enterprise/knowledge/drafts', { area: $('k-area').value, title: $('k-title').value, body: $('k-body').value });
+    toast('Submitted for approval.'); $('k-title').value = $('k-body').value = ''; });
+  $('k-drafts').addEventListener('click', (e) => { const b = e.target.closest('button[data-decide]'); if (!b) return;
+    busy(b, async () => { const r = await api('/api/enterprise/knowledge/drafts/decide', { id: b.dataset.decide, approve: !!b.dataset.approve });
+      toast(r.status === 'approved' ? `Published as ${r.published_path}` : 'Rejected.'); loadKnowledge(); }); });
+  $('ka-save').onclick = (e) => busy(e.currentTarget, async () => {
+    const grants = [...$('ka-grants').children].map((row) => ({ principal_type: row.querySelector('[data-g=type]').value,
+      principal_id: row.querySelector('[data-g=id]').value.trim(), level: row.querySelector('[data-g=level]').value }));
+    const key = $('ka-key').value.trim();
+    await api('/api/enterprise/knowledge/areas', { key, name: $('ka-name').value.trim(), grants });
+    const file = $('ka-zip').files[0]; let note = '';
+    if (file) {
+      const buf = new Uint8Array(await file.arrayBuffer()); let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      const r = await api('/api/enterprise/knowledge/import', { area: key, zip_base64: btoa(bin) });
+      note = ` ${r.imported} note(s) imported${r.skipped ? `, ${r.skipped} skipped` : ''}.`;
+    }
+    toast('Area saved.' + note); resetAreaForm(null); loadKnowledge();
+  });
 
+  // ── Audit ──
+  const ACTIONS = { 'login.succeeded': 'Signed in', 'login.failed': 'Sign-in failed', 'user.created': 'Person added', 'user.disabled': 'Person disabled',
+    'user.enabled': 'Person enabled', 'user.roles_changed': 'Roles changed', 'user.password_set': 'Password set', 'user.password_link_issued': 'Password link created',
+    'setup.completed': 'Organisation created', 'org.setup.applied': 'Setup wizard applied', 'authz.denied': 'Access denied', 'role.updated': 'Role changed',
+    'role.created': 'Role created', 'role.deleted': 'Role deleted', 'knowledge.area_saved': 'Knowledge area saved', 'knowledge.imported': 'Notes imported',
+    'user.recovered': 'Access restored from the server' };
   async function loadAudit() {
     const o = await api('/api/enterprise/ops');
-    const cells = [['Gateway', o.gateway], ['Active users', o.users.active], ['Disabled users', o.users.disabled],
+    const cells = [['Gateway', o.gateway], ['Active people', o.users.active], ['Disabled people', o.users.disabled],
       ['Open sessions', o.open_sessions], ['Telegram linked', o.telegram_linked], ['Drafts waiting', o.drafts_pending],
-      ['Unanswered questions (7 days)', o.knowledge_gaps_7d], ['Failed logins (24 h)', o.last_24h.failed_logins],
-      ['Throttled logins (24 h)', o.last_24h.throttled_logins], ['Denied requests (24 h)', o.last_24h.denied_requests]];
-    $('ops').innerHTML = cells.map(([k, v]) => `<div><span class="muted">${esc(k)}</span><br><b class="${v === 'ok' ? 'ok' : ''}">${esc(v)}</b></div>`).join('');
+      ['Unanswered (7 days)', o.knowledge_gaps_7d], ['Failed sign-ins (24 h)', o.last_24h.failed_logins],
+      ['Throttled sign-ins (24 h)', o.last_24h.throttled_logins], ['Denied requests (24 h)', o.last_24h.denied_requests]];
+    $('ops').innerHTML = cells.map(([k, v]) => `<div class="tile"><span>${esc(k)}</span><b>${v === 'ok' ? '<span class="badge ok" style="font-size:14px">ok</span>' : esc(v)}</b></div>`).join('');
     const { events } = await api('/api/enterprise/audit');
-    $('audit-table').innerHTML = '<tr><th>When</th><th>Action</th><th>Target</th><th>Details</th></tr>' + events.map((e) =>
-      `<tr><td class="muted">${esc(new Date(e.at).toLocaleString())}</td><td>${esc(e.action)}</td><td class="muted">${esc(e.target)}</td><td class="muted">${esc(JSON.stringify(e.detail))}</td></tr>`).join('');
+    const users = Object.fromEntries((usersCache.length ? usersCache : (can('org.users.manage') ? (await api('/api/enterprise/users').catch(() => ({ users: [] }))).users : [])).map((u) => [u.id, u.display_name || u.email]));
+    $('audit-table').innerHTML = events.length ? '<thead><tr><th>When</th><th>Who</th><th>What</th><th>Target</th><th>Details</th></tr></thead><tbody>' + events.map((e) => `<tr>
+      <td class="hint" style="white-space:nowrap">${esc(new Date(e.at).toLocaleString())}</td><td>${esc(users[e.actor_id] || (e.actor_id ? '' : 'system'))}</td>
+      <td>${e.action === 'authz.denied' || e.action === 'login.failed' ? `<span class="badge warn">${esc(ACTIONS[e.action])}</span>` : esc(ACTIONS[e.action] || e.action)}</td>
+      <td class="hint">${esc(users[e.target] || e.target)}</td><td class="hint" style="font-size:12px">${esc(Object.keys(e.detail || {}).length ? JSON.stringify(e.detail) : '')}</td></tr>`).join('') + '</tbody>'
+      : `<tr><td>${empty('No events yet', '')}</td></tr>`;
   }
 
   api('/api/enterprise/me').then((m) => {
-    me = m; $('who').textContent = `${m.display_name || m.email} · ${m.roles.join(', ')}`;
-    const tabs = [...document.querySelectorAll('[data-tab]')].filter((el) => !el.dataset.perm || m.permissions.includes(el.dataset.perm));
-    $('tabs').innerHTML = tabs.map((el) => `<button role="tab" data-for="${el.id}">${esc(el.dataset.tab)}</button>`).join('');
+    me = m; $('who-name').textContent = m.display_name || m.email;
+    $('who-roles').innerHTML = m.roles.map((r) => `<span class="badge role">${esc(r)}</span>`).join('');
+    const tabs = [...document.querySelectorAll('[data-tab]')].filter((el) => !el.dataset.perm || can(el.dataset.perm));
+    let group = '';
+    $('tabs').innerHTML = tabs.map((el) => { const head = el.dataset.group !== group ? `<div class="group-label">${esc(el.dataset.group)}</div>` : '';
+      group = el.dataset.group; return head + `<button role="tab" data-for="${el.id}">${icon(el.dataset.icon)}${esc(el.dataset.tab)}</button>`; }).join('');
     $('tabs').onclick = (e) => { const b = e.target.closest('button'); if (b) showTab(b.dataset.for); };
-    $('setup-link').hidden = !m.permissions.includes('operator.setup');
-    // /lisa#users, #roles, #knowledge, #audit, #account (#admin kept for old links)
-    const fromHash = () => {
-      const want = location.hash.slice(1) === 'admin' ? 'users' : location.hash.slice(1);
-      return tabs.some((t) => t.id === want) ? want : 'account';
-    };
+    $('setup-link').hidden = !can('operator.setup');
+    // /lisa#users, #roles, #knowledge, #audit, #account, #guide (#admin kept for old links)
+    const fromHash = () => { const want = location.hash.slice(1) === 'admin' ? 'users' : location.hash.slice(1);
+      return tabs.some((t) => t.id === want) ? want : 'account'; };
     window.addEventListener('hashchange', () => showTab(fromHash()));
     showTab(fromHash());
   });

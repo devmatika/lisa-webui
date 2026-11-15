@@ -154,9 +154,25 @@ def get_user(db: Session, user_id: str) -> User:
     return user
 
 
+# Without an active holder of each, nobody could ever add users or run the setup wizard again.
+KEEP_HELD = {"org.users.manage": "manage users", "operator.setup": "run the setup wizard"}
+
+
+def _ensure_org_keeps_control(db: Session) -> None:
+    """Refuse a change that leaves no active user able to manage users or run setup."""
+    db.flush()
+    active = [u for u in db.scalars(select(User).where(User.status == "active"))]
+    held = {p.permission for u in active for r in u.roles for p in r.permissions}
+    lost = [label for perm, label in KEEP_HELD.items() if perm not in held]
+    if lost:
+        raise DirectoryError(f"At least one active user must be able to {' and '.join(lost)}. "
+                             "Give that role to someone else first.")
+
+
 def set_roles(db: Session, actor: Actor, user_id: str, role_keys: list[str]) -> User:
     user = get_user(db, user_id)
     user.roles = _roles(db, role_keys)
+    _ensure_org_keeps_control(db)
     audit(db, actor, "user.roles_changed", user.id, roles=sorted(role_keys))
     return user
 
@@ -168,6 +184,7 @@ def set_status(db: Session, actor: Actor, user_id: str, status: str) -> User:
     if status == "disabled" and user.id == actor.id:
         raise DirectoryError("You cannot disable your own account")
     user.status = status
+    _ensure_org_keeps_control(db)
     audit(db, actor, f"user.{'enabled' if status == 'active' else 'disabled'}", user.id)
     return user
 
@@ -245,7 +262,7 @@ def save_role(db: Session, actor: Actor, *, key: str, name: str, permissions: li
     if role.template is None:
         role.template = RoleTemplate(toolsets=[], plugins=[], skills=[])
     role.template.toolsets = [t for t in SAFE_TOOLSETS if t in set(toolsets)]
-    db.flush()
+    _ensure_org_keeps_control(db)
     audit(db, actor, "role.created" if created else "role.updated", key,
           permissions=sorted(set(permissions)), toolsets=role.template.toolsets)
     return role

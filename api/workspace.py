@@ -417,6 +417,9 @@ def _profile_default_workspace(profile: str | Path | None = None) -> str:
 
     Falls back to the live DEFAULT_WORKSPACE from api.config.
     """
+    enterprise_root = _enterprise_workspace_root()
+    if enterprise_root is not None:  # the server-wide default is outside a Lisa user's own root
+        return str(enterprise_root)
     try:
         from api.config import get_config_for_profile_home
         profile_home = _resolve_profile_home_param(profile)
@@ -560,6 +563,15 @@ def _migrate_global_workspaces() -> list:
 
 
 def load_workspaces(profile: str | Path | None = None) -> list:
+    enterprise_root = _enterprise_workspace_root()
+    if enterprise_root is not None:
+        inside = [w for w in _load_workspaces_unconfined(profile)
+                  if _is_within(Path(w['path']).resolve(), enterprise_root)]
+        return inside or [{'path': str(enterprise_root), 'name': 'Home'}]
+    return _load_workspaces_unconfined(profile)
+
+
+def _load_workspaces_unconfined(profile: str | Path | None = None) -> list:
     ws_file = _workspaces_file_for_profile(profile)
     if ws_file is not None and ws_file.exists():
         try:

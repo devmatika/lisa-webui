@@ -518,6 +518,15 @@ def _k_save_area(handler, body):
         db, _actor(handler), body.get("key", ""), body.get("name", ""), list(body.get("grants") or [])).key})
 
 
+def _k_import(handler, body):
+    import base64
+    try:
+        data = base64.b64decode(body.get("zip_base64") or "", validate=True)
+    except ValueError:
+        data = b""
+    return _knowledge_call(handler, lambda db: knowledge.import_vault(db, _actor(handler), body.get("area", ""), data))
+
+
 def _k_submit(handler, body):
     return _knowledge_call(handler, lambda db: {"ok": True, "draft_id": knowledge.submit_draft(
         db, _actor(handler), _me_user(db, handler), body.get("area", ""), body.get("title", ""),
@@ -605,6 +614,7 @@ ROUTES = {
     ("POST", "/api/enterprise/knowledge/drafts/decide"): (_k_decide, "knowledge.approve"),
     ("POST", "/api/enterprise/knowledge/areas"): (_k_save_area, "knowledge.manage"),
     ("GET", "/api/enterprise/knowledge/gaps"): (_k_gaps, "knowledge.manage"),
+    ("POST", "/api/enterprise/knowledge/import"): (_k_import, "knowledge.manage"),
     # Called by the org-authz plugin's knowledge tools; authenticated by the profile's own key.
     ("POST", "/api/enterprise/knowledge/agent/search"): (_a_search, None),
     ("POST", "/api/enterprise/knowledge/agent/read"): (_a_read, None),

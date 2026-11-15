@@ -16,32 +16,24 @@ import yaml
 from sqlalchemy import func, select
 
 from api.enterprise import db as edb
-from api.enterprise import directory, mailer, provisioner
+from api.enterprise import directory, integrations, mailer, provisioner
 from api.enterprise.models import KnowledgeArea, Role, TelegramLink, User
 
 logger = logging.getLogger(__name__)
 
 # The wizard steps that mean something for a whole organisation. Capabilities come from roles,
 # persona/briefings belong to each user's own assistant, and approval policies have no consumer.
-STEPS = ["company", "provider", "services", "organization", "finish"]
-# Organisation-wide credentials only; personal accounts (Google token, ClickUp) are connected by
-# each user under My account.
-SERVICES = ["telegram", "google_workspace", "microsoft_graph"]
+# ``orgknowledge`` and ``team`` work directly on the directory (areas, users), not on the draft.
+STEPS = ["company", "provider", "services", "orgknowledge", "team", "finish"]
+# Company-wide connections. Google stays one sign-in per person (the OAuth client is the company's);
+# the company ClickUp account shows each person the tasks assigned to their own e-mail.
+SERVICES = ["telegram", "google_workspace", "microsoft_graph", "clickup"]
 
 
 def _root_config() -> dict:
     path = provisioner.root_home() / "config.yaml"
     data = yaml.safe_load(path.read_text()) if path.is_file() else None
     return data if isinstance(data, dict) else {}
-
-
-def _google_ready() -> bool:
-    from api.enterprise import integrations
-    try:
-        integrations._google_client()
-    except Exception:
-        return False
-    return True
 
 
 def org_setup_status() -> dict:
@@ -62,7 +54,8 @@ def org_setup_status() -> dict:
         "model": bool(model_name) and (any(provisioner.PROVIDER_KEY.match(k) for k in root_env)
                                        or (isinstance(model, dict) and bool(model.get("api_key") or model.get("base_url")))),
         "telegram_bot": bool(root_env.get("TELEGRAM_BOT_TOKEN")),
-        "google_client": _google_ready(),
+        "google_client": integrations._google_ready(),
+        "clickup_company": bool(root_env.get("CLICKUP_API_KEY")),
         "outlook_app": any(root_env.get(k) for k in ("MS_GRAPH_CLIENT_ID", "MICROSOFT_CLIENT_ID")),
         "email": mailer.configured(),
         "public_url": bool(os.environ.get("LISA_PUBLIC_URL", "").strip()),

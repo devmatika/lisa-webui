@@ -188,7 +188,8 @@ def test_clickup_token_is_validated_and_stored_only_for_the_user(homes):
     with pytest.raises(integrations.DirectoryError):
         integrations.clickup_set("u-anna", "not-a-token")
     integrations.clickup_set("u-anna", "pk_1234567890abcdef")
-    assert integrations.status("u-anna") == {"google": False, "clickup": True}
+    s = integrations.status("u-anna")
+    assert (s["google"], s["clickup"]) == (False, True)
     assert integrations.status("u-ben")["clickup"] is False
     integrations.clickup_set("u-anna", None)
     assert integrations.status("u-anna")["clickup"] is False

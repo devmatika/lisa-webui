@@ -133,7 +133,18 @@ def clickup_connected(profile: str) -> bool:
 
 
 def status(profile: str) -> dict:
-    return {"google": google_connected(profile), "clickup": clickup_connected(profile)}
+    root_env = provisioner._read_env(provisioner.root_home() / ".env")
+    return {"google": google_connected(profile), "clickup": clickup_connected(profile),
+            "clickup_company": bool(root_env.get("CLICKUP_API_KEY") or root_env.get("CLICKUP_COMPANY_TOKEN")),
+            "google_ready": _google_ready()}
+
+
+def _google_ready() -> bool:
+    try:
+        _google_client()
+    except DirectoryError:
+        return False
+    return True
 
 
 __all__ = ["google_start", "google_finish", "google_disconnect", "clickup_set", "status"]

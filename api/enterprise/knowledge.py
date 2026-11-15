@@ -203,6 +203,54 @@ def save_area(db, actor: Actor, key: str, name: str, grants: list[dict]) -> Know
     return area
 
 
+MAX_IMPORT_FILES = 5000
+MAX_IMPORT_BYTES = 100 * 1024 * 1024  # uncompressed Markdown
+_SKIPPED_DIRS = {".obsidian", ".trash", ".history", ".git", "__MACOSX"}
+
+
+def import_vault(db, actor: Actor, area: str, zip_bytes: bytes) -> dict:
+    """Unpack the Markdown notes of a zipped Obsidian vault (or any folder of .md files) into an area.
+
+    Only ``.md`` files, folders kept, existing notes with the same path replaced. Who may read them is
+    the area's grants, as for everything else in the vault."""
+    import io
+    import zipfile
+    from pathlib import PurePosixPath
+    area = (area or "").strip().lower()
+    if db.get(KnowledgeArea, area) is None:
+        raise DirectoryError("Area not found: create it first")
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile as exc:
+        raise DirectoryError("That file is not a .zip archive") from exc
+    notes = [i for i in archive.infolist() if not i.is_dir() and i.filename.lower().endswith(".md")]
+    parts = [PurePosixPath(i.filename.replace("\\", "/")).parts for i in notes]
+    # a vault zipped as its folder ("Company/…") lands at the area's top, not one level down
+    tops = {p[0] for p in parts if len(p) > 1}
+    strip = 1 if parts and len(tops) == 1 and all(len(p) > 1 for p in parts) else 0
+    if len(notes) > MAX_IMPORT_FILES:
+        raise DirectoryError(f"Too many notes ({len(notes)}); at most {MAX_IMPORT_FILES} per import")
+    if sum(i.file_size for i in notes) > MAX_IMPORT_BYTES:
+        raise DirectoryError("The notes are larger than 100 MB uncompressed")
+    base = _area_dir(area)
+    imported = skipped = 0
+    for info, p in zip(notes, parts):
+        rel = p[strip:]
+        if not rel or any(x in ("..", "") or x.startswith(".") or x in _SKIPPED_DIRS for x in rel) \
+                or PurePosixPath(info.filename).is_absolute():
+            skipped += 1
+            continue
+        target = base.joinpath(*rel).resolve()
+        if base not in target.parents:
+            skipped += 1
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(archive.read(info))
+        imported += 1
+    audit(db, actor, "knowledge.imported", area, notes=imported, skipped=skipped)
+    return {"ok": True, "area": area, "imported": imported, "skipped": skipped}
+
+
 def areas_view(db) -> list[dict]:
     grants = list(db.scalars(select(AreaGrant)))
     return [{"key": a.key, "name": a.name,

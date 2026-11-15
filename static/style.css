@@ -8314,6 +8314,21 @@ html[data-conversation-outline="enabled"] #outlineToggleBtn:not([hidden]){displa
 }
 
 /* Validation */
+/* Lisa Enterprise wizard: what a company connection means for the team, and small form helpers */
+.cw-org-note {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent, #3b82f6);
+  background: color-mix(in srgb, var(--accent, #3b82f6) 8%, transparent);
+  border-radius: 4px;
+  color: var(--text, inherit);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cw-org-note code { word-break: break-all; }
+.cw-muted { color: var(--muted, #888); font-size: 13px; }
+.cw-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; min-height: 32px; }
+
 .cw-checks-list {
   display: flex;
   flex-direction: column;

@@ -9,6 +9,8 @@ const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCall
 
 function assistantDisplayName(){
   const branded=(typeof Branding!=='undefined'&&Branding.defaultBotName)?Branding.defaultBotName():null;
+  // Lisa Enterprise: a person's profile is an internal id (u-…); the assistant keeps the company's name.
+  if(window.LISA_ENTERPRISE) return window._botName||branded||'Lisa';
   if(S.activeProfile&&S.activeProfile!=='default'){
     // White-label: profile slug matching company brand should show the full app
     // name ("matika" → "Matika AI Assistant"), not a capitalized slug ("Matika").

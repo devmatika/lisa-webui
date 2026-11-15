@@ -44,18 +44,19 @@ const CUSTOMER_WIZARD = {
 // from), so it shows only the steps that apply to everyone; the server sends that list.
 const CW_ORG_STEP_TITLES = {
   company: 'Company & Assistant',
-  provider: 'AI Model (for everyone)',
-  services: 'Organisation Services',
-  organization: 'Team & Access',
-  finish: 'Validate & Finish',
+  provider: 'AI Model',
+  services: 'Company Tools',
+  orgknowledge: 'Company Knowledge',
+  team: 'Team',
+  finish: 'Review & Apply',
 };
-const CW_ORG_LINKS = [
-  ['users', 'Users', 'Add people, choose their role, send the password link.', 'org.users.manage'],
-  ['roles', 'Roles', 'What each role may do: assistant tools, Google / Outlook / ClickUp access.', 'org.users.manage'],
-  ['knowledge', 'Knowledge', 'Company knowledge areas and who may read, contribute or approve.', 'knowledge.read'],
-  ['account', 'My account', 'Link your own Telegram and connect your own Google / ClickUp.', null],
-  ['audit', 'Audit log & status', 'Gateway health, logins, denied requests, every change.', 'org.audit.read'],
-];
+// What each company connection means for the people using Lisa (shown on the Company Tools step).
+const CW_ORG_SERVICE_NOTES = {
+  telegram: 'One company bot for everyone. Each person links their own Telegram under My account with a pairing code; the bot then talks to them as their own private assistant.',
+  google_workspace: 'Create an OAuth client of type <b>Web application</b> with redirect URI <code>{origin}/api/enterprise/google/callback</code>. Each person then signs in with their own Google account under My account; nobody sees anyone else\'s mail or calendar.',
+  microsoft_graph: 'One app registration for the company. Each person\'s assistant only reaches the mailbox with that person\'s own e-mail address.',
+  clickup: 'Connect the company ClickUp once with the token of an admin or a bot member. Each person then sees the tasks assigned to their own e-mail address; nobody needs a token of their own.',
+};
 
 // ── Entry Points & Loading ────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ async function runSetupWizardAgain() {
 let _wizardSaveChain = Promise.resolve();
 function _saveCurrentStepDraft() {
   const currentStepName = CUSTOMER_WIZARD.steps[CUSTOMER_WIZARD.step];
-  if (!currentStepName || currentStepName === 'finish' || currentStepName === 'organization') return _wizardSaveChain;
+  if (!currentStepName || ['finish', 'orgknowledge', 'team'].includes(currentStepName)) return _wizardSaveChain;
   _collectCurrentStepData(currentStepName);
   const body = JSON.stringify({ step: currentStepName, data: CUSTOMER_WIZARD.draft[currentStepName] || {} });
   _wizardSaveChain = _wizardSaveChain
@@ -294,7 +295,7 @@ function _renderCustomerWizardSteps() {
     backBtn.style.display = CUSTOMER_WIZARD.step > 0 && !CUSTOMER_WIZARD.applied ? 'inline-block' : 'none';
   }
   if (skipBtn) {
-    const canSkip = ['services', 'briefing'].includes(CUSTOMER_WIZARD.steps[CUSTOMER_WIZARD.step]);
+    const canSkip = ['services', 'briefing', 'orgknowledge'].includes(CUSTOMER_WIZARD.steps[CUSTOMER_WIZARD.step]);
     skipBtn.style.display = canSkip && !CUSTOMER_WIZARD.applied ? 'inline-block' : 'none';
   }
   if (nextBtn) {
@@ -348,8 +349,10 @@ function _renderCustomerWizardBody() {
     _renderStepKnowledge(body);
   } else if (stepName === 'briefing') {
     _renderStepBriefing(body);
-  } else if (stepName === 'organization') {
-    _renderStepOrganization(body);
+  } else if (stepName === 'orgknowledge') {
+    _renderStepOrgKnowledge(body);
+  } else if (stepName === 'team') {
+    _renderStepTeam(body);
   } else if (stepName === 'finish') {
     _renderStepFinish(body);
   }
@@ -671,9 +674,9 @@ function _renderStepServices(el) {
   el.innerHTML = `
     <div class="cw-step-pane">
       <div class="cw-pane-head">
-        <h3>${org ? 'Organisation Services' : 'Connect Business Services'}</h3>
+        <h3>${org ? 'Company Tools' : 'Connect Business Services'}</h3>
         <p>${org
-          ? 'Credentials the whole company shares: the company Telegram bot, the Google OAuth client (type <b>Web</b>, redirect URI <code>' + _escapeHtml(location.origin) + '/api/enterprise/google/callback</code>) and the Microsoft app registration. Each employee then connects their own Google account or ClickUp token under <b>My account</b>; who may use which service is set per role.'
+          ? 'Connect each tool once for the whole company. Which people may use it is decided by their role (Organization → Roles); everything is optional and can be added later by running this wizard again.'
           : 'Configure credentials and upload token files directly below. Settings and keys are encrypted and saved to your private environment.'}</p>
       </div>
 
@@ -701,6 +704,7 @@ function _renderStepServices(el) {
                     <span class="cw-service-name">${_escapeHtml(s.name)}</span>
                   </div>
                   <div class="cw-service-desc">${_escapeHtml(s.description || '')}</div>
+                  ${org && CW_ORG_SERVICE_NOTES[s.id] ? `<div class="cw-service-desc cw-org-note">${CW_ORG_SERVICE_NOTES[s.id].replace('{origin}', _escapeHtml(location.origin))}</div>` : ''}
                 </div>
                 <div class="cw-service-badge-col">
                   <span class="cw-status-badge ${statusCls}">${_formatStatus(effectiveStatus)}</span>
@@ -1706,48 +1710,161 @@ function _renderStepBriefing(el) {
   `;
 }
 
-// ── Enterprise: Team & Access ─────────────────────────────────────────────────
+// ── Enterprise: Company Knowledge ─────────────────────────────────────────────
 
-function _renderStepOrganization(el) {
-  const org = (CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise) || { checks: {}, counts: {} };
+function _cwSlug(name) {
+  return String(name || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
+async function _renderStepOrgKnowledge(el) {
+  el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Company Knowledge</h3>
+    <p><span class="cw-spinner"></span> Loading…</p></div></div>`;
+  let areas = [], roles = [];
+  try {
+    const [a, r] = await Promise.all([api('/api/enterprise/knowledge/areas'), api('/api/enterprise/roles')]);
+    areas = a.all || []; roles = r.roles || [];
+  } catch (err) {
+    el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Company Knowledge</h3>
+      <p>Only someone with the "Create knowledge areas" permission can set this up (${_escapeHtml(err.message)}). You can skip this step.</p></div></div>`;
+    return;
+  }
+  const roleBoxes = roles.map((r) => `<label class="cw-chk"><input type="checkbox" name="cwKaRead" value="${_escapeHtml(r.key)}" ${r.key === 'operator' ? '' : 'checked'}> ${_escapeHtml(r.name)}</label>`).join('');
+  el.innerHTML = `
+    <div class="cw-step-pane">
+      <div class="cw-pane-head">
+        <h3>Company Knowledge</h3>
+        <p>One shared knowledge base for the whole company — an Obsidian vault works as it is. It is split into
+          <b>areas</b> (folders such as "Handbook" or "Sales"); for each area you choose which roles may read it.
+          Lisa answers from the areas a person may read and says when she does not know.
+          Nobody needs an Obsidian of their own: personal notes stay in each person's private memory.</p>
+      </div>
+      <div class="cw-summary-card">
+        <h4>Areas</h4>
+        ${areas.length ? `<ul>${areas.map((a) => `<li><strong>${_escapeHtml(a.name)}</strong> <code>${_escapeHtml(a.key)}</code> —
+          ${a.grants.length ? a.grants.map((g) => `${g.principal_type === 'user' ? 'one person' : _escapeHtml(g.principal_id)}: ${_escapeHtml(g.level)}`).join(', ') : '<em>nobody can read it yet</em>'}</li>`).join('')}</ul>`
+          : '<p class="cw-muted">No area yet. Create the first one below, e.g. "Company handbook" readable by everyone.</p>'}
+      </div>
+      <div class="cw-form-row">
+        <div class="cw-form-group"><label for="cwKaName">New area name</label>
+          <input id="cwKaName" placeholder="Company handbook" value="${areas.length ? '' : 'Company handbook'}"></div>
+        <div class="cw-form-group"><label>Who may read it</label><div class="cw-checkbox-grid">${roleBoxes}</div></div>
+      </div>
+      <div class="cw-form-group">
+        <label for="cwKaZip">Import notes <span class="cw-opt">(optional: your Obsidian vault or any folder of .md files, zipped)</span></label>
+        <input type="file" id="cwKaZip" accept=".zip,application/zip">
+        <small class="cw-muted">Administrators may approve new knowledge in this area; anyone who may read it can suggest additions ("Teach Lisa").</small>
+      </div>
+      <button type="button" class="sm-btn" id="cwKaCreate">Create area${areas.length ? '' : ' and import'}</button>
+      <div class="cw-service-msg" id="cwKaMsg" role="status"></div>
+      ${areas.length ? `<div class="cw-form-group" style="margin-top:14px">
+        <label for="cwKaInto">…or import more notes into an existing area</label>
+        <div class="cw-form-row"><select id="cwKaInto">${areas.map((a) => `<option value="${_escapeHtml(a.key)}">${_escapeHtml(a.name)}</option>`).join('')}</select>
+        <input type="file" id="cwKaZip2" accept=".zip,application/zip"><button type="button" class="sm-btn" id="cwKaImport">Import</button></div></div>` : ''}
+    </div>`;
+  const msg = (t, ok) => { const m = $('cwKaMsg'); m.textContent = t; m.className = 'cw-service-msg ' + (ok ? 'ok' : 'error'); };
+  const importZip = async (area, file) => {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return api('/api/enterprise/knowledge/import', { method: 'POST', body: JSON.stringify({ area, zip_base64: btoa(bin) }) });
+  };
+  $('cwKaCreate').onclick = async () => {
+    const name = $('cwKaName').value.trim(), key = _cwSlug(name);
+    if (!key) return msg('Give the area a name.', false);
+    const readers = _getSelectedCheckboxes('cwKaRead');
+    const grants = readers.map((r) => ({ principal_type: 'role', principal_id: r, level: r === 'admin' ? 'approve' : 'read' }));
+    if (!readers.includes('admin')) grants.push({ principal_type: 'role', principal_id: 'admin', level: 'approve' });
+    try {
+      await api('/api/enterprise/knowledge/areas', { method: 'POST', body: JSON.stringify({ key, name, grants }) });
+      const file = $('cwKaZip').files[0];
+      const r = file ? await importZip(key, file) : null;
+      msg(`✓ Area "${name}" created${r ? `, ${r.imported} note(s) imported` : ''}.`, true);
+      setTimeout(() => _renderStepOrgKnowledge(el), 1200);
+    } catch (err) { msg(err.message, false); }
+  };
+  if ($('cwKaImport')) $('cwKaImport').onclick = async () => {
+    const file = $('cwKaZip2').files[0];
+    if (!file) return msg('Choose a .zip file first.', false);
+    try { const r = await importZip($('cwKaInto').value, file); msg(`✓ ${r.imported} note(s) imported${r.skipped ? `, ${r.skipped} skipped` : ''}.`, true); }
+    catch (err) { msg(err.message, false); }
+  };
+}
+
+// ── Enterprise: Team ──────────────────────────────────────────────────────────
+
+async function _renderStepTeam(el) {
+  el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Team</h3><p><span class="cw-spinner"></span> Loading…</p></div></div>`;
+  let users = [], roles = [];
+  try {
+    const [u, r] = await Promise.all([api('/api/enterprise/users'), api('/api/enterprise/roles')]);
+    users = u.users || []; roles = r.roles || [];
+  } catch (err) {
+    el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Team</h3><p>${_escapeHtml(err.message)}</p></div></div>`;
+    return;
+  }
+  const roleName = (k) => (roles.find((r) => r.key === k) || { name: k }).name;
+  const ROLE_HELP = { viewer: 'asks questions, reads company knowledge', staff: 'everyday assistant: tasks, e-mail, knowledge',
+    manager: 'staff + approves knowledge', admin: 'manages people, roles and knowledge', operator: 'IT: setup wizard, model, server' };
+  el.innerHTML = `
+    <div class="cw-step-pane">
+      <div class="cw-pane-head">
+        <h3>Team</h3>
+        <p>Add the people who will use Lisa. Each person gets their own private assistant (their chats, memory and
+          accounts are never visible to anyone else) and a single-use link to choose a password.
+          Their <b>role</b> decides what their assistant may do.</p>
+      </div>
+      <div class="cw-form-row">
+        <div class="cw-form-group"><label for="cwTmName">Full name</label><input id="cwTmName" autocomplete="off" placeholder="Anna Berger"></div>
+        <div class="cw-form-group"><label for="cwTmEmail">E-mail</label><input id="cwTmEmail" type="email" autocomplete="off" placeholder="anna@company.com"></div>
+      </div>
+      <div class="cw-form-row">
+        <div class="cw-form-group"><label for="cwTmRole">Role</label>
+          <select id="cwTmRole">${roles.map((r) => `<option value="${_escapeHtml(r.key)}" ${r.key === 'staff' ? 'selected' : ''}>${_escapeHtml(r.name)}${ROLE_HELP[r.key] ? ' — ' + ROLE_HELP[r.key] : ''}</option>`).join('')}</select></div>
+        <div class="cw-form-group"><label for="cwTmDept">Department <span class="cw-opt">(optional)</span></label><input id="cwTmDept" placeholder="Sales"></div>
+      </div>
+      <button type="button" class="sm-btn" id="cwTmAdd">Add person</button>
+      <div class="cw-service-msg" id="cwTmMsg" role="status"></div>
+      <div class="cw-summary-card" style="margin-top:16px">
+        <h4>People (${users.length})</h4>
+        <ul>${users.map((u) => `<li><strong>${_escapeHtml(u.display_name || u.email)}</strong> · ${_escapeHtml(u.email)} ·
+          ${u.roles.map(roleName).map(_escapeHtml).join(', ')} · ${u.status !== 'active' ? 'disabled' : (u.has_password ? 'active' : '<em>invited, no password yet</em>')}</li>`).join('')}</ul>
+        <small class="cw-muted">Change roles, disable people or send a new password link on the <a href="/lisa#users" target="_blank" rel="noopener">Users page</a>.</small>
+      </div>
+    </div>`;
+  $('cwTmAdd').onclick = async () => {
+    const m = $('cwTmMsg');
+    try {
+      const r = await api('/api/enterprise/users', { method: 'POST', body: JSON.stringify({
+        email: $('cwTmEmail').value.trim(), display_name: $('cwTmName').value.trim(),
+        department: $('cwTmDept').value.trim() || null, roles: [$('cwTmRole').value] }) });
+      const link = location.origin + r.password_link;
+      m.className = 'cw-service-msg ok';
+      m.innerHTML = r.invitation_emailed
+        ? `✓ Added. The invitation was e-mailed to ${_escapeHtml($('cwTmEmail').value.trim())}.`
+        : `✓ Added. Send this single-use link (valid 48 h) so they choose a password:<br><code>${_escapeHtml(link)}</code>
+           <button type="button" class="sm-btn" onclick="navigator.clipboard.writeText('${_escapeHtml(link)}');this.textContent='Copied'">Copy</button>`;
+      setTimeout(() => { const keep = m.innerHTML; _renderStepTeam(el).then(() => { const n = $('cwTmMsg'); if (n) { n.className = 'cw-service-msg ok'; n.innerHTML = keep; } }); }, 300);
+    } catch (err) { m.className = 'cw-service-msg error'; m.textContent = err.message; }
+  };
+}
+
+function _renderOrgChecklist(org) {
   const c = org.checks, n = org.counts;
   const row = (ok, title, detail) => `
     <div class="cw-check-item ${ok ? 'passed' : 'skipped'}">
       <span class="cw-check-icon">${ok ? '✓' : '—'}</span>
       <div class="cw-check-info"><strong>${title}</strong><small>${detail}</small></div>
     </div>`;
-  const perms = window.LISA_ME ? window.LISA_ME.permissions : null;  // the Organization page enforces it anyway
-  const links = CW_ORG_LINKS.filter(([, , , perm]) => !perm || !perms || perms.includes(perm));
-  el.innerHTML = `
-    <div class="cw-step-pane">
-      <div class="cw-pane-head">
-        <h3>Team & Access</h3>
-        <p>People, roles and company knowledge are managed on the Organization page (also in the menu under
-          <b>Organization</b>). Each link opens in a new tab; this wizard keeps your progress.</p>
-      </div>
-      <div class="cw-checks-list">
-        ${row(c.model, 'AI model for everyone', c.model ? _escapeHtml(org.model) : 'Set it in the "AI Model" step; every assistant uses it.')}
-        ${row(n.users > 1, 'Users', `${n.users} user(s)${n.users_waiting_for_password ? `, ${n.users_waiting_for_password} have not set a password yet` : ''}`)}
-        ${row(n.roles > 0, 'Roles', `${n.roles} role(s): viewer, staff, manager, admin, operator and your own`)}
-        ${row(n.knowledge_areas > 0, 'Company knowledge', `${n.knowledge_areas} knowledge area(s)`)}
-        ${row(c.telegram_bot, 'Company Telegram bot', c.telegram_bot
-          ? `${n.telegram_links} user(s) linked. Each user links under My account with a pairing code from the bot.`
-          : 'Add the bot token in "Organisation Services".')}
-        ${row(c.google_client, 'Google sign-in for users', c.google_client ? 'OAuth client ready' : 'Optional: add the OAuth client in "Organisation Services".')}
-        ${row(c.outlook_app, 'Outlook (Microsoft app)', c.outlook_app ? 'App registration ready' : 'Optional.')}
-        ${row(c.email, 'E-mailed invitations', c.email ? 'SMTP configured' : 'Optional: set LISA_SMTP_* and LISA_PUBLIC_URL in the stack .env; until then copy password links by hand.')}
-        ${row(c.public_url, 'Public address', c.public_url ? 'LISA_PUBLIC_URL set' : 'Needed for e-mailed links and Google: set LISA_PUBLIC_URL in the stack .env.')}
-        ${row(c.voice, 'Voice', c.voice ? 'Enabled' : 'Optional: LISA_VOICE_SECRET + DEEPGRAM_API_KEY, then start the voice profile.')}
-      </div>
-      <div class="cw-services-list" style="margin-top:16px">
-        ${links.map(([tab, title, hint]) => `
-          <a class="cw-service-card" href="/lisa#${tab}" target="_blank" rel="noopener"
-             style="display:block;text-decoration:none;color:inherit;padding:12px 14px">
-            <strong>${title} ↗</strong><br><small class="cw-muted">${hint}</small>
-          </a>`).join('')}
-      </div>
-    </div>
-  `;
+  return `<div class="cw-checks-list">
+    ${row(c.model, 'AI model for everyone', c.model ? _escapeHtml(org.model) : 'Required: set it in the "AI Model" step.')}
+    ${row(n.users > 1, 'Team', `${n.users} person(s)${n.users_waiting_for_password ? `, ${n.users_waiting_for_password} still have to set a password` : ''}`)}
+    ${row(n.knowledge_areas > 0, 'Company knowledge', `${n.knowledge_areas} area(s)`)}
+    ${row(c.telegram_bot, 'Company Telegram bot', c.telegram_bot ? `${n.telegram_links} person(s) linked` : 'Optional: add it under Company Tools.')}
+    ${row(c.google_client, 'Google for everyone', c.google_client ? 'Each person signs in under My account' : 'Optional.')}
+    ${row(c.outlook_app, 'Outlook (Microsoft 365)', c.outlook_app ? 'App registration ready' : 'Optional.')}
+    ${row(c.clickup_company, 'Company ClickUp', c.clickup_company ? 'Each person sees their own tasks' : 'Optional.')}
+    ${row(c.email, 'Invitations by e-mail', c.email ? 'SMTP configured' : 'Optional: without it you copy password links by hand (LISA_SMTP_* in the server .env).')}
+    ${row(c.public_url, 'Public address', c.public_url ? 'Set' : 'Needed for e-mailed links and Google sign-in: LISA_PUBLIC_URL in the server .env.')}
+  </div>`;
 }
 
 // ── Step G: Validate & Finish ─────────────────────────────────────────────────
@@ -1756,8 +1873,10 @@ async function _renderStepFinish(el) {
   el.innerHTML = `
     <div class="cw-step-pane">
       <div class="cw-pane-head">
-        <h3>Validate & Finish Setup</h3>
-        <p>Running non-destructive preflight validation across all configured components…</p>
+        <h3>${CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise ? 'Review & Apply' : 'Validate & Finish Setup'}</h3>
+        <p>${CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise
+          ? 'Check what is ready, then press <b>Apply &amp; Finish</b>: every assistant is refreshed with these settings and Lisa is back within about 20 seconds.'
+          : 'Running non-destructive preflight validation across all configured components…'}</p>
       </div>
       <div id="cwValidationResults" class="cw-validation-box">
         <span class="cw-spinner"></span> Validating configuration…
@@ -1774,6 +1893,10 @@ async function _renderStepFinish(el) {
 
   try {
     await _wizardSaveChain;  // validate what the user just entered, not an older save
+    if (CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise) {  // people/areas added in earlier steps
+      const st = await api('/api/customer-wizard/status');
+      if (st && st.enterprise) CUSTOMER_WIZARD.status.enterprise = st.enterprise;
+    }
     const res = await api('/api/customer-wizard/validate', { method: 'POST', body: '{}' });
     CUSTOMER_WIZARD.validation = res;
     _renderValidationBox(res);
@@ -1789,7 +1912,9 @@ function _renderValidationBox(res) {
   const box = $('cwValidationResults');
   if (!box) return;
 
-  const checks = res.checks || [];
+  // Approval policies and briefings belong to single-user Lisa; the organisation checklist replaces them.
+  const ORG_HIDDEN = /approval|briefing|profile directory/i;
+  const checks = (res.checks || []).filter((c) => !(CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise && ORG_HIDDEN.test(c.title || '')));
   box.innerHTML = `
     <div class="cw-checks-list">
       ${checks.map(c => {
@@ -1808,6 +1933,7 @@ function _renderValidationBox(res) {
       }).join('')}
     </div>
 
+    ${CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise ? _renderOrgChecklist(CUSTOMER_WIZARD.status.enterprise) : ''}
     <div class="cw-summary-card">
       <h4>Setup Summary</h4>
       <ul>
