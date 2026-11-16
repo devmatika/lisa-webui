@@ -6832,6 +6832,39 @@ main.main > .main-view:not([id="mainChat"]):not([id="mainSettings"]) .main-view-
 .rightpanel[data-active-tab="files"] .workspace-artifacts{display:none!important;}
 .rightpanel[data-active-tab="todos"] .breadcrumb-bar,.rightpanel[data-active-tab="todos"] .file-tree,.rightpanel[data-active-tab="todos"] #wsEmptyState,.rightpanel[data-active-tab="todos"] .workspace-artifacts{display:none!important;}
 .rightpanel:not([data-active-tab="todos"]) .workspace-todos{display:none!important;}
+/* Company knowledge tab (Lisa Enterprise): read-only browser of the vault areas the person may read */
+.rightpanel[data-active-tab="knowledge"] .breadcrumb-bar,.rightpanel[data-active-tab="knowledge"] .file-tree,.rightpanel[data-active-tab="knowledge"] #wsEmptyState,.rightpanel[data-active-tab="knowledge"] .workspace-artifacts,.rightpanel[data-active-tab="knowledge"] .workspace-todos{display:none!important;}
+.rightpanel:not([data-active-tab="knowledge"]) .workspace-knowledge{display:none!important;}
+.workspace-knowledge{flex:1;overflow:auto;min-height:0;display:flex;flex-direction:column;}
+.ck-search{position:sticky;top:0;z-index:1;padding:8px;background:var(--bg);border-bottom:1px solid var(--border);}
+.ck-search input{width:100%;box-sizing:border-box;border:1px solid var(--border2);border-radius:8px;background:var(--surface-subtle);color:var(--text);padding:7px 10px;font-size:13px;}
+.ck-search input:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+.ck-list{padding:6px 8px 16px;}
+.ck-area{margin-bottom:4px;}
+.ck-area-empty .ck-area-head{color:var(--muted);font-weight:500;}
+.ck-area-head{display:flex;align-items:center;gap:6px;width:100%;border:0;background:transparent;color:var(--text);padding:7px 6px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;text-align:left;min-height:34px;}
+.ck-area-head:hover{background:var(--surface-subtle);}
+.ck-chev{width:12px;color:var(--muted);font-size:11px;}
+.ck-area-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ck-count{color:var(--muted);font-size:11px;font-weight:500;border:1px solid var(--border);border-radius:999px;padding:0 7px;}
+.ck-doc{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:6px 8px 6px 24px;border-radius:7px;cursor:pointer;min-height:32px;}
+.ck-results-head + .ck-doc,.ck-results-head ~ .ck-doc{padding-left:8px;}
+.ck-doc:hover,.ck-doc:focus-visible{background:var(--surface-subtle);}
+.ck-doc-title{display:block;font-size:13px;overflow-wrap:anywhere;}
+.ck-doc-folder{display:block;font-size:11px;color:var(--muted);overflow-wrap:anywhere;margin-top:1px;}
+.ck-none{padding:6px 8px 6px 24px;color:var(--muted);font-size:12px;}
+.ck-empty{padding:28px 14px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6;}
+.ck-empty b{display:block;color:var(--text);font-size:13px;margin-bottom:4px;}
+.ck-results-head{display:flex;align-items:center;justify-content:space-between;padding:4px 8px 6px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+.ck-clear{border:0;background:transparent;color:var(--accent-text,var(--accent));cursor:pointer;font-size:12px;text-transform:none;letter-spacing:0;}
+.ck-reader{padding:0 14px 20px;}
+.ck-bar{position:sticky;top:0;display:flex;justify-content:space-between;gap:8px;padding:8px 0;background:var(--bg);border-bottom:1px solid var(--border);margin:0 -14px 8px;padding-left:10px;padding-right:10px;}
+.ck-back,.ck-ask{border:1px solid var(--border2);background:var(--surface-subtle);color:var(--text);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;min-height:30px;}
+.ck-ask{border-color:var(--accent);color:var(--accent-text,var(--accent));}
+.ck-path{color:var(--muted);font-size:11px;margin-bottom:6px;overflow-wrap:anywhere;}
+.ck-note{font-size:13px;line-height:1.6;overflow-wrap:anywhere;}
+.ck-note .ck-link{color:var(--accent-text,var(--accent));text-decoration:underline;text-underline-offset:2px;}
+.ck-foot{margin-top:18px;padding-top:10px;border-top:1px solid var(--border);color:var(--muted);font-size:11px;line-height:1.5;}
 .cron-run-usage-strip{display:inline-flex;align-items:center;gap:4px;margin-left:8px;color:var(--text-secondary);font-size:11px;opacity:.72;white-space:nowrap;}
 .cron-run-usage-footer{display:flex;margin:8px 0 0 0;padding-top:8px;border-top:1px solid var(--border-subtle);}
 .cron-item.active,.ws-row.active,.profile-card.active{background:var(--accent-bg);}

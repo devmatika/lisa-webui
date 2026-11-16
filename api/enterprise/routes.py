@@ -521,6 +521,10 @@ def _k_doc(handler, _body):
     return _knowledge_call(handler, lambda db: knowledge.read(db, _me_user(db, handler), _query(handler, "path")))
 
 
+def _k_tree(handler, _body):
+    return _knowledge_call(handler, lambda db: knowledge.tree(db, _me_user(db, handler)))
+
+
 def _k_areas(handler, _body):
     def run(db):
         me = _me_user(db, handler)
@@ -703,6 +707,7 @@ ROUTES = {
     ("POST", "/api/enterprise/telegram/unlink"): (_telegram_unlink, "chat.use"),
     ("GET", "/api/enterprise/knowledge/areas"): (_k_areas, "knowledge.read"),
     ("GET", "/api/enterprise/knowledge/search"): (_k_search, "knowledge.read"),
+    ("GET", "/api/enterprise/knowledge/tree"): (_k_tree, "knowledge.read"),
     ("GET", "/api/enterprise/knowledge/doc"): (_k_doc, "knowledge.read"),
     ("POST", "/api/enterprise/knowledge/drafts"): (_k_submit, "knowledge.contribute"),
     ("GET", "/api/enterprise/knowledge/drafts"): (_k_pending, "knowledge.approve"),

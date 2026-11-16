@@ -126,6 +126,25 @@ def search(db, user: User, query: str, limit: int = 8) -> dict:
     return {"results": hits[:limit], "searched_areas": sorted(a for a, lv in access.levels.items() if lv >= 1)}
 
 
+MAX_TREE = 3000  # notes listed per area; search still covers all of them
+
+
+def tree(db, user: User) -> dict:
+    """The areas this person may read and their notes, for browsing (nothing else is listed)."""
+    levels = access_for(db, user).levels
+    names = {a.key: a.name for a in db.scalars(select(KnowledgeArea))}
+    areas = []
+    for key in sorted((k for k, lv in levels.items() if lv >= 1), key=lambda k: names.get(k, k).lower()):
+        docs = []
+        for rel, _path in _docs(key):
+            if len(docs) >= MAX_TREE:
+                break
+            docs.append({"path": rel, "title": Path(rel).stem})
+        areas.append({"key": key, "name": names.get(key, key), "level": {1: "read", 2: "contribute", 3: "approve"}[levels[key]],
+                      "docs": docs, "truncated": len(docs) >= MAX_TREE})
+    return {"areas": areas}
+
+
 def read(db, user: User, path: str) -> dict:
     area, target = _resolve_doc(path)
     if access_for(db, user).levels.get(area, 0) < 1 or not target.is_file():

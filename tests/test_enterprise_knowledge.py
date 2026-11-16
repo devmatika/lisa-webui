@@ -177,3 +177,14 @@ def test_agent_calls_must_prove_the_profile_with_its_own_key(kb, tmp_path, monke
                              ("", "anna-key-123"), ("u-ghost", "x")):
             with pytest.raises(DirectoryError):
                 routes._agent_user(db, H(profile, key))
+
+
+def test_browsing_lists_only_the_areas_a_person_may_read(kb):
+    from api.enterprise import knowledge
+    edb, ids, _ = kb
+    with edb.session() as db:
+        anna = knowledge.tree(db, _user(db, ids["anna"]))
+        ben = knowledge.tree(db, _user(db, ids["ben"]))
+    assert [(a["key"], a["name"], a["level"]) for a in anna["areas"]] == [("farm", "Farm", "contribute")]
+    assert [d["path"] for d in anna["areas"][0]["docs"]] == ["farm/milking.md"]  # never .history or other areas
+    assert ben["areas"] == [] and "salaries" not in str(anna)

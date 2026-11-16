@@ -384,11 +384,16 @@ if(typeof document !== 'undefined'){
 }
 
 function switchWorkspacePanelTab(tab){
-  _workspacePanelActiveTab = tab === 'artifacts' ? 'artifacts' : tab === 'todos' ? 'todos' : 'files';
+  _workspacePanelActiveTab = ['artifacts', 'todos', 'knowledge'].includes(tab) ? tab : 'files';
   _setWorkspacePanelTabDataset();
   const filesTab = $('workspaceFilesTab');
   const artifactsTab = $('workspaceArtifactsTab');
   const todosTab = $('workspaceTodosTab');
+  const knowledgeTab = $('workspaceKnowledgeTab');
+  if(knowledgeTab){
+    knowledgeTab.classList.toggle('active', _workspacePanelActiveTab === 'knowledge');
+    knowledgeTab.setAttribute('aria-selected', _workspacePanelActiveTab === 'knowledge' ? 'true' : 'false');
+  }
   if(filesTab){
     filesTab.classList.toggle('active', _workspacePanelActiveTab === 'files');
     filesTab.setAttribute('aria-selected', _workspacePanelActiveTab === 'files' ? 'true' : 'false');
@@ -407,6 +412,9 @@ function switchWorkspacePanelTab(tab){
   if(todosPanel) todosPanel.hidden = _workspacePanelActiveTab !== 'todos';
   if(_workspacePanelActiveTab === 'artifacts') renderSessionArtifacts();
   if(_workspacePanelActiveTab === 'todos') _loadWorkspacePanelTodos();
+  const knowledge = $('workspaceKnowledge');
+  if(knowledge) knowledge.hidden = _workspacePanelActiveTab !== 'knowledge';
+  if(_workspacePanelActiveTab === 'knowledge' && typeof window.renderCompanyKnowledge === 'function') window.renderCompanyKnowledge();
 }
 
 function _loadWorkspacePanelTodos(){
