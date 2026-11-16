@@ -112,7 +112,9 @@ def search(db, user: User, query: str, limit: int = 8) -> dict:
         for rel, path in _docs(area):
             text = path.read_text(errors="replace")
             low = text.lower()
-            score = sum(low.count(t) for t in terms)
+            # in an Obsidian vault the file name is the note's title: it counts more than the text
+            name = path.stem.lower()
+            score = sum(low.count(t) + 3 * name.count(t) for t in terms)
             if score:
                 pos = min((low.find(t) for t in terms if t in low), default=0)
                 snippet = text[max(0, pos - 120): pos + MAX_SNIPPET - 120].strip()
@@ -208,11 +210,21 @@ MAX_IMPORT_BYTES = 100 * 1024 * 1024  # uncompressed Markdown
 _SKIPPED_DIRS = {".obsidian", ".trash", ".history", ".git", "__MACOSX"}
 
 
-def import_vault(db, actor: Actor, area: str, zip_bytes: bytes) -> dict:
-    """Unpack the Markdown notes of a zipped Obsidian vault (or any folder of .md files) into an area.
+def _folder_area_key(folder: str) -> str:
+    """Area key for a vault folder; a name without Latin letters (e.g. Persian) gets a stable hash."""
+    import hashlib
+    key = re.sub(r"[^a-z0-9]+", "-", folder.lower()).strip("-")[:64].strip("-")
+    return key or "area-" + hashlib.sha1(folder.encode()).hexdigest()[:8]
+
+
+def import_vault(db, actor: Actor, area: str, zip_bytes: bytes, *, split_folders: bool = False,
+                 new_area_grants: list[dict] | None = None) -> dict:
+    """Unpack the Markdown notes of a zipped Obsidian vault (or any folder of .md files).
 
     Only ``.md`` files, folders kept, existing notes with the same path replaced. Who may read them is
-    the area's grants, as for everything else in the vault."""
+    the area's grants, as for everything else in the vault. With ``split_folders`` every top-level
+    folder becomes its own area (created with ``new_area_grants`` when it does not exist yet, so each
+    folder can get its own access); notes at the top level go to ``area``."""
     import io
     import zipfile
     from pathlib import PurePosixPath
@@ -224,31 +236,39 @@ def import_vault(db, actor: Actor, area: str, zip_bytes: bytes) -> dict:
     except zipfile.BadZipFile as exc:
         raise DirectoryError("That file is not a .zip archive") from exc
     notes = [i for i in archive.infolist() if not i.is_dir() and i.filename.lower().endswith(".md")]
-    parts = [PurePosixPath(i.filename.replace("\\", "/")).parts for i in notes]
-    # a vault zipped as its folder ("Company/…") lands at the area's top, not one level down
-    tops = {p[0] for p in parts if len(p) > 1}
-    strip = 1 if parts and len(tops) == 1 and all(len(p) > 1 for p in parts) else 0
     if len(notes) > MAX_IMPORT_FILES:
         raise DirectoryError(f"Too many notes ({len(notes)}); at most {MAX_IMPORT_FILES} per import")
     if sum(i.file_size for i in notes) > MAX_IMPORT_BYTES:
         raise DirectoryError("The notes are larger than 100 MB uncompressed")
-    base = _area_dir(area)
-    imported = skipped = 0
+    parts = [PurePosixPath(i.filename.replace("\\", "/")).parts for i in notes]
+    # a vault zipped as its folder ("Company/…") lands at the area's top, not one level down
+    tops = {p[0] for p in parts if len(p) > 1}
+    strip = 1 if parts and len(tops) == 1 and all(len(p) > 1 for p in parts) else 0
+    per_area: dict[str, int] = {}
+    skipped = 0
     for info, p in zip(notes, parts):
         rel = p[strip:]
         if not rel or any(x in ("..", "") or x.startswith(".") or x in _SKIPPED_DIRS for x in rel) \
                 or PurePosixPath(info.filename).is_absolute():
             skipped += 1
             continue
+        target_area = area
+        if split_folders and len(rel) > 1:
+            folder, rel = rel[0], rel[1:]
+            target_area = _folder_area_key(folder)
+            if db.get(KnowledgeArea, target_area) is None:
+                save_area(db, actor, target_area, folder, list(new_area_grants or []))
+        base = _area_dir(target_area)
         target = base.joinpath(*rel).resolve()
         if base not in target.parents:
             skipped += 1
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(archive.read(info))
-        imported += 1
-    audit(db, actor, "knowledge.imported", area, notes=imported, skipped=skipped)
-    return {"ok": True, "area": area, "imported": imported, "skipped": skipped}
+        per_area[target_area] = per_area.get(target_area, 0) + 1
+    imported = sum(per_area.values())
+    audit(db, actor, "knowledge.imported", area, notes=imported, skipped=skipped, areas=per_area)
+    return {"ok": True, "area": area, "imported": imported, "skipped": skipped, "areas": per_area}
 
 
 def areas_view(db) -> list[dict]:

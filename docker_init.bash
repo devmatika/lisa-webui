@@ -335,6 +335,11 @@ if [ "A${whoami}" == "Aroot" ]; then
   fi
 
   chown_home_hermeswebui || error_exit "Failed to set owner of /home/hermeswebui"
+  # Lisa Enterprise: the company knowledge vault is a Docker volume that starts out root-owned;
+  # the WebUI creates area folders and publishes approved notes into it.
+  if [ -n "${LISA_KNOWLEDGE_DIR:-}" ] && [ -d "${LISA_KNOWLEDGE_DIR}" ]; then
+    chown -R "${WANTED_UID}:${WANTED_GID}" "${LISA_KNOWLEDGE_DIR}" || error_exit "Failed to set owner of ${LISA_KNOWLEDGE_DIR}"
+  fi
   if [ -n "${_old_hermeswebui_uid:-}" ] && [ "A${_old_hermeswebui_uid}" != "A${WANTED_UID}" ]; then
     migrate_home_old_uid "$_old_hermeswebui_uid" || error_exit "Failed to move files of UID ${_old_hermeswebui_uid} under /home/hermeswebui to UID ${WANTED_UID}"
   fi

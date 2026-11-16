@@ -491,7 +491,8 @@ def _knowledge_call(handler, fn):
         with edb.session() as db:
             return j(handler, fn(db))
     except DirectoryError as exc:
-        return bad(handler, str(exc), 404 if "not found" in str(exc).lower() else 403)
+        msg = str(exc).lower()  # refusals are 403, unknown things 404, everything else is the user's input
+        return bad(handler, str(exc), 403 if "cannot" in msg else 404 if "not found" in msg else 400)
 
 
 def _k_search(handler, _body):
@@ -524,7 +525,9 @@ def _k_import(handler, body):
         data = base64.b64decode(body.get("zip_base64") or "", validate=True)
     except ValueError:
         data = b""
-    return _knowledge_call(handler, lambda db: knowledge.import_vault(db, _actor(handler), body.get("area", ""), data))
+    return _knowledge_call(handler, lambda db: knowledge.import_vault(
+        db, _actor(handler), body.get("area", ""), data, split_folders=bool(body.get("split_folders")),
+        new_area_grants=list(body.get("grants") or [])))
 
 
 def _k_submit(handler, body):

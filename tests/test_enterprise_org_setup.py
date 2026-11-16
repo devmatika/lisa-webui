@@ -218,3 +218,36 @@ def test_company_clickup_reaches_granted_assistants_with_their_email(ent, monkey
     import yaml
     cfg = yaml.safe_load((root / "profiles" / "u-anna" / "config.yaml").read_text())
     assert cfg["plugins"]["entries"]["clickup-personal"]["settings"] == {"account_email": "anna@x"}
+
+
+def test_each_vault_folder_can_become_its_own_area_with_its_own_access(ent, tmp_path, monkeypatch):
+    from api.enterprise import directory, knowledge
+    edb, ids, _ = ent
+    monkeypatch.setenv("LISA_KNOWLEDGE_DIR", str(tmp_path / "vault"))
+    actor = directory.Actor(ids["boss"])
+    staff_read = [{"principal_type": "role", "principal_id": "staff", "level": "read"}]
+    with edb.session() as db:
+        knowledge.save_area(db, actor, "general", "General", staff_read)
+        knowledge.save_area(db, actor, "projects", "Projects", [])  # exists: its (empty) access is kept
+        r = knowledge.import_vault(db, actor, "general", _zip({
+            "lisa/Welcome.md": "# Welcome", "lisa/Knowledge/Onboarding.md": "# Onboarding steps",
+            "lisa/Projects/Secret plan.md": "# Secret plan", "lisa/پروژه‌ها/Note.md": "# Persian folder"}),
+            split_folders=True, new_area_grants=staff_read)
+        assert r["areas"] == {"general": 1, "knowledge": 1, "projects": 1, knowledge._folder_area_key("پروژه‌ها"): 1}
+        anna = directory.get_user(db, ids["anna"])
+        assert [h["title"] for h in knowledge.search(db, anna, "onboarding")["results"]] == ["Onboarding steps"]
+        assert knowledge.search(db, anna, "secret")["results"] == []  # the existing area's access wins
+
+
+def test_an_obsidian_note_is_found_by_its_file_name(ent, tmp_path, monkeypatch):
+    """Obsidian titles are file names; the default Welcome.md never says 'welcome' in its text."""
+    from api.enterprise import directory, knowledge
+    edb, ids, _ = ent
+    monkeypatch.setenv("LISA_KNOWLEDGE_DIR", str(tmp_path / "vault"))
+    actor = directory.Actor(ids["boss"])
+    with edb.session() as db:
+        knowledge.save_area(db, actor, "general", "General",
+                            [{"principal_type": "role", "principal_id": "staff", "level": "read"}])
+        knowledge.import_vault(db, actor, "general", _zip({"Holiday policy.md": "Ask two weeks ahead."}))
+        anna = directory.get_user(db, ids["anna"])
+        assert [h["title"] for h in knowledge.search(db, anna, "holiday")["results"]] == ["Holiday policy"]

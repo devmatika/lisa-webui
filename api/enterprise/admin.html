@@ -288,7 +288,8 @@
       <div class="label" style="margin:14px 0 8px">Who has access</div>
       <div id="ka-grants"></div>
       <button class="btn sm" id="ka-add-grant"><svg class="i"><use href="#i-plus"/></svg>Add access</button>
-      <div class="field" style="margin-top:14px"><label for="ka-zip">Import notes <span class="hint">(optional: a zipped Obsidian vault or folder of .md files)</span></label><input type="file" id="ka-zip" accept=".zip,application/zip"></div>
+      <div class="field" style="margin-top:14px"><label for="ka-zip">Import notes <span class="hint">(optional: a zipped Obsidian vault or folder of .md files)</span></label><input type="file" id="ka-zip" accept=".zip,application/zip">
+        <label class="check"><input type="checkbox" id="ka-split"><span>Make each top-level folder its own area<small>Each folder can then get its own access (edit them in the table above afterwards). New folder areas start with the access chosen here; notes outside a folder go into this area.</small></span></label></div>
       <div class="actions"><button class="btn primary" id="ka-save">Save area</button><button class="btn" id="ka-reset" hidden>Cancel editing</button></div>
       <h3 style="font-size:15px;margin:24px 0 8px">Questions Lisa could not answer</h3>
       <p class="hint" style="margin:0 0 8px">Good candidates for new knowledge.</p>
@@ -547,7 +548,7 @@
     $('ka-name').value = area ? area.name : ''; $('ka-key').value = area ? area.key : ''; $('ka-key').disabled = !!area;
     $('ka-grants').innerHTML = ''; (area ? area.grants : [{ principal_type: 'role', principal_id: 'staff', level: 'read' },
       { principal_type: 'role', principal_id: 'admin', level: 'approve' }]).forEach(grantRow);
-    $('ka-zip').value = ''; $('ka-reset').hidden = !area;
+    $('ka-zip').value = ''; $('ka-split').checked = false; $('ka-reset').hidden = !area;
   }
   let areasCache = [];
   async function loadKnowledge() {
@@ -599,14 +600,18 @@
   $('ka-save').onclick = (e) => busy(e.currentTarget, async () => {
     const grants = [...$('ka-grants').children].map((row) => ({ principal_type: row.querySelector('[data-g=type]').value,
       principal_id: row.querySelector('[data-g=id]').value.trim(), level: row.querySelector('[data-g=level]').value }));
+    if (!$('ka-name').value.trim()) throw new Error('Give the area a name.');
+    // a name without Latin letters (e.g. Persian) still needs a folder name
+    if (!$('ka-key').value.trim()) $('ka-key').value = 'area-' + Date.now().toString(36);
     const key = $('ka-key').value.trim();
     await api('/api/enterprise/knowledge/areas', { key, name: $('ka-name').value.trim(), grants });
     const file = $('ka-zip').files[0]; let note = '';
     if (file) {
       const buf = new Uint8Array(await file.arrayBuffer()); let bin = '';
       for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-      const r = await api('/api/enterprise/knowledge/import', { area: key, zip_base64: btoa(bin) });
-      note = ` ${r.imported} note(s) imported${r.skipped ? `, ${r.skipped} skipped` : ''}.`;
+      const r = await api('/api/enterprise/knowledge/import', { area: key, zip_base64: btoa(bin), split_folders: $('ka-split').checked, grants });
+      const where = Object.keys(r.areas || {}).length > 1 ? ` into ${Object.keys(r.areas).length} areas` : '';
+      note = ` ${r.imported} note(s) imported${where}${r.skipped ? `, ${r.skipped} skipped` : ''}.`;
     }
     toast('Area saved.' + note); resetAreaForm(null); loadKnowledge();
   });
