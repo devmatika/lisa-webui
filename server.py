@@ -574,6 +574,8 @@ def _start_enterprise() -> None:
             from api.enterprise.provisioner import ensure_front_desk, ensure_root_gateway_url
             ensure_root_gateway_url()
             ensure_front_desk()
+            from api.enterprise.sources import start_scheduler
+            start_scheduler()  # company vaults (Git) are pulled on their interval
             print(f'[ok] Lisa Enterprise: database at revision {revision}', flush=True)
             return
         except Exception as exc:

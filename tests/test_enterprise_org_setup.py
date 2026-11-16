@@ -251,3 +251,17 @@ def test_an_obsidian_note_is_found_by_its_file_name(ent, tmp_path, monkeypatch):
         knowledge.import_vault(db, actor, "general", _zip({"Holiday policy.md": "Ask two weeks ahead."}))
         anna = directory.get_user(db, ids["anna"])
         assert [h["title"] for h in knowledge.search(db, anna, "holiday")["results"]] == ["Holiday policy"]
+
+
+def test_single_user_onboarding_never_covers_the_organisation_wizard(monkeypatch):
+    """A fresh install showed Hermes' own 'Provider setup' on top of the setup wizard."""
+    import io
+    import json as _json
+    from urllib.parse import urlparse
+    from api import routes
+    monkeypatch.setenv("LISA_ENTERPRISE", "1")
+    monkeypatch.setattr(routes, "get_onboarding_status", lambda: {"completed": False})
+    sent = {}
+    monkeypatch.setattr(routes, "j", lambda handler, data, *a, **k: sent.update(data) or True)
+    routes.handle_get(SimpleNamespace(wfile=io.BytesIO(), headers={}), urlparse("/api/onboarding/status"))
+    assert sent["completed"] is True

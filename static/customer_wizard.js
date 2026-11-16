@@ -1712,81 +1712,21 @@ function _renderStepBriefing(el) {
 
 // ── Enterprise: Company Knowledge ─────────────────────────────────────────────
 
-function _cwSlug(name) {
-  return String(name || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
-}
-
 async function _renderStepOrgKnowledge(el) {
-  el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Company Knowledge</h3>
-    <p><span class="cw-spinner"></span> Loading…</p></div></div>`;
-  let areas = [], roles = [];
-  try {
-    const [a, r] = await Promise.all([api('/api/enterprise/knowledge/areas'), api('/api/enterprise/roles')]);
-    areas = a.all || []; roles = r.roles || [];
-  } catch (err) {
-    el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Company Knowledge</h3>
-      <p>Only someone with the "Create knowledge areas" permission can set this up (${_escapeHtml(err.message)}). You can skip this step.</p></div></div>`;
-    return;
-  }
-  const roleBoxes = roles.map((r) => `<label class="cw-chk"><input type="checkbox" name="cwKaRead" value="${_escapeHtml(r.key)}" ${r.key === 'operator' ? '' : 'checked'}> ${_escapeHtml(r.name)}</label>`).join('');
+  // The same component as Organization → Knowledge → Company vault, so there is one way to do it.
   el.innerHTML = `
     <div class="cw-step-pane">
       <div class="cw-pane-head">
         <h3>Company Knowledge</h3>
-        <p>One shared knowledge base for the whole company — an Obsidian vault works as it is. It is split into
-          <b>areas</b> (folders such as "Handbook" or "Sales"); for each area you choose which roles may read it.
-          Lisa answers from the areas a person may read and says when she does not know.
-          Nobody needs an Obsidian of their own: personal notes stay in each person's private memory.</p>
+        <p>Connect the company's Obsidian vault (Git). Each folder becomes an area, and you choose who may read it —
+          for example <i>Knowledge</i> for everyone and <i>Projects</i> for managers only. Lisa keeps it up to date by
+          herself and only ever reads it. Nobody needs an Obsidian of their own.</p>
       </div>
-      <div class="cw-summary-card">
-        <h4>Areas</h4>
-        ${areas.length ? `<ul>${areas.map((a) => `<li><strong>${_escapeHtml(a.name)}</strong> <code>${_escapeHtml(a.key)}</code> —
-          ${a.grants.length ? a.grants.map((g) => `${g.principal_type === 'user' ? 'one person' : _escapeHtml(g.principal_id)}: ${_escapeHtml(g.level)}`).join(', ') : '<em>nobody can read it yet</em>'}</li>`).join('')}</ul>`
-          : '<p class="cw-muted">No area yet. Create the first one below, e.g. "Company handbook" readable by everyone.</p>'}
-      </div>
-      <div class="cw-form-row">
-        <div class="cw-form-group"><label for="cwKaName">New area name</label>
-          <input id="cwKaName" placeholder="Company handbook" value="${areas.length ? '' : 'Company handbook'}"></div>
-        <div class="cw-form-group"><label>Who may read it</label><div class="cw-checkbox-grid">${roleBoxes}</div></div>
-      </div>
-      <div class="cw-form-group">
-        <label for="cwKaZip">Import notes <span class="cw-opt">(optional: your Obsidian vault or any folder of .md files, zipped)</span></label>
-        <input type="file" id="cwKaZip" accept=".zip,application/zip">
-        <small class="cw-muted">Administrators may approve new knowledge in this area; anyone who may read it can suggest additions ("Teach Lisa").</small>
-      </div>
-      <button type="button" class="sm-btn" id="cwKaCreate">Create area${areas.length ? '' : ' and import'}</button>
-      <div class="cw-service-msg" id="cwKaMsg" role="status"></div>
-      ${areas.length ? `<div class="cw-form-group" style="margin-top:14px">
-        <label for="cwKaInto">…or import more notes into an existing area</label>
-        <div class="cw-form-row"><select id="cwKaInto">${areas.map((a) => `<option value="${_escapeHtml(a.key)}">${_escapeHtml(a.name)}</option>`).join('')}</select>
-        <input type="file" id="cwKaZip2" accept=".zip,application/zip"><button type="button" class="sm-btn" id="cwKaImport">Import</button></div></div>` : ''}
+      <iframe id="cwVaultFrame" src="/lisa?embed=vault#knowledge" title="Company vault"
+        style="width:100%;height:520px;border:1px solid var(--border, #334);border-radius:10px;background:transparent"></iframe>
+      <p class="cw-muted" style="margin-top:10px">No Git repository? You can skip this step and create areas or upload notes later under
+        <a href="/lisa#knowledge" target="_blank" rel="noopener">Organization → Knowledge</a>.</p>
     </div>`;
-  const msg = (t, ok) => { const m = $('cwKaMsg'); m.textContent = t; m.className = 'cw-service-msg ' + (ok ? 'ok' : 'error'); };
-  const importZip = async (area, file) => {
-    const buf = new Uint8Array(await file.arrayBuffer());
-    let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-    return api('/api/enterprise/knowledge/import', { method: 'POST', body: JSON.stringify({ area, zip_base64: btoa(bin) }) });
-  };
-  $('cwKaCreate').onclick = async () => {
-    const name = $('cwKaName').value.trim(), key = _cwSlug(name);
-    if (!key) return msg('Give the area a name.', false);
-    const readers = _getSelectedCheckboxes('cwKaRead');
-    const grants = readers.map((r) => ({ principal_type: 'role', principal_id: r, level: r === 'admin' ? 'approve' : 'read' }));
-    if (!readers.includes('admin')) grants.push({ principal_type: 'role', principal_id: 'admin', level: 'approve' });
-    try {
-      await api('/api/enterprise/knowledge/areas', { method: 'POST', body: JSON.stringify({ key, name, grants }) });
-      const file = $('cwKaZip').files[0];
-      const r = file ? await importZip(key, file) : null;
-      msg(`✓ Area "${name}" created${r ? `, ${r.imported} note(s) imported` : ''}.`, true);
-      setTimeout(() => _renderStepOrgKnowledge(el), 1200);
-    } catch (err) { msg(err.message, false); }
-  };
-  if ($('cwKaImport')) $('cwKaImport').onclick = async () => {
-    const file = $('cwKaZip2').files[0];
-    if (!file) return msg('Choose a .zip file first.', false);
-    try { const r = await importZip($('cwKaInto').value, file); msg(`✓ ${r.imported} note(s) imported${r.skipped ? `, ${r.skipped} skipped` : ''}.`, true); }
-    catch (err) { msg(err.message, false); }
-  };
 }
 
 // ── Enterprise: Team ──────────────────────────────────────────────────────────

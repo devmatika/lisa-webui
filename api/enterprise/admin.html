@@ -132,6 +132,30 @@
   .guide .steps li { counter-increment:s; position:relative; padding-left:40px; min-height:28px; margin:12px 0; }
   .guide .steps li::before { content:counter(s); position:absolute; left:0; top:-1px; width:28px; height:28px; border-radius:50%; background:var(--primary-soft); color:var(--primary-soft-text); font-weight:700; font-size:13px; display:grid; place-items:center; }
 
+  /* Company vault */
+  .src { border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:10px; background:var(--surface-2); }
+  .src-head { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .src-head .what { flex:1 1 260px; min-width:0; }
+  .src-head .what b { display:block; }
+  .src-head .what code { font-size:12px; }
+  .src-meta { color:var(--muted); font-size:13px; margin-top:6px; }
+  .stepper { display:flex; gap:8px; margin:0 0 16px; flex-wrap:wrap; }
+  .stepper span { font-size:13px; font-weight:600; color:var(--muted); padding:4px 12px; border-radius:999px; background:var(--surface-2); border:1px solid var(--line); }
+  .stepper span.on { color:var(--primary-soft-text); background:var(--primary-soft); border-color:transparent; }
+  .keybox { margin-top:12px; padding:14px; border-radius:10px; border:1px dashed var(--line-strong); background:var(--surface-2); }
+  .keybox textarea { min-height:70px; font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .keybox ol { margin:8px 0 0; padding-left:20px; font-size:14px; }
+  .folder-table td { vertical-align:top; }
+  .folder-table input[type=text] { min-height:36px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip-toggle { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--line-strong); border-radius:999px; font-size:13px; cursor:pointer; user-select:none; min-height:32px; }
+  .chip-toggle:has(input:checked) { background:var(--primary-soft); color:var(--primary-soft-text); border-color:transparent; font-weight:600; }
+  .chip-toggle input { width:14px; height:14px; }
+  tr.off td:not(:first-child) { opacity:.45; }
+  body.embed .top, body.embed .side, body.embed .page-head, body.embed #knowledge > section:not(#vault-card) { display:none !important; }
+  body.embed .layout { display:block; padding:0; max-width:none; }
+  body.embed .card { box-shadow:none; }
+  body.embed #vault-card > h2, body.embed #vault-card > .sub { display:none; }
   #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(8px); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:10px; max-width:min(560px,90vw); opacity:0; pointer-events:none; transition:opacity .2s,transform .2s; z-index:20; font-size:14px; box-shadow:0 8px 24px rgba(0,0,0,.2); }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   #toast.err { background:var(--err); color:#fff; }
@@ -259,6 +283,50 @@
   <!-- ── Knowledge ─────────────────────────────────────────── -->
   <div id="knowledge" data-tab="Knowledge" data-icon="book" data-group="Organization" data-perm="knowledge.read" hidden>
     <div class="page-head"><h1>Company knowledge</h1><p>Shared workflows, guidelines and know-how. Lisa answers from the areas a person may read.</p></div>
+    <section class="card" id="vault-card" data-need="knowledge.manage">
+      <h2>Company vault <span class="badge">Obsidian · Git</span></h2>
+      <p class="sub">Connect the company's Obsidian vault (a Git repository on GitLab, GitHub or your own server). Every
+        folder becomes an area, you choose who may read each one, and Lisa keeps it up to date by herself. She only
+        reads — she never changes the vault.</p>
+      <div id="src-list"></div>
+      <div class="actions" id="src-add-row"><button class="btn primary" id="src-add"><svg class="i"><use href="#i-plus"/></svg>Connect a vault</button></div>
+      <div id="src-form" hidden>
+        <div class="stepper"><span data-st="1">1 · Address</span><span data-st="2">2 · Folders &amp; access</span><span data-st="3">3 · Sync</span></div>
+        <div id="src-step1">
+          <div class="fields">
+            <div class="field" style="grid-column:span 2"><label for="src-url">Repository address</label>
+              <input id="src-url" autocomplete="off" spellcheck="false" placeholder="git@gitlab.com:company/obsidian-vault.git">
+              <span class="hint">Copy it from GitLab/GitHub → <i>Clone</i>. SSH (git@…) or HTTPS (https://…).</span></div>
+            <div class="field"><label for="src-branch">Branch</label><input id="src-branch" value="main" spellcheck="false"></div>
+          </div>
+          <div class="keybox" id="src-ssh" hidden>
+            <b>Give Lisa read access</b>
+            <ol>
+              <li>Copy Lisa's key below.</li>
+              <li><b>GitLab:</b> project → Settings → Repository → <i>Deploy keys</i> → Add new key. <b>GitHub:</b> repository → Settings → <i>Deploy keys</i> → Add deploy key.</li>
+              <li>Paste the key, name it "Lisa", and leave <i>write access</i> <b>off</b>. Then press <i>Check connection</i>.</li>
+            </ol>
+            <textarea id="src-pubkey" readonly aria-label="Lisa's read-only key" style="margin-top:10px"></textarea>
+            <div class="actions" style="margin-top:8px"><button class="btn sm" id="src-copykey">Copy key</button></div>
+          </div>
+          <div class="keybox" id="src-https" hidden>
+            <div class="field"><label for="src-token">Access token <span class="hint">(only for a private repository)</span></label>
+              <input id="src-token" type="password" autocomplete="off" placeholder="glpat-… or github_pat_…"></div>
+            <p class="hint" style="margin:8px 0 0">GitLab: Settings → Access tokens, scope <i>read_repository</i>. GitHub: fine-grained token with <i>Contents: read-only</i> for this repository.</p>
+          </div>
+          <div class="actions"><button class="btn primary" id="src-check">Check connection</button><button class="btn" id="src-cancel">Cancel</button></div>
+        </div>
+        <div id="src-step2" hidden>
+          <div class="callout ok" id="src-found"></div>
+          <div class="fields" style="margin-top:14px"><div class="field"><label for="src-name">Name</label><input id="src-name" value="Company vault"></div>
+            <div class="field"><label for="src-interval">Update</label><select id="src-interval">
+              <option value="15">Every 15 minutes</option><option value="60" selected>Every hour</option><option value="360">Every 6 hours</option><option value="1440">Once a day</option></select></div></div>
+          <p class="hint" style="margin:14px 0 6px">Tick the folders Lisa may use and who may read each one. Administrators may always approve new knowledge.</p>
+          <div class="table-wrap"><table class="folder-table" id="src-folders"></table></div>
+          <div class="actions"><button class="btn primary" id="src-save">Save and sync</button><button class="btn" id="src-back">Back</button></div>
+        </div>
+      </div>
+    </section>
     <section class="card">
       <h2>Search</h2>
       <div class="fields"><div class="field" style="grid-column:1/-1"><label for="k-q">What are you looking for?</label>
@@ -329,7 +397,7 @@
         <li><b>Run the setup wizard</b> (button at the top) once: company, AI model for everyone, company tools (Telegram bot, Google, Microsoft 365, ClickUp), company knowledge and your team. Press <i>Apply</i> at the end: every assistant is refreshed and Lisa is back within about 20 seconds.</li>
         <li><b>Add people</b> under <i>Users</i> with a role. Send them the password link (or it is e-mailed automatically when e-mail is configured).</li>
         <li><b>Adjust roles</b> under <i>Roles</i>: what each role's assistant may do and which company tools it may use. The built-in roles are a good start: <i>Staff</i> for most people, <i>Manager</i> to approve knowledge, <i>Administrator</i> for people management, <i>Operator (IT)</i> for the setup wizard, AI model and server settings.</li>
-        <li><b>Build the knowledge base</b> under <i>Knowledge</i>: create areas (e.g. Handbook, Sales, Production), choose who may read them, and import an existing Obsidian vault as a zip. Nobody needs their own Obsidian.</li>
+        <li><b>Connect the company vault</b> under <i>Knowledge → Company vault</i>: paste the Git address of the Obsidian vault, give Lisa read access (her key as a GitLab/GitHub deploy key, or a read-only token), then tick per folder who may read it — e.g. <i>Knowledge</i> for everyone, <i>Projects</i> for managers only. Lisa updates it by herself every hour; nobody needs their own Obsidian.</li>
         <li><b>Watch</b> <i>Status & audit log</i>: failed logins, denied requests and every change are recorded.</li>
       </ol>
       <h3>How shared tools work</h3>
@@ -345,6 +413,7 @@
         <li><b>Someone lost access</b> — send a new password link from <i>Users</i>. Disabling a person signs them out everywhere at once.</li>
         <li><b>The setup wizard or AI settings are missing</b> — your account needs the <i>Operator (IT)</i> role. Lisa refuses changes that would leave nobody able to manage users or run setup. If you are locked out anyway, on the server run:<br><code>docker compose exec webui /app/venv/bin/python -m api.enterprise.recover you@company.com</code></li>
         <li><b>Lisa does not answer</b> — check <i>Status</i>: the gateway must be "ok". After the wizard's Apply it restarts for about 20 seconds.</li>
+        <li><b>The vault shows "Not synced"</b> — the message under it says why: usually Lisa's deploy key was not added to the repository, or the access token expired. Fix it and press <i>Sync now</i>.</li>
       </ul>
     </section>
   </div>
@@ -552,6 +621,7 @@
   }
   let areasCache = [];
   async function loadKnowledge() {
+    if (can('knowledge.manage') && !srcPoll) loadSources().catch((e) => toast(e.message, true));
     const areas = await api('/api/enterprise/knowledge/areas');
     const contrib = Object.entries(areas.mine).filter(([, lv]) => lv !== 'read');
     $('k-area').innerHTML = contrib.map(([k]) => `<option>${esc(k)}</option>`).join('') || '<option value="">No area you may contribute to</option>';
@@ -565,12 +635,13 @@
     }
     if (can('knowledge.manage') && areas.all) {
       areasCache = areas.all;
+      const synced = areas.synced || {};
       if (!rolesData) rolesData = await api('/api/enterprise/roles').catch(() => null);
       if (!usersCache.length && can('org.users.manage')) usersCache = (await api('/api/enterprise/users').catch(() => ({ users: [] }))).users;
       const who = (g) => g.principal_type === 'role' ? roleName(g.principal_id) : g.principal_type === 'user'
         ? ((usersCache.find((u) => u.id === g.principal_id) || {}).display_name || g.principal_id) : `${g.principal_id} (department)`;
       $('ka-table').innerHTML = areas.all.length ? '<thead><tr><th>Area</th><th>Access</th><th></th></tr></thead><tbody>' + areas.all.map((a) => `<tr>
-        <td class="person"><b>${esc(a.name)}</b><span>${esc(a.key)}</span></td>
+        <td class="person"><b>${esc(a.name)}${synced[a.key] ? ` <span class="badge">from ${esc(synced[a.key])}</span>` : ''}</b><span>${esc(a.key)}</span></td>
         <td>${a.grants.map((g) => `<span class="badge ${g.level === 'approve' ? 'role' : ''}">${esc(who(g))} · ${esc(g.level)}</span>`).join('') || '<span class="badge warn">Nobody can read it</span>'}</td>
         <td style="text-align:right"><button class="btn sm" data-edit-area="${esc(a.key)}">Edit</button></td></tr>`).join('') + '</tbody>'
         : `<tr><td>${empty('No areas yet', 'Create the first one below — for example "Company handbook", readable by everyone.')}</td></tr>`;
@@ -616,6 +687,101 @@
     toast('Area saved.' + note); resetAreaForm(null); loadKnowledge();
   });
 
+  // ── Company vault (Git) ──
+  const ago = (iso) => { if (!iso) return 'never'; const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(iso).toLocaleDateString(); };
+  let srcState = { id: null, credential_id: null, preview: null }, srcPoll = null, sourcesCache = [];
+  const urlKind = (u) => /^(git@|ssh:\/\/)/.test(u) ? 'ssh' : /^https:\/\//.test(u) ? 'https' : /^file:\/\//.test(u) ? 'file' : '';
+  async function loadSources() {
+    if (!can('knowledge.manage')) return;
+    const { sources } = await api('/api/enterprise/sources'); sourcesCache = sources;
+    $('src-list').innerHTML = sources.map((s) => {
+      const st = s.last_error ? `<span class="badge err">Not synced</span>` : s.last_sync_at ? `<span class="badge ok">Up to date</span>` : `<span class="badge warn">Syncing…</span>`;
+      const areas = Object.entries(s.folders).filter(([, a]) => a).map(([f, a]) => `<span class="badge role">${esc(f || 'top level')} → ${esc(a)}</span>`).join('');
+      return `<div class="src"><div class="src-head"><div class="what"><b>${esc(s.name)} ${st}</b><code>${esc(s.url)}</code> · <span class="hint">${esc(s.branch)}</span></div>
+        <button class="btn sm" data-src-sync="${esc(s.id)}">Sync now</button><button class="btn sm" data-src-edit="${esc(s.id)}">Folders &amp; access</button>
+        <button class="btn sm danger" data-src-del="${esc(s.id)}">Disconnect</button></div>
+        <div class="src-meta">${s.notes} notes · last update ${esc(ago(s.last_sync_at))}${s.last_commit ? ` · version ${esc(s.last_commit.slice(0, 7))}` : ''} · ${esc(s.interval_minutes >= 1440 ? 'daily' : s.interval_minutes >= 60 ? `every ${s.interval_minutes / 60} h` : `every ${s.interval_minutes} min`)}</div>
+        ${s.last_error ? `<div class="callout err" style="margin-top:10px">${icon('info')}<div>${esc(s.last_error)}</div></div>` : ''}
+        <div style="margin-top:8px">${areas}</div></div>`; }).join('') ||
+      `<div class="empty"><b>No vault connected</b>Connect the company's Obsidian vault and Lisa learns from it — every folder with its own access.</div>`;
+    const busySync = sources.some((s) => !s.last_sync_at);
+    clearTimeout(srcPoll); if (busySync) srcPoll = setTimeout(() => loadSources().then(() => { if (!sourcesCache.some((s) => !s.last_sync_at)) loadKnowledge(); }), 2000);
+  }
+  function srcStep(n) {
+    $('src-form').hidden = n === 0; $('src-add-row').hidden = n !== 0;
+    $('src-step1').hidden = n !== 1; $('src-step2').hidden = n !== 2;
+    document.querySelectorAll('#src-form .stepper span').forEach((el) => el.classList.toggle('on', Number(el.dataset.st) === n));
+  }
+  async function srcUrlChanged() {
+    const k = urlKind($('src-url').value.trim());
+    $('src-ssh').hidden = k !== 'ssh'; $('src-https').hidden = k !== 'https';
+    if (k === 'ssh' && !srcState.publicKey) {
+      const r = await api('/api/enterprise/sources/key', {}); srcState.credential_id = r.credential_id; srcState.publicKey = r.public_key;
+    }
+    if (k === 'ssh') $('src-pubkey').value = srcState.publicKey || '';
+  }
+  $('src-url').addEventListener('change', () => srcUrlChanged().catch((e) => toast(e.message, true)));
+  $('src-url').addEventListener('input', () => { const k = urlKind($('src-url').value.trim()); $('src-ssh').hidden = k !== 'ssh' || !srcState.publicKey; $('src-https').hidden = k !== 'https'; });
+  $('src-copykey').onclick = () => navigator.clipboard.writeText($('src-pubkey').value).then(() => toast('Key copied.'));
+  $('src-add').onclick = () => { srcState = { id: null, credential_id: null, preview: null };
+    $('src-url').value = ''; $('src-branch').value = 'main'; $('src-token').value = ''; $('src-ssh').hidden = $('src-https').hidden = true; srcStep(1); $('src-url').focus(); };
+  $('src-cancel').onclick = () => srcStep(0);
+  $('src-back').onclick = () => srcStep(1);
+  function readersFor(areaKey, fallback) {
+    const a = areasCache.find((x) => x.key === areaKey);
+    return a ? a.grants.filter((g) => g.principal_type === 'role' && g.level !== 'approve').map((g) => g.principal_id) : fallback;
+  }
+  function renderFolders(pre, existing) {
+    const roles = (rolesData ? rolesData.roles : []).filter((r) => r.key !== 'admin' && r.key !== 'operator');
+    const everyone = roles.map((r) => r.key);
+    const rows = pre.folders.map((f) => ({ ...f })); if (pre.root_notes) rows.unshift({ folder: '', notes: pre.root_notes, key: 'general', name: 'General', suggested: true });
+    $('src-folders').innerHTML = '<thead><tr><th>Use</th><th>Folder</th><th>Area name</th><th>Who may read</th></tr></thead><tbody>' + rows.map((f, i) => {
+      const area = existing ? existing[f.folder] : undefined;
+      const on = existing ? !!area : f.suggested;
+      const readers = area ? readersFor(area, everyone) : everyone;
+      return `<tr data-folder="${esc(f.folder)}" data-key="${esc(area || f.key)}" class="${on ? '' : 'off'}">
+        <td><input type="checkbox" data-use ${on ? 'checked' : ''} aria-label="Use ${esc(f.folder || 'top level notes')}"></td>
+        <td class="person"><b>${esc(f.folder || 'Notes at the top level')}</b><span>${f.notes} note${f.notes === 1 ? '' : 's'}</span></td>
+        <td><input type="text" data-name value="${esc(area ? ((areasCache.find((a) => a.key === area) || {}).name || f.name) : f.name)}" aria-label="Area name"></td>
+        <td><div class="chips">${roles.map((r) => `<label class="chip-toggle"><input type="checkbox" data-reader value="${esc(r.key)}" ${readers.includes(r.key) ? 'checked' : ''}>${esc(r.name)}</label>`).join('')}</div></td></tr>`; }).join('') + '</tbody>';
+    $('src-folders').querySelectorAll('[data-use]').forEach((c) => { c.onchange = () => c.closest('tr').classList.toggle('off', !c.checked); });
+  }
+  $('src-check').onclick = (e) => busy(e.currentTarget, async () => {
+    const url = $('src-url').value.trim(); if (!url) throw new Error('Paste the repository address first.');
+    if (urlKind(url) === 'ssh' && !srcState.credential_id) await srcUrlChanged();
+    if (!rolesData) rolesData = await api('/api/enterprise/roles');
+    const pre = await api('/api/enterprise/sources/preview', { url, branch: $('src-branch').value.trim() || 'main',
+      credential_id: srcState.credential_id, token: urlKind(url) === 'https' ? $('src-token').value.trim() : '' });
+    srcState.credential_id = pre.credential_id || srcState.credential_id; srcState.preview = pre;
+    $('src-found').innerHTML = `${icon('info')}<div>Connected. Found <b>${pre.folders.length} folders</b> and ${pre.folders.reduce((n, f) => n + f.notes, 0) + pre.root_notes} notes (version ${esc(pre.commit.slice(0, 7))}).</div>`;
+    const existing = srcState.id ? (sourcesCache.find((s) => s.id === srcState.id) || {}).folders : null;
+    renderFolders(pre, existing); srcStep(2);
+  });
+  $('src-save').onclick = (e) => busy(e.currentTarget, async () => {
+    const folders = [...$('src-folders').querySelectorAll('tbody tr')].map((tr) => ({ folder: tr.dataset.folder,
+      include: tr.querySelector('[data-use]').checked, key: tr.dataset.key, name: tr.querySelector('[data-name]').value.trim(),
+      readers: [...tr.querySelectorAll('[data-reader]:checked')].map((c) => c.value) }));
+    await api('/api/enterprise/sources', { id: srcState.id, name: $('src-name').value.trim(), url: $('src-url').value.trim(),
+      branch: $('src-branch').value.trim() || 'main', credential_id: srcState.credential_id, folders,
+      interval_minutes: Number($('src-interval').value) });
+    toast('Saved. Lisa is reading the vault now…'); srcStep(0); loadSources(); loadKnowledge();
+    if (window.parent !== window) window.parent.postMessage({ lisa: 'vault-saved' }, location.origin);
+  });
+  $('src-list').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.srcSync) busy(b, async () => { await api('/api/enterprise/sources/sync', { id: b.dataset.srcSync }); toast('Updating…');
+      setTimeout(loadSources, 2500); setTimeout(() => { loadSources(); loadKnowledge(); }, 8000); });
+    if (b.dataset.srcDel) busy(b, async () => {
+      if (!confirm('Disconnect this vault? Lisa removes everything she copied from it. The areas and their access stay, and the vault itself is not touched.')) return;
+      await api('/api/enterprise/sources/delete', { id: b.dataset.srcDel }); toast('Vault disconnected.'); loadSources(); loadKnowledge(); });
+    if (b.dataset.srcEdit) { const s = sourcesCache.find((x) => x.id === b.dataset.srcEdit);
+      srcState = { id: s.id, credential_id: s.credential_id, publicKey: s.public_key, preview: null };
+      $('src-url').value = s.url; $('src-branch').value = s.branch; $('src-name').value = s.name; $('src-interval').value = String(s.interval_minutes);
+      $('src-token').value = ''; $('src-ssh').hidden = !s.public_key; $('src-pubkey').value = s.public_key || ''; $('src-https').hidden = s.auth !== 'token' && urlKind(s.url) !== 'https';
+      srcStep(1); $('src-check').click(); }
+  });
+
   // ── Audit ──
   const ACTIONS = { 'login.succeeded': 'Signed in', 'login.failed': 'Sign-in failed', 'user.created': 'Person added', 'user.disabled': 'Person disabled',
     'user.enabled': 'Person enabled', 'user.roles_changed': 'Roles changed', 'user.password_set': 'Password set', 'user.password_link_issued': 'Password link created',
@@ -638,6 +804,8 @@
       : `<tr><td>${empty('No events yet', '')}</td></tr>`;
   }
 
+  const EMBED = new URLSearchParams(location.search).get('embed');  // the setup wizard shows just the vault card
+  if (EMBED === 'vault') { document.body.classList.add('embed'); history.replaceState(null, '', location.pathname + '?embed=vault#knowledge'); }
   api('/api/enterprise/me').then((m) => {
     me = m; $('who-name').textContent = m.display_name || m.email;
     $('who-roles').innerHTML = m.roles.map((r) => `<span class="badge role">${esc(r)}</span>`).join('');

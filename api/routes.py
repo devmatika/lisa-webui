@@ -16845,7 +16845,11 @@ def handle_get(handler, parsed) -> bool:
         )
 
     if parsed.path == "/api/onboarding/status":
-        return j(handler, get_onboarding_status())
+        status = get_onboarding_status()
+        from api.enterprise import enabled as _enterprise_on
+        if _enterprise_on():  # the organisation setup wizard replaces the single-user onboarding
+            status["completed"] = True
+        return j(handler, status)
 
     if parsed.path == "/api/email-assistant":
         from api.email_assistant import get_email_assistant

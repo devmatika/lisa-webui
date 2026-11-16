@@ -176,7 +176,28 @@ class KnowledgeGap(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
+class KnowledgeSource(Base):
+    """A Git repository (e.g. the company's Obsidian vault) mirrored into knowledge areas.
+
+    ``folders`` maps each top-level folder of the repository to an area key, or to None when the
+    folder is left out; ``""`` stands for the notes at the repository root. Secrets (deploy key,
+    access token) live on disk under the vault's ``.sources/<credential_id>``, never in the database."""
+    __tablename__ = "knowledge_sources"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(200))
+    url: Mapped[str] = mapped_column(String(500))
+    branch: Mapped[str] = mapped_column(String(200), default="main")
+    credential_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    folders: Mapped[dict] = mapped_column(JSON, default=dict)
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_commit: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 Index("ix_one_time_tokens_purpose_user", OneTimeToken.purpose, OneTimeToken.user_id)
 __all__ = ["Base", "Organization", "Department", "Role", "RolePermission", "RoleTemplate", "User",
-           "UserRole", "AuthSession", "OneTimeToken", "LoginAttempt", "AuditEvent", "TelegramLink", "KnowledgeArea", "AreaGrant", "KnowledgeDraft", "KnowledgeGap",
+           "UserRole", "AuthSession", "OneTimeToken", "LoginAttempt", "AuditEvent", "TelegramLink", "KnowledgeArea", "AreaGrant", "KnowledgeDraft", "KnowledgeGap", "KnowledgeSource",
            "utcnow"]

@@ -12,7 +12,7 @@ from pathlib import Path
 from sqlalchemy import select
 
 from api.enterprise import db as edb
-from api.enterprise import directory, knowledge, provisioner, sessions, telegram
+from api.enterprise import directory, knowledge, provisioner, sessions, sources, telegram
 from api.enterprise.directory import Actor, DirectoryError
 from api.enterprise.gate import current_user
 from api.enterprise.models import AuditEvent, Role, User
@@ -43,6 +43,9 @@ def _html(handler, body: str, status: int = 200) -> bool:
     handler.send_header("Content-Type", "text/html; charset=utf-8")
     handler.send_header("Content-Length", str(len(raw)))
     handler.send_header("Cache-Control", "no-store")
+    # sign-in and Organization pages: only the WebUI itself may frame them (the setup wizard does)
+    handler.send_header("X-Frame-Options", "SAMEORIGIN")
+    handler.send_header("Content-Security-Policy", "frame-ancestors 'self'")
     handler.end_headers()
     handler.wfile.write(raw)
     return True
@@ -510,6 +513,7 @@ def _k_areas(handler, _body):
         out = {"mine": {k: {1: "read", 2: "contribute", 3: "approve"}[v] for k, v in levels.items() if v}}
         if current_user(handler).can("knowledge.manage"):
             out["all"] = knowledge.areas_view(db)
+            out["synced"] = sources.areas_from_sources(db)  # area -> vault it is mirrored from
         return out
     return _knowledge_call(handler, run)
 
@@ -528,6 +532,55 @@ def _k_import(handler, body):
     return _knowledge_call(handler, lambda db: knowledge.import_vault(
         db, _actor(handler), body.get("area", ""), data, split_folders=bool(body.get("split_folders")),
         new_area_grants=list(body.get("grants") or [])))
+
+
+def _s_key(handler, _body):
+    return _knowledge_call(handler, lambda db: sources.new_deploy_key())
+
+
+def _s_preview(handler, body):
+    def run(db):
+        cred = body.get("credential_id") or None
+        if body.get("token"):
+            cred = sources.store_token(str(body["token"]), cred)
+        out = sources.preview(body.get("url", ""), body.get("branch") or "main", cred)
+        out["credential_id"] = cred
+        return out
+    return _knowledge_call(handler, run)
+
+
+def _s_list(handler, _body):
+    from sqlalchemy import select as _select
+    from api.enterprise.models import KnowledgeSource
+    return _knowledge_call(handler, lambda db: {"sources": [sources.view(s) for s in db.scalars(
+        _select(KnowledgeSource).order_by(KnowledgeSource.created_at))]})
+
+
+def _s_save(handler, body):
+    from api.helpers import bad, j
+    try:
+        with edb.session() as db:
+            src = sources.save_source(db, _actor(handler), source_id=body.get("id") or None, name=body.get("name", ""),
+                                      url=body.get("url", ""), branch=body.get("branch") or "main",
+                                      credential_id=body.get("credential_id") or None,
+                                      folders=list(body.get("folders") or []),
+                                      interval_minutes=int(body.get("interval_minutes") or 60))
+            out = sources.view(src)
+    except (DirectoryError, ValueError) as exc:
+        return bad(handler, str(exc), 400)
+    sources.sync_in_background(out["id"])  # after commit: the sync thread must see the source
+    return j(handler, {"ok": True, "source": out, "syncing": True})
+
+
+def _s_sync(handler, body):
+    from api.helpers import j
+    sources.sync_in_background(str(body.get("id") or ""))
+    return j(handler, {"ok": True, "syncing": True})
+
+
+def _s_delete(handler, body):
+    return _knowledge_call(handler, lambda db: (sources.delete_source(db, _actor(handler), str(body.get("id") or "")),
+                                                {"ok": True})[1])
 
 
 def _k_submit(handler, body):
@@ -618,6 +671,12 @@ ROUTES = {
     ("POST", "/api/enterprise/knowledge/areas"): (_k_save_area, "knowledge.manage"),
     ("GET", "/api/enterprise/knowledge/gaps"): (_k_gaps, "knowledge.manage"),
     ("POST", "/api/enterprise/knowledge/import"): (_k_import, "knowledge.manage"),
+    ("POST", "/api/enterprise/sources/key"): (_s_key, "knowledge.manage"),
+    ("POST", "/api/enterprise/sources/preview"): (_s_preview, "knowledge.manage"),
+    ("GET", "/api/enterprise/sources"): (_s_list, "knowledge.manage"),
+    ("POST", "/api/enterprise/sources"): (_s_save, "knowledge.manage"),
+    ("POST", "/api/enterprise/sources/sync"): (_s_sync, "knowledge.manage"),
+    ("POST", "/api/enterprise/sources/delete"): (_s_delete, "knowledge.manage"),
     # Called by the org-authz plugin's knowledge tools; authenticated by the profile's own key.
     ("POST", "/api/enterprise/knowledge/agent/search"): (_a_search, None),
     ("POST", "/api/enterprise/knowledge/agent/read"): (_a_read, None),
