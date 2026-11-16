@@ -44,6 +44,10 @@ def kb(tmp_path, monkeypatch, request):
     (vault / "hr" / "salaries.md").write_text("# Salaries\n\nCEO salary SECRET-HR 9000 euro milking bonus.\n")
     (vault / "farm" / ".history").mkdir()
     (vault / "farm" / ".history" / "old.md").write_text("old milking SECRET-OLD")
+    with edb.session() as db:  # these tests build their own areas, without the standard folders
+        from api.enterprise.models import KnowledgeArea
+        for area in db.query(KnowledgeArea).all():
+            db.delete(area)
     with edb.session() as db:
         from api.enterprise import knowledge
         knowledge.save_area(db, a, "farm", "Farm", [

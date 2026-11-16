@@ -234,6 +234,18 @@ def _public_key(credential_id: str | None) -> str | None:
     return None
 
 
+def _kept_grants(db, key: str, readers: set[str]) -> list[dict]:
+    """What an area already grants beyond plain reading survives a vault save: Teach-Lisa contributors
+    whose role still reads it, administrators, and grants to single people or departments."""
+    from api.enterprise.models import AreaGrant
+    kept = []
+    for g in db.scalars(select(AreaGrant).where(AreaGrant.area_key == key)):
+        role = g.principal_type == "role"
+        if not role or g.principal_id == "admin" or (g.level != "read" and g.principal_id in readers):
+            kept.append({"principal_type": g.principal_type, "principal_id": g.principal_id, "level": g.level})
+    return kept
+
+
 def save_source(db, actor: Actor, *, source_id: str | None, name: str, url: str, branch: str,
                 credential_id: str | None, folders: list[dict], interval_minutes: int = 60) -> KnowledgeSource:
     """Create or update a source and its areas.
@@ -255,9 +267,12 @@ def save_source(db, actor: Actor, *, source_id: str | None, name: str, url: str,
             mapping[folder] = None
             continue
         key = (f.get("key") or _area_key_for(folder or "general")).strip().lower()
-        grants = [{"principal_type": "role", "principal_id": r, "level": "read"}
-                  for r in f.get("readers") or [] if r != "admin"]
-        grants.append({"principal_type": "role", "principal_id": "admin", "level": "approve"})
+        readers = {r for r in f.get("readers") or [] if r != "admin"}
+        grants = _kept_grants(db, key, readers)
+        held = {g["principal_id"] for g in grants if g["principal_type"] == "role"}
+        grants += [{"principal_type": "role", "principal_id": r, "level": "read"} for r in sorted(readers - held)]
+        if "admin" not in held:
+            grants.append({"principal_type": "role", "principal_id": "admin", "level": "approve"})
         save_area(db, actor, key, f.get("name") or _area_name_for(folder or "General"), grants)
         mapping[folder] = key
     if not any(mapping.values()):

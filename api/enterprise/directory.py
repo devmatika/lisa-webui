@@ -124,6 +124,8 @@ def first_run_setup(db: Session, *, org_name: str, email: str, password: str, di
     db.add(user)
     db.flush()
     audit(db, Actor(None, ip), "setup.completed", user.id, email=user.email)
+    from api.enterprise.knowledge_defaults import add_standard_areas
+    add_standard_areas(db, Actor(user.id, ip))  # the standard vault folders, so nobody starts from zero
     return user
 
 

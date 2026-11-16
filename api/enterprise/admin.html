@@ -288,6 +288,11 @@
       <p class="sub">Connect the company's Obsidian vault (a Git repository on GitLab, GitHub or your own server). Every
         folder becomes an area, you choose who may read each one, and Lisa keeps it up to date by herself. She only
         reads — she never changes the vault.</p>
+      <div class="callout" id="src-standard"><svg class="i"><use href="#i-info"/></svg><div>Lisa starts with the standard folders <b>01-People, 02-Companies,
+        03-Projects, 04-Meetings, 05-Decisions, 06-Knowledge, 07-Daily, 08-Team-Briefing</b>, each with its access already
+        set. Use the same folder names in your vault and that access carries over. No vault yet?
+        <a href="/api/enterprise/knowledge/starter.zip" download>Download the starter vault</a>, put it in a private
+        GitLab or GitHub repository and connect it here.</div></div>
       <div id="src-list"></div>
       <div class="actions" id="src-add-row"><button class="btn primary" id="src-add"><svg class="i"><use href="#i-plus"/></svg>Connect a vault</button></div>
       <div id="src-form" hidden>
@@ -348,6 +353,8 @@
       <h2>Areas and access</h2>
       <p class="sub">An area is a folder of notes. Choose who may <b>read</b> it, <b>contribute</b> (suggest changes) or <b>approve</b> (publish). Administrators see nothing unless they are listed here too.</p>
       <div class="table-wrap"><table id="ka-table"></table></div>
+      <div class="actions" id="ka-standard" hidden><button class="btn sm" id="ka-standard-add"><svg class="i"><use href="#i-plus"/></svg>Add the standard folders</button>
+        <span class="hint" id="ka-standard-hint"></span></div>
       <h3 style="font-size:15px;margin:20px 0 10px" id="ka-form-title">New area</h3>
       <div class="fields">
         <div class="field"><label for="ka-name">Name</label><input id="ka-name" placeholder="Company handbook"></div>
@@ -636,6 +643,9 @@
     if (can('knowledge.manage') && areas.all) {
       areasCache = areas.all;
       const synced = areas.synced || {};
+      const missing = areas.standard_missing || [];
+      $('ka-standard').hidden = !missing.length;
+      $('ka-standard-hint').textContent = missing.length ? `Missing: ${missing.join(', ')}. Existing areas are not changed.` : '';
       if (!rolesData) rolesData = await api('/api/enterprise/roles').catch(() => null);
       if (!usersCache.length && can('org.users.manage')) usersCache = (await api('/api/enterprise/users').catch(() => ({ users: [] }))).users;
       const who = (g) => g.principal_type === 'role' ? roleName(g.principal_id) : g.principal_type === 'user'
@@ -737,8 +747,9 @@
     const everyone = roles.map((r) => r.key);
     const rows = pre.folders.map((f) => ({ ...f })); if (pre.root_notes) rows.unshift({ folder: '', notes: pre.root_notes, key: 'general', name: 'General', suggested: true });
     $('src-folders').innerHTML = '<thead><tr><th>Use</th><th>Folder</th><th>Area name</th><th>Who may read</th></tr></thead><tbody>' + rows.map((f, i) => {
-      const area = existing ? existing[f.folder] : undefined;
-      const on = existing ? !!area : f.suggested;
+      const known = areasCache.some((a) => a.key === f.key);  // a standard folder keeps the access it already has
+      const area = existing ? existing[f.folder] : (known ? f.key : undefined);
+      const on = existing ? !!area : (f.suggested || (known && f.notes > 0));
       const readers = area ? readersFor(area, everyone) : everyone;
       return `<tr data-folder="${esc(f.folder)}" data-key="${esc(area || f.key)}" class="${on ? '' : 'off'}">
         <td><input type="checkbox" data-use ${on ? 'checked' : ''} aria-label="Use ${esc(f.folder || 'top level notes')}"></td>
@@ -767,6 +778,10 @@
       interval_minutes: Number($('src-interval').value) });
     toast('Saved. Lisa is reading the vault now…'); srcStep(0); loadSources(); loadKnowledge();
     if (window.parent !== window) window.parent.postMessage({ lisa: 'vault-saved' }, location.origin);
+  });
+  $('ka-standard-add').onclick = (e) => busy(e.currentTarget, async () => {
+    const r = await api('/api/enterprise/knowledge/defaults', {});
+    toast(r.added.length ? `Added ${r.added.length} standard folders.` : 'All standard folders are already there.'); loadKnowledge();
   });
   $('src-list').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;

@@ -124,3 +124,48 @@ def test_a_failed_pull_is_reported_in_plain_words(ent, tmp_path):
     shutil.rmtree(repo)
     view = sources.sync(sid)
     assert view["last_error"] and view["last_sync_at"]
+
+
+def test_a_new_organisation_starts_with_the_standard_folders_and_their_access(ent):
+    from api.enterprise import directory, knowledge
+    from api.enterprise.knowledge_defaults import STANDARD_FOLDERS, add_standard_areas, missing_standard_areas
+    edb, ids, _repo = ent
+    with edb.session() as db:
+        assert missing_standard_areas(db) == []
+        levels = {who: knowledge.access_for(db, directory.get_user(db, ids[who])).levels for who in ("anna", "mia")}
+        assert len(STANDARD_FOLDERS) == 8
+    assert "people" not in levels["anna"] and "projects" not in levels["anna"]
+    assert levels["mia"]["people"] == 1 and levels["anna"]["meetings"] == 1
+    assert levels["anna"]["knowledge"] == 2  # staff may teach Lisa how things are done
+    with edb.session() as db:  # adding the defaults again never touches an area the admin changed
+        knowledge.save_area(db, directory.Actor(ids["boss"]), "people", "Team", [])
+    with edb.session() as db:
+        assert add_standard_areas(db, directory.Actor(ids["boss"])) == []
+        assert knowledge.areas_view(db)[[a["key"] for a in knowledge.areas_view(db)].index("people")]["grants"] == []
+
+
+def test_a_vault_with_the_standard_folders_keeps_their_access(ent):
+    from api.enterprise import directory, knowledge, sources
+    edb, ids, repo = ent
+    url = f"file://{repo}"
+    folders = [{"folder": "06-Knowledge", "include": True, "readers": ["staff", "manager"]},
+               {"folder": "03-Projects", "include": True, "readers": ["manager"]}]
+    with edb.session() as db:
+        sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=url, branch="main",
+                                  credential_id=None, folders=folders).id
+    sources.sync(sid)
+    with edb.session() as db:
+        anna = knowledge.access_for(db, directory.get_user(db, ids["anna"])).levels
+        assert anna["knowledge"] == 2 and "projects" not in anna  # Teach-Lisa access survived the vault save
+        assert [h["title"] for h in knowledge.search(db, directory.get_user(db, ids["mia"]), "budget")["results"]] \
+            == ["Hotel pilot"]
+
+
+def test_the_starter_vault_has_every_standard_folder():
+    import io
+    import zipfile
+    from api.enterprise.knowledge_defaults import STANDARD_FOLDERS, UNREAD_FOLDERS, starter_vault_zip
+    names = zipfile.ZipFile(io.BytesIO(starter_vault_zip("KSP"))).namelist()
+    for folder in [f[0] for f in STANDARD_FOLDERS] + [f[0] for f in UNREAD_FOLDERS]:
+        assert any(n.startswith(f"company-vault/{folder}/") for n in names)
+    assert "company-vault/README.md" in names

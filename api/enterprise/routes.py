@@ -514,6 +514,8 @@ def _k_areas(handler, _body):
         if current_user(handler).can("knowledge.manage"):
             out["all"] = knowledge.areas_view(db)
             out["synced"] = sources.areas_from_sources(db)  # area -> vault it is mirrored from
+            from api.enterprise.knowledge_defaults import missing_standard_areas
+            out["standard_missing"] = missing_standard_areas(db)
         return out
     return _knowledge_call(handler, run)
 
@@ -532,6 +534,27 @@ def _k_import(handler, body):
     return _knowledge_call(handler, lambda db: knowledge.import_vault(
         db, _actor(handler), body.get("area", ""), data, split_folders=bool(body.get("split_folders")),
         new_area_grants=list(body.get("grants") or [])))
+
+
+def _k_defaults(handler, _body):
+    from api.enterprise.knowledge_defaults import add_standard_areas
+    return _knowledge_call(handler, lambda db: {"ok": True, "added": add_standard_areas(db, _actor(handler))})
+
+
+def _k_starter(handler, _body):
+    from api.enterprise.knowledge_defaults import starter_vault_zip
+    from api.enterprise.models import Organization
+    with edb.session() as db:
+        org = db.scalar(select(Organization))
+        raw = starter_vault_zip(org.name if org else "")
+    handler.send_response(200)
+    handler.send_header("Content-Type", "application/zip")
+    handler.send_header("Content-Disposition", 'attachment; filename="company-vault.zip"')
+    handler.send_header("Content-Length", str(len(raw)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(raw)
+    return True
 
 
 def _s_key(handler, _body):
@@ -671,6 +694,8 @@ ROUTES = {
     ("POST", "/api/enterprise/knowledge/areas"): (_k_save_area, "knowledge.manage"),
     ("GET", "/api/enterprise/knowledge/gaps"): (_k_gaps, "knowledge.manage"),
     ("POST", "/api/enterprise/knowledge/import"): (_k_import, "knowledge.manage"),
+    ("POST", "/api/enterprise/knowledge/defaults"): (_k_defaults, "knowledge.manage"),
+    ("GET", "/api/enterprise/knowledge/starter.zip"): (_k_starter, "knowledge.manage"),
     ("POST", "/api/enterprise/sources/key"): (_s_key, "knowledge.manage"),
     ("POST", "/api/enterprise/sources/preview"): (_s_preview, "knowledge.manage"),
     ("GET", "/api/enterprise/sources"): (_s_list, "knowledge.manage"),
