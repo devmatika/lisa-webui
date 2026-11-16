@@ -409,11 +409,21 @@ def _google_callback(handler, _body):
     from api.enterprise import integrations
     q = parse_qs(handler._lisa_parsed.query or "")
     u = current_user(handler)
-    try:
-        integrations.google_finish(u.user_id, u.hermes_profile, (q.get("state") or [""])[0], (q.get("code") or [""])[0])
+    try:  # one redirect address for both: the Google tools and Gmail accounts (the state says which)
+        mail_flow = integrations.google_finish(u.user_id, u.hermes_profile, (q.get("state") or [""])[0],
+                                               (q.get("code") or [""])[0])
+        if mail_flow is not None:
+            from api.enterprise import mail
+            if not u.can("integration.email"):
+                raise DirectoryError("Your role does not include e-mail.")
+            with edb.session() as db:
+                acct = mail.google_finish(db, _actor(handler), directory.get_user(db, u.user_id),
+                                          mail_flow["tokens"], mail_flow["purpose"])
+                address = acct.address
+            return _redirect(handler, "/lisa?connected=" + quote(address) + "#account")
     except (DirectoryError, OSError, ValueError) as exc:
         msg = str(exc) if isinstance(exc, DirectoryError) else "Google did not accept the sign-in. Try again."
-        return _redirect(handler, "/lisa?error=" + quote(msg))
+        return _redirect(handler, "/lisa?error=" + quote(msg) + "#account")
     with edb.session() as db:
         directory.audit(db, _actor(handler), "integration.google_connected", u.user_id)
     return _redirect(handler, "/lisa?connected=google")
@@ -488,6 +498,10 @@ def _me_user(db, handler):
     return directory.get_user(db, current_user(handler).user_id)
 
 
+class Refused(DirectoryError):
+    """The caller is not who it claims to be (agent API with a wrong profile key): always 403."""
+
+
 def _knowledge_call(handler, fn):
     from api.helpers import bad, j
     try:
@@ -495,7 +509,8 @@ def _knowledge_call(handler, fn):
             return j(handler, fn(db))
     except DirectoryError as exc:
         msg = str(exc).lower()  # refusals are 403, unknown things 404, everything else is the user's input
-        return bad(handler, str(exc), 403 if "cannot" in msg else 404 if "not found" in msg else 400)
+        status = 403 if isinstance(exc, Refused) or "cannot" in msg else 404 if "not found" in msg else 400
+        return bad(handler, str(exc), status)
 
 
 def _k_search(handler, _body):
@@ -587,7 +602,7 @@ def _s_save(handler, body):
                                       url=body.get("url", ""), branch=body.get("branch") or "main",
                                       credential_id=body.get("credential_id") or None,
                                       folders=list(body.get("folders") or []),
-                                      interval_minutes=int(body.get("interval_minutes") or 60))
+                                      interval_minutes=int(body.get("interval_minutes") or 15))
             out = sources.view(src)
     except (DirectoryError, ValueError) as exc:
         return bad(handler, str(exc), 400)
@@ -640,7 +655,7 @@ def _agent_user(db, handler) -> User:
     user = db.scalar(select(User).where(User.hermes_profile == profile)) if profile else None
     expected = provisioner._read_env(provisioner._home(profile) / ".env").get("API_SERVER_KEY", "") if user else ""
     if user is None or user.status != "active" or not expected or not hmac.compare_digest(key, expected):
-        raise DirectoryError("Not allowed")
+        raise Refused("Not allowed")
     return user
 
 
@@ -679,7 +694,8 @@ ROUTES = {
     ("GET", "/api/enterprise/ops"): (_ops, "org.audit.read"),
     ("GET", "/api/enterprise/integrations"): (_integrations, "chat.use"),
     ("GET", "/api/enterprise/google/start"): (_google_start, "integration.google"),
-    ("GET", "/api/enterprise/google/callback"): (_google_callback, "integration.google"),
+    # signed-in only: the Google tools need integration.google, Gmail accounts integration.email (checked inside)
+    ("GET", "/api/enterprise/google/callback"): (_google_callback, "signed-in"),
     ("POST", "/api/enterprise/google/disconnect"): (_google_disconnect, "integration.google"),
     ("POST", "/api/enterprise/integrations/clickup"): (_clickup_token, "integration.clickup"),
     ("GET", "/api/enterprise/telegram"): (_telegram_status, "chat.use"),
@@ -707,6 +723,8 @@ ROUTES = {
     ("POST", "/api/enterprise/knowledge/agent/read"): (_a_read, None),
     ("POST", "/api/enterprise/knowledge/agent/draft"): (_a_draft, None),
 }
+from api.enterprise.mail_routes import ROUTES as _MAIL_ROUTES  # noqa: E402  (mail_routes imports routes lazily)
+ROUTES.update(_MAIL_ROUTES)
 
 
 def handle(handler, parsed, method: str) -> bool:

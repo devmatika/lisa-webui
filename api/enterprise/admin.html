@@ -95,6 +95,13 @@
   .conn { display:flex; align-items:center; gap:14px; padding:14px 0; border-top:1px solid var(--line); flex-wrap:wrap; }
   .conn:first-of-type { border-top:0; }
   .conn .what { flex:1 1 240px; min-width:0; }
+  .conn .what > span:not(.badge) { display:block; color:var(--muted); font-size:13px; margin-top:2px; overflow-wrap:anywhere; }
+  .conn .how { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .seg { display:inline-flex; flex-wrap:wrap; gap:4px; padding:4px; border:1px solid var(--line); border-radius:12px; margin:6px 0 4px; }
+  .seg button { border:0; background:transparent; color:inherit; font:inherit; font-size:14px; padding:8px 14px; border-radius:9px; cursor:pointer; min-height:40px; }
+  .seg button[aria-pressed="true"] { background:var(--primary-soft); color:var(--primary-soft-text); font-weight:600; }
+  #mail-form details { margin:10px 0 4px; }
+  #mail-form details summary { cursor:pointer; min-height:32px; }
   .conn .what b { display:block; }
   .conn .what span { color:var(--muted); font-size:13px; }
   .conn .how { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -232,6 +239,40 @@
           <button class="btn primary sm" id="c-save">Save</button><button class="btn sm" id="c-remove" hidden>Remove</button></div>
       </div>
     </section>
+    <section class="card" id="mail-card" data-need="integration.email">
+      <h2>E-mail accounts</h2>
+      <p class="sub">Add every mailbox Lisa should help with — work and personal. Per account you decide what Lisa may do;
+        an e-mail is only ever sent after you confirm it in the chat. Your passwords are never shown to anyone.</p>
+      <div id="mail-list"></div>
+      <div class="actions" id="mail-add-row"><button class="btn primary" id="mail-add"><svg class="i"><use href="#i-plus"/></svg>Add an e-mail account</button></div>
+      <div id="mail-form" hidden>
+        <div class="seg" role="radiogroup" aria-label="Kind of account" id="mail-kind">
+          <button type="button" data-kind="google" aria-pressed="false">Google / Gmail</button>
+          <button type="button" data-kind="microsoft" aria-pressed="false">Microsoft 365 (work)</button>
+          <button type="button" data-kind="imap" aria-pressed="true">Other e-mail</button>
+        </div>
+        <p class="hint" id="mail-kind-hint"></p>
+        <div class="fields">
+          <div class="field" data-for="imap"><label for="mail-address">E-mail address</label><input id="mail-address" type="email" autocomplete="off" placeholder="name@example.com"></div>
+          <div class="field" data-for="imap"><label for="mail-password">Password <span class="hint">(often an app password)</span></label><input id="mail-password" type="password" autocomplete="new-password"></div>
+          <div class="field"><label for="mail-label">Name in Lisa</label><input id="mail-label" list="mail-labels" value="Work" maxlength="60">
+            <datalist id="mail-labels"><option>Work</option><option>Personal</option><option>Sales</option><option>Support</option></datalist></div>
+          <div class="field"><label for="mail-allow">Lisa may</label><select id="mail-allow">
+            <option value="read">Read only</option><option value="draft" selected>Read and write drafts</option><option value="send">Read, write drafts and send (you confirm each)</option></select></div>
+        </div>
+        <details data-for="imap" id="mail-adv"><summary class="hint">Server settings (only if Lisa cannot find them)</summary>
+          <div class="fields">
+            <div class="field"><label for="mail-imap-host">IMAP server</label><input id="mail-imap-host" placeholder="imap.example.com"></div>
+            <div class="field"><label for="mail-imap-port">IMAP port</label><input id="mail-imap-port" inputmode="numeric" placeholder="993"></div>
+            <div class="field"><label for="mail-imap-sec">IMAP encryption</label><select id="mail-imap-sec"><option value="">Automatic</option><option value="ssl">SSL/TLS</option><option value="starttls">STARTTLS</option></select></div>
+            <div class="field"><label for="mail-smtp-host">SMTP server</label><input id="mail-smtp-host" placeholder="smtp.example.com"></div>
+            <div class="field"><label for="mail-smtp-port">SMTP port</label><input id="mail-smtp-port" inputmode="numeric" placeholder="587"></div>
+            <div class="field"><label for="mail-smtp-sec">SMTP encryption</label><select id="mail-smtp-sec"><option value="">Automatic</option><option value="ssl">SSL/TLS</option><option value="starttls">STARTTLS</option></select></div>
+            <div class="field"><label for="mail-user">User name <span class="hint">(if not the address)</span></label><input id="mail-user" autocomplete="off"></div>
+          </div></details>
+        <div class="actions"><button class="btn primary" id="mail-connect">Connect</button><button class="btn" id="mail-cancel">Cancel</button></div>
+      </div>
+    </section>
     <section class="card"><h2>Session</h2><p class="sub">Sign out on this device.</p><button class="btn" id="logout">Sign out</button></section>
   </div>
 
@@ -253,6 +294,21 @@
     <section class="card">
       <h2>People <span class="badge" id="user-count"></span></h2>
       <div class="table-wrap"><table id="user-table"></table></div>
+    </section>
+    <section class="card" id="shared-card" data-need="org.settings.manage">
+      <h2>Team mailboxes</h2>
+      <p class="sub">A shared address such as info@ or support@ that several people work on. Choose which roles may use it;
+        their assistants then see it next to their own accounts.</p>
+      <div id="shared-list"></div>
+      <div class="fields">
+        <div class="field"><label for="sh-kind">Kind</label><select id="sh-kind"><option value="imap">Password (IMAP)</option><option value="microsoft">Microsoft 365</option></select></div>
+        <div class="field"><label for="sh-address">Address</label><input id="sh-address" type="email" autocomplete="off" placeholder="info@company.com"></div>
+        <div class="field" id="sh-password-field"><label for="sh-password">Password</label><input id="sh-password" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="sh-label">Name in Lisa</label><input id="sh-label" value="Team" maxlength="60"></div>
+        <div class="field"><label for="sh-allow">Lisa may</label><select id="sh-allow"><option value="read">Read only</option><option value="draft" selected>Read and write drafts</option><option value="send">Read, drafts and send</option></select></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Who may use it</label><div class="chips" id="sh-roles"></div></div>
+      <div class="actions"><button class="btn primary" id="sh-add"><svg class="i"><use href="#i-plus"/></svg>Add team mailbox</button></div>
     </section>
   </div>
 
@@ -325,7 +381,7 @@
           <div class="callout ok" id="src-found"></div>
           <div class="fields" style="margin-top:14px"><div class="field"><label for="src-name">Name</label><input id="src-name" value="Company vault"></div>
             <div class="field"><label for="src-interval">Update</label><select id="src-interval">
-              <option value="15">Every 15 minutes</option><option value="60" selected>Every hour</option><option value="360">Every 6 hours</option><option value="1440">Once a day</option></select></div></div>
+              <option value="15" selected>Every 15 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Once a day</option></select></div></div>
           <p class="hint" style="margin:14px 0 6px">Tick the folders Lisa may use and who may read each one. Administrators may always approve new knowledge.</p>
           <div class="table-wrap"><table class="folder-table" id="src-folders"></table></div>
           <div class="actions"><button class="btn primary" id="src-save">Save and sync</button><button class="btn" id="src-back">Back</button></div>
@@ -389,6 +445,7 @@
         <li><b>Chat</b> — click <i>Back to chat</i>. Your assistant is private: your conversations, memory and files are never visible to colleagues or administrators.</li>
         <li><b>Telegram</b> (optional) — under <i>My account</i>, link your Telegram with the pairing code the company bot sends you. Then you can talk to Lisa from your phone.</li>
         <li><b>Your accounts</b> — if your role allows it, connect Google (mail, calendar, docs) under <i>My account</i>. ClickUp usually works without setup: Lisa finds the tasks assigned to your e-mail address.</li>
+        <li><b>E-mail</b> — under <i>My account → E-mail accounts</i> add every mailbox you want help with: your work mailbox, a personal Gmail, an account at another company. Give each a name ("Work", "Personal") and choose what Lisa may do: read, write drafts, or also send. Then just ask: "anything new in my personal mail?", "answer the roofer from my work account". Every e-mail is shown to you before it leaves. Gmail, GMX, WEB.DE, Yahoo and iCloud need an <i>app password</i> (made in the provider's security settings), not your normal password.</li>
         <li><b>Company knowledge</b> — ask Lisa "how do we …?". She answers from the areas you may read and tells you when she does not know. Under <i>Knowledge</i> you can search yourself and <i>Teach Lisa</i>: your suggestion is published after an approver checks it.</li>
       </ol>
       <h3>Good to know</h3>
@@ -404,14 +461,16 @@
         <li><b>Run the setup wizard</b> (button at the top) once: company, AI model for everyone, company tools (Telegram bot, Google, Microsoft 365, ClickUp), company knowledge and your team. Press <i>Apply</i> at the end: every assistant is refreshed and Lisa is back within about 20 seconds.</li>
         <li><b>Add people</b> under <i>Users</i> with a role. Send them the password link (or it is e-mailed automatically when e-mail is configured).</li>
         <li><b>Adjust roles</b> under <i>Roles</i>: what each role's assistant may do and which company tools it may use. The built-in roles are a good start: <i>Staff</i> for most people, <i>Manager</i> to approve knowledge, <i>Administrator</i> for people management, <i>Operator (IT)</i> for the setup wizard, AI model and server settings.</li>
-        <li><b>Connect the company vault</b> under <i>Knowledge → Company vault</i>: paste the Git address of the Obsidian vault, give Lisa read access (her key as a GitLab/GitHub deploy key, or a read-only token), then tick per folder who may read it — e.g. <i>Knowledge</i> for everyone, <i>Projects</i> for managers only. Lisa updates it by herself every hour; nobody needs their own Obsidian.</li>
+        <li><b>Connect the company vault</b> under <i>Knowledge → Company vault</i>: paste the Git address of the Obsidian vault, give Lisa read access (her key as a GitLab/GitHub deploy key, or a read-only token), then tick per folder who may read it — e.g. <i>Knowledge</i> for everyone, <i>Projects</i> for managers only. Lisa updates it by herself every 15 minutes (change it under <i>Folders &amp; access</i>, or press <i>Sync now</i>); nobody needs their own Obsidian.</li>
+        <li><b>Team mailboxes</b> such as info@ or support@: add them under <i>Users → Team mailboxes</i> and tick the roles that work on them. Everyone else never sees them.</li>
         <li><b>Watch</b> <i>Status & audit log</i>: failed logins, denied requests and every change are recorded.</li>
       </ol>
       <h3>How shared tools work</h3>
       <ul>
         <li><b>Telegram</b>: one company bot; each person links their own Telegram and gets their own private chat.</li>
         <li><b>Google</b>: the company provides the sign-in app; each person connects their own Google account.</li>
-        <li><b>Microsoft 365 / Outlook</b>: one company app; each assistant reaches only its owner's mailbox.</li>
+        <li><b>Microsoft 365 / Outlook</b>: one company app; each person can add only their own work mailbox, shared mailboxes only an administrator can add.</li>
+        <li><b>E-mail</b>: each person adds as many accounts as they like (Gmail via Google sign-in, Microsoft 365, any other provider via IMAP). Passwords stay in Lisa's server, never in anyone's assistant, and Lisa checks on every request which mailboxes a person may use.</li>
         <li><b>ClickUp</b>: connected once with a company token; each person sees the tasks assigned to their e-mail. A personal token is optional.</li>
         <li><b>Knowledge</b>: one company vault, split into areas with their own access.</li>
       </ul>
@@ -420,6 +479,7 @@
         <li><b>Someone lost access</b> — send a new password link from <i>Users</i>. Disabling a person signs them out everywhere at once.</li>
         <li><b>The setup wizard or AI settings are missing</b> — your account needs the <i>Operator (IT)</i> role. Lisa refuses changes that would leave nobody able to manage users or run setup. If you are locked out anyway, on the server run:<br><code>docker compose exec webui /app/venv/bin/python -m api.enterprise.recover you@company.com</code></li>
         <li><b>Lisa does not answer</b> — check <i>Status</i>: the gateway must be "ok". After the wizard's Apply it restarts for about 20 seconds.</li>
+        <li><b>An e-mail account shows "Needs attention"</b> — the message under it says why: usually the password was changed or an app password was revoked. Remove the account and add it again with the new password.</li>
         <li><b>The vault shows "Not synced"</b> — the message under it says why: usually Lisa's deploy key was not added to the repository, or the access token expired. Fix it and press <i>Sync now</i>.</li>
       </ul>
     </section>
@@ -463,7 +523,7 @@
     document.querySelectorAll(`#${id} [data-need]`).forEach((el) => { el.hidden = !can(el.dataset.need); });
     window.scrollTo(0, 0);
     ({ users: loadUsers, roles: loadRoles, audit: loadAudit, knowledge: loadKnowledge,
-       account: () => { loadTelegram(); loadIntegrations(); } })[id]?.()?.catch?.((e) => toast(e.message, true));
+       account: () => { loadTelegram(); loadIntegrations(); if (can('integration.email')) loadMail(); } })[id]?.()?.catch?.((e) => toast(e.message, true));
   }
 
   // ── My account ──
@@ -498,7 +558,95 @@
   $('c-remove').onclick = (e) => busy(e.currentTarget, async () => { await api('/api/enterprise/integrations/clickup', { token: null }); toast('Personal ClickUp token removed.'); loadIntegrations(); });
   { const q = new URLSearchParams(location.search);
     if (q.get('error')) setTimeout(() => toast(q.get('error'), true), 300);
-    if (q.get('connected') === 'google') setTimeout(() => toast('Google connected.'), 300); }
+    if (q.get('connected') === 'google') setTimeout(() => toast('Google connected.'), 300);
+    else if (q.get('connected')) setTimeout(() => toast(`${q.get('connected')} connected.`), 300); }
+  // ── E-mail accounts ──
+  const ALLOW = { read: 'Read only', draft: 'Read and write drafts', send: 'Read, drafts and send' };
+  const KIND = { google: 'Gmail', microsoft: 'Microsoft 365', imap: 'E-mail' };
+  let mailData = null, mailKind = 'imap';
+  function mailRow(a, shared) {
+    const state = a.last_error ? `<span class="badge err">Needs attention</span> ${esc(a.last_error)}` : '<span class="badge ok">Connected</span>';
+    const how = shared
+      ? `<span class="badge">${esc(ALLOW[a.level])}</span>`
+      : `<select data-mail-allow="${esc(a.id)}" aria-label="What Lisa may do in ${esc(a.address)}">${Object.entries(ALLOW).map(([k, v]) => `<option value="${k}"${a.allow === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+         ${a.is_default ? '<span class="badge role">Default</span>' : `<button class="btn sm" data-mail-default="${esc(a.id)}">Make default</button>`}
+         <button class="btn sm" data-mail-check="${esc(a.id)}">Check</button><button class="btn sm danger" data-mail-remove="${esc(a.id)}">Remove</button>`;
+    return `<div class="conn"><div class="what"><b>${esc(a.label)}</b> <span class="badge">${esc(KIND[a.kind] || a.kind)}</span>${shared ? ' <span class="badge">Team mailbox</span>' : ''}
+      <span>${esc(a.address)}</span><span>${state}</span></div><div class="how">${how}</div></div>`;
+  }
+  async function loadMail() {
+    mailData = await api('/api/enterprise/mail/accounts');
+    const own = mailData.accounts.filter((a) => !a.shared), team = mailData.accounts.filter((a) => a.shared);
+    $('mail-list').innerHTML = mailData.accounts.length ? own.map((a) => mailRow(a, false)).join('') + team.map((a) => mailRow(a, true)).join('')
+      : empty('No e-mail account yet', 'Add your work mailbox first; you can add more (personal, other companies) any time.');
+    setMailKind(mailKind);
+  }
+  function setMailKind(kind) {
+    const p = (mailData && mailData.providers) || {};
+    mailKind = kind;
+    $('mail-kind').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
+    $('mail-form').querySelectorAll('[data-for="imap"]').forEach((el) => { el.hidden = kind !== 'imap'; });
+    const hints = {
+      google: p.google ? 'You sign in with Google in the next step. Lisa only gets access to Gmail.' : 'Not available yet: the administrator has to add Google in the setup wizard. You can still add Gmail under "Other e-mail" with an app password.',
+      microsoft: p.microsoft ? `Your work mailbox ${mailData.own_email} through the company's Microsoft 365. No password needed.` : 'Not available yet: the administrator has to add Microsoft 365 in the setup wizard.',
+      imap: 'Works with almost every provider (GMX, WEB.DE, IONOS, Yahoo, iCloud, Gmail, company mail servers). Lisa finds the server settings herself.' };
+    $('mail-kind-hint').textContent = hints[kind];
+    $('mail-connect').disabled = (kind === 'google' && !p.google) || (kind === 'microsoft' && !p.microsoft);
+    $('mail-connect').textContent = kind === 'google' ? 'Continue to Google' : 'Connect';
+  }
+  $('mail-kind').onclick = (e) => { const b = e.target.closest('button[data-kind]'); if (b) setMailKind(b.dataset.kind); };
+  $('mail-add').onclick = () => { $('mail-form').hidden = false; $('mail-add-row').hidden = true; setMailKind(mailKind); $('mail-address').focus(); };
+  $('mail-cancel').onclick = () => { $('mail-form').hidden = true; $('mail-add-row').hidden = false; $('mail-password').value = ''; };
+  $('mail-connect').onclick = (e) => busy(e.currentTarget, async () => {
+    const label = $('mail-label').value.trim() || 'Work', allow = $('mail-allow').value;
+    if (mailKind === 'google') { location.href = `/api/enterprise/mail/google/start?label=${encodeURIComponent(label)}&allow=${allow}`; return; }
+    if (mailKind === 'microsoft') { await api('/api/enterprise/mail/accounts/microsoft', { label, allow }); }
+    else {
+      const adv = $('mail-imap-host').value.trim();
+      const settings = adv ? { imap_host: adv, imap_port: Number($('mail-imap-port').value) || 993, smtp_host: $('mail-smtp-host').value.trim() || adv,
+        smtp_port: Number($('mail-smtp-port').value) || 587, username: $('mail-user').value.trim(),
+        imap_security: $('mail-imap-sec').value || undefined, smtp_security: $('mail-smtp-sec').value || undefined } : null;
+      $('mail-connect').textContent = 'Checking the mailbox…';
+      await api('/api/enterprise/mail/accounts/imap', { address: $('mail-address').value.trim(), password: $('mail-password').value, label, allow, settings });
+    }
+    toast('Connected. Lisa can use this mailbox from your next message.');
+    $('mail-password').value = ''; $('mail-address').value = ''; $('mail-cancel').click(); loadMail();
+  }).finally(() => setMailKind(mailKind));
+  $('mail-list').addEventListener('change', (e) => { const s = e.target.closest('[data-mail-allow]'); if (!s) return;
+    busy(s, async () => { await api('/api/enterprise/mail/accounts/update', { id: s.dataset.mailAllow, allow: s.value }); toast('Saved.'); }); });
+  $('mail-list').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.mailDefault) busy(b, async () => { await api('/api/enterprise/mail/accounts/update', { id: b.dataset.mailDefault, is_default: true }); loadMail(); });
+    if (b.dataset.mailCheck) busy(b, async () => { const r = await api('/api/enterprise/mail/accounts/check', { id: b.dataset.mailCheck });
+      toast(r.account.last_error ? r.account.last_error : 'Works.', !!r.account.last_error); loadMail(); });
+    if (b.dataset.mailRemove) busy(b, async () => { if (!confirm('Remove this account from Lisa? The mailbox itself is not touched.')) return;
+      await api('/api/enterprise/mail/accounts/remove', { id: b.dataset.mailRemove }); toast('Removed.'); loadMail(); }); });
+
+  // ── Team mailboxes (administrator) ──
+  async function loadShared() {
+    const r = await api('/api/enterprise/mail/shared');
+    const roles = (rolesData ? rolesData.roles : []).filter((x) => x.key !== 'operator');
+    if (!$('sh-roles').children.length) $('sh-roles').innerHTML = roles.map((x) => `<label class="chip-toggle"><input type="checkbox" value="${esc(x.key)}"${['staff', 'manager'].includes(x.key) ? ' checked' : ''}>${esc(x.name)}</label>`).join('');
+    $('sh-kind').querySelector('[value="microsoft"]').disabled = !r.providers.microsoft;
+    $('shared-list').innerHTML = r.shared.length ? r.shared.map((a) => `<div class="conn"><div class="what"><b>${esc(a.label)}</b> <span class="badge">${esc(KIND[a.kind])}</span>
+      <span>${esc(a.address)}</span><span>${a.last_error ? `<span class="badge err">Needs attention</span> ${esc(a.last_error)}` : '<span class="badge ok">Connected</span>'}
+      · ${esc(ALLOW[a.allow])} · ${a.grants.map((g) => esc(g.principal_type === 'role' ? roleName(g.principal_id) : ((usersCache.find((u) => u.id === g.principal_id) || {}).display_name || g.principal_id))).join(', ') || 'nobody yet'}</span></div>
+      <div class="how"><button class="btn sm" data-sh-check="${esc(a.id)}">Check</button><button class="btn sm danger" data-sh-remove="${esc(a.id)}">Remove</button></div></div>`).join('')
+      : empty('No team mailbox', 'Add info@ or support@ below if several people answer it.');
+  }
+  $('sh-kind').onchange = () => { $('sh-password-field').hidden = $('sh-kind').value !== 'imap'; };
+  $('sh-add').onclick = (e) => busy(e.currentTarget, async () => {
+    const allow = $('sh-allow').value;
+    const grants = [...$('sh-roles').querySelectorAll('input:checked')].map((c) => ({ principal_type: 'role', principal_id: c.value, level: allow }));
+    await api('/api/enterprise/mail/shared', { kind: $('sh-kind').value, address: $('sh-address').value.trim(), password: $('sh-password').value,
+      label: $('sh-label').value.trim(), allow, grants });
+    $('sh-address').value = ''; $('sh-password').value = ''; toast('Team mailbox added.'); loadShared();
+  });
+  $('shared-list').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.shCheck) busy(b, async () => { const r = await api('/api/enterprise/mail/shared/check', { id: b.dataset.shCheck });
+      toast(r.account.last_error || 'Works.', !!r.account.last_error); loadShared(); });
+    if (b.dataset.shRemove) busy(b, async () => { if (!confirm('Remove this team mailbox from Lisa? The mailbox itself is not touched.')) return;
+      await api('/api/enterprise/mail/shared/remove', { id: b.dataset.shRemove }); toast('Removed.'); loadShared(); }); });
+
   $('logout').onclick = async () => { await api('/api/enterprise/logout', {}); location.href = '/login'; };
 
   // ── Users ──
@@ -510,6 +658,7 @@
   async function loadUsers() {
     const [{ users }, roles] = await Promise.all([api('/api/enterprise/users'), api('/api/enterprise/roles')]);
     rolesData = roles; usersCache = users;
+    if (can('org.settings.manage')) loadShared().catch((e) => toast(e.message, true));
     $('nu-role').innerHTML = roles.roles.map((r) => `<option value="${esc(r.key)}"${r.key === 'staff' ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
     $('user-count').textContent = users.length;
     if (!users.length) { $('user-table').innerHTML = `<tr><td>${empty('Nobody yet', 'Add the first person above.')}</td></tr>`; return; }
@@ -735,7 +884,7 @@
   $('src-url').addEventListener('input', () => { const k = urlKind($('src-url').value.trim()); $('src-ssh').hidden = k !== 'ssh' || !srcState.publicKey; $('src-https').hidden = k !== 'https'; });
   $('src-copykey').onclick = () => navigator.clipboard.writeText($('src-pubkey').value).then(() => toast('Key copied.'));
   $('src-add').onclick = () => { srcState = { id: null, credential_id: null, preview: null };
-    $('src-url').value = ''; $('src-branch').value = 'main'; $('src-token').value = ''; $('src-ssh').hidden = $('src-https').hidden = true; srcStep(1); $('src-url').focus(); };
+    $('src-url').value = ''; $('src-branch').value = 'main'; $('src-interval').value = '15'; $('src-token').value = ''; $('src-ssh').hidden = $('src-https').hidden = true; srcStep(1); $('src-url').focus(); };
   $('src-cancel').onclick = () => srcStep(0);
   $('src-back').onclick = () => srcStep(1);
   function readersFor(areaKey, fallback) {
@@ -802,7 +951,8 @@
     'user.enabled': 'Person enabled', 'user.roles_changed': 'Roles changed', 'user.password_set': 'Password set', 'user.password_link_issued': 'Password link created',
     'setup.completed': 'Organisation created', 'org.setup.applied': 'Setup wizard applied', 'authz.denied': 'Access denied', 'role.updated': 'Role changed',
     'role.created': 'Role created', 'role.deleted': 'Role deleted', 'knowledge.area_saved': 'Knowledge area saved', 'knowledge.imported': 'Notes imported',
-    'user.recovered': 'Access restored from the server' };
+    'user.recovered': 'Access restored from the server', 'mail.account_added': 'E-mail account added', 'mail.account_removed': 'E-mail account removed',
+    'mail.account_changed': 'E-mail account changed', 'mail.account_renewed': 'E-mail account renewed', 'mail.draft_created': 'E-mail draft written', 'mail.sent': 'E-mail sent', 'org.assistants_refreshed': 'Assistants refreshed after an update' };
   async function loadAudit() {
     const o = await api('/api/enterprise/ops');
     const cells = [['Gateway', o.gateway], ['Active people', o.users.active], ['Disabled people', o.users.disabled],

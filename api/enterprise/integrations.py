@@ -34,7 +34,7 @@ GOOGLE_SCOPES = [
 ]
 GOOGLE_TOKEN = "google_token.json"
 CLICKUP_KEY = "CLICKUP_API_TOKEN"
-_PENDING: dict[str, tuple[str, str, float]] = {}  # state -> (user_id, code_verifier, expires)
+_PENDING: dict[str, tuple[str, str, float, dict | None]] = {}  # state -> (user_id, verifier, expires, purpose)
 _LOCK = threading.Lock()
 _CLICKUP_TOKEN = re.compile(r"^pk_[A-Za-z0-9_]{10,200}$")
 
@@ -65,7 +65,9 @@ def google_redirect_uri() -> str:
     return f"{base}/api/enterprise/google/callback"
 
 
-def google_start(user_id: str) -> str:
+def google_start(user_id: str, scopes: list[str] | None = None, purpose: dict | None = None) -> str:
+    """Start a Google sign-in. ``purpose`` None = the person's Google tools (Calendar, Docs, …);
+    a mail purpose adds a Gmail account (``mail.google_finish``) with only the Gmail scope."""
     client = _google_client()
     state, verifier = secrets.token_urlsafe(24), secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
@@ -73,18 +75,21 @@ def google_start(user_id: str) -> str:
         now = time.time()
         for key in [k for k, v in _PENDING.items() if v[2] < now]:
             _PENDING.pop(key, None)
-        _PENDING[state] = (user_id, verifier, now + 600)
+        _PENDING[state] = (user_id, verifier, now + 600, purpose)
     params = {"client_id": client["client_id"], "redirect_uri": google_redirect_uri(), "response_type": "code",
-              "scope": " ".join(GOOGLE_SCOPES), "access_type": "offline", "prompt": "consent",
+              "scope": " ".join(scopes or GOOGLE_SCOPES), "access_type": "offline", "prompt": "consent",
               "include_granted_scopes": "true", "state": state, "code_challenge": challenge,
               "code_challenge_method": "S256"}
     return client.get("auth_uri", "https://accounts.google.com/o/oauth2/auth") + "?" + urllib.parse.urlencode(params)
 
 
-def google_finish(user_id: str, profile: str, state: str, code: str) -> None:
-    """Exchange the code; the state must have been issued to this same signed-in user."""
+def google_exchange(user_id: str, state: str, code: str) -> tuple[dict, dict | None]:
+    """Exchange the code; the state must have been issued to this same signed-in user.
+    Returns the tokens and the purpose the sign-in was started for."""
     with _LOCK:
-        pending = _PENDING.pop(state or "", None)
+        pending = _PENDING.get(state or "")
+        # only its own user consumes a sign-in: someone replaying another person's state burns nothing
+        pending = _PENDING.pop(state) if pending is not None and pending[0] == user_id else None
     if pending is None or pending[0] != user_id or pending[2] < time.time() or not code:
         raise DirectoryError("This Google sign-in was not started from your Lisa account, or it expired.")
     client = _google_client()
@@ -98,6 +103,13 @@ def google_finish(user_id: str, profile: str, state: str, code: str) -> None:
         tokens = json.loads(r.read())
     if not tokens.get("refresh_token"):
         raise DirectoryError("Google did not grant offline access; remove Lisa in your Google account and retry.")
+    tokens["_client"], tokens["_token_uri"] = client, token_uri
+    return tokens, pending[3]
+
+
+def google_save_tools_token(profile: str, tokens: dict) -> None:
+    """The Google tools' token goes only into the person's own profile."""
+    client, token_uri = tokens["_client"], tokens["_token_uri"]
     granted = str(tokens.get("scope") or " ".join(GOOGLE_SCOPES)).split()
     payload = {"type": "authorized_user", "client_id": client["client_id"], "client_secret": client["client_secret"],
                "refresh_token": tokens["refresh_token"], "token": tokens.get("access_token", ""),
@@ -105,6 +117,16 @@ def google_finish(user_id: str, profile: str, state: str, code: str) -> None:
     path = provisioner._home(profile) / GOOGLE_TOKEN
     path.write_text(json.dumps(payload))
     path.chmod(0o600)
+
+
+def google_finish(user_id: str, profile: str, state: str, code: str) -> dict | None:
+    """Finish a sign-in started from Lisa. The Google tools' token is saved in the profile; a mail
+    sign-in returns its tokens and purpose for ``mail.google_finish`` instead."""
+    tokens, purpose = google_exchange(user_id, state, code)
+    if purpose and purpose.get("mail"):
+        return {"tokens": tokens, "purpose": purpose}
+    google_save_tools_token(profile, tokens)
+    return None
 
 
 def google_connected(profile: str) -> bool:

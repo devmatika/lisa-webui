@@ -70,7 +70,7 @@ def _audit_denied(user, method: str, path: str) -> None:
 def is_public(path: str) -> bool:
     if path in PUBLIC_EXACT or path.startswith(PUBLIC_PREFIXES):
         return True
-    if path.startswith("/api/enterprise/knowledge/agent/"):
+    if path.startswith(("/api/enterprise/knowledge/agent/", "/api/enterprise/mail/agent/")):
         return True  # no browser session: each call proves its profile with that profile's API key
     # Read-only shared transcripts by token; creating/revoking a share needs a session.
     return path.startswith("/api/share/") and path not in ("/api/share/create", "/api/share/revoke")

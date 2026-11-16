@@ -173,8 +173,7 @@ def test_google_connect_binds_state_to_the_user_and_writes_only_their_profile(ho
     assert q["access_type"] == ["offline"] and q["code_challenge_method"] == ["S256"]
     with pytest.raises(integrations.DirectoryError):  # someone else's session cannot use anna's state
         integrations.google_finish("ben-id", "u-ben", q["state"][0], "code")
-    url = integrations.google_start("anna-id")
-    state = parse_qs(urlparse(url).query)["state"][0]
+    state = q["state"][0]  # ...and does not burn it: anna still finishes her own sign-in
     integrations.google_finish("anna-id", "u-anna", state, "code")
     token = json.loads((homes / "profiles" / "u-anna" / "google_token.json").read_text())
     assert token["refresh_token"] == "rt" and token["type"] == "authorized_user"

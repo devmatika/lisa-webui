@@ -26,6 +26,9 @@ import yaml
 logger = logging.getLogger(__name__)
 
 SURFACES = ("cli", "telegram", "api_server")
+# Bump when what a profile gets changes (new tools, settings): on the next start Lisa rebuilds every
+# assistant once, so an upgrade needs no "Apply" in the setup wizard. 2 = mail tools.
+PROFILE_LAYOUT = 2
 FRONT_DESK = "front-desk"
 PLUGIN_SOURCE = Path("/opt/lisa/plugins")  # mounted read-only by the Lisa stack
 REQUIRED_PLUGINS = ("org-authz",)
@@ -49,6 +52,9 @@ INTEGRATIONS = {
                                     "MS_GRAPH_AUTH_MODE"), "user_files": (), "user_env": (),
                             # app-level Graph access can read any mailbox: pin it to the user's own
                             "settings": lambda email: {"account_address": email}},
+    # several mailboxes per person; the tools ask the WebUI, which holds the secrets and checks access
+    "integration.email": {"plugin": "org-authz", "toolset": "lisa_mail", "env": (), "user_files": (),
+                          "user_env": (), "settings": None},
 }
 MEDIA_POLICY = {"profile_isolation": True, "strict": True, "trust_recent_files": False}
 COPIED_CONFIG_KEYS = ("model", "providers", "custom_providers", "fallback_providers", "auxiliary", "timezone")
@@ -126,7 +132,7 @@ def render_config(default_cfg: dict, toolsets: list[str], profile_name: str | No
         cfg["webui_gateway_base_url"] = f"{gateway_url()}/p/{profile_name}"
     cfg["platform_toolsets"] = {surface: _surface_toolsets(toolsets, list(integrations)) for surface in SURFACES}
     cfg["gateway"] = dict(MEDIA_POLICY)
-    plugins = list(REQUIRED_PLUGINS) + [INTEGRATIONS[i]["plugin"] for i in integrations]
+    plugins = list(dict.fromkeys(list(REQUIRED_PLUGINS) + [INTEGRATIONS[i]["plugin"] for i in integrations]))
     cfg["plugins"] = {"enabled": plugins}
     entries = {INTEGRATIONS[i]["plugin"]: {"settings": INTEGRATIONS[i]["settings"](email)}
                for i in integrations if INTEGRATIONS[i]["settings"]}
@@ -143,9 +149,9 @@ def allowed_tools(toolsets: list[str]) -> list[str]:
 
 def _install_plugins(home: Path, integrations: list[str] = ()) -> None:
     import shutil
-    wanted = list(REQUIRED_PLUGINS) + [INTEGRATIONS[i]["plugin"] for i in integrations]
+    wanted = list(dict.fromkeys(list(REQUIRED_PLUGINS) + [INTEGRATIONS[i]["plugin"] for i in integrations]))
     for stale in (home / "plugins").glob("*") if (home / "plugins").is_dir() else []:
-        if stale.name not in wanted and stale.name in {v["plugin"] for v in INTEGRATIONS.values()}:
+        if stale.name not in wanted and stale.name in {v["plugin"] for v in INTEGRATIONS.values()} - set(REQUIRED_PLUGINS):
             shutil.rmtree(stale, ignore_errors=True)  # an integration whose grant was removed
     for name in wanted:
         src = PLUGIN_SOURCE / name
@@ -216,6 +222,8 @@ def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str
     env["API_SERVER_KEY"] = _read_env(home / ".env").get("API_SERVER_KEY") or secrets.token_urlsafe(32)
     if "knowledge" in toolsets:  # where the knowledge tools ask; the WebUI checks the user's area grants
         env["LISA_KNOWLEDGE_URL"] = webui_internal_url()
+    if "integration.email" in integrations:  # where the mail tools ask; the WebUI checks the accounts
+        env["LISA_WEBUI_URL"] = webui_internal_url()
     _write_private(home / ".env", "".join(f"{k}={v}\n" for k, v in env.items()))
     _install_plugins(home, integrations)
     _write_allowlist(home, toolsets, integrations)
@@ -261,6 +269,6 @@ def _invalidate_webui_profile_cache() -> None:
     _invalidate_list_profiles_cache()
 
 
-__all__ = ["profile_name_for", "provision", "ensure_front_desk", "restart_gateway", "root_home",
+__all__ = ["PROFILE_LAYOUT", "profile_name_for", "provision", "ensure_front_desk", "restart_gateway", "root_home",
            "park", "unpark", "rescan", "render_config", "allowed_tools",
            "assert_own_gateway_route", "ensure_root_gateway_url"]

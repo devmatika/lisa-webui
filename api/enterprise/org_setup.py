@@ -84,3 +84,36 @@ def after_org_setup(handler) -> dict:
 
     threading.Thread(target=refresh, name="lisa-org-refresh", daemon=True).start()
     return {"refreshing": len(user_ids), "gateway_restart": True}
+
+
+def refresh_after_upgrade() -> threading.Thread | None:
+    """Rebuild every assistant once when this version's profile layout is newer than the one they were
+    built with (e.g. new tools), in the background; then record the layout. No gateway restart:
+    the rebuilt profiles are picked up by the gateway's rescan."""
+    from api.enterprise.models import Organization
+    from api.enterprise.routes import _provision
+    with edb.session() as db:
+        org = db.scalar(select(Organization))
+        if org is None or (org.settings or {}).get("profile_layout") == provisioner.PROFILE_LAYOUT:
+            return None
+        user_ids = list(db.scalars(select(User.id).where(User.hermes_profile.is_not(None), User.status == "active")))
+
+    def refresh() -> None:
+        failed = 0
+        for user_id in user_ids:
+            try:
+                _provision(user_id)
+            except Exception:
+                failed += 1
+                logger.exception("Refreshing assistant of user %s after an upgrade failed", user_id)
+        if failed:
+            return  # tried again on the next start
+        with edb.session() as db:
+            org = db.scalar(select(Organization))
+            org.settings = {**(org.settings or {}), "profile_layout": provisioner.PROFILE_LAYOUT}
+            directory.audit(db, directory.Actor(None, "upgrade"), "org.assistants_refreshed", "",
+                            assistants=len(user_ids), layout=provisioner.PROFILE_LAYOUT)
+
+    thread = threading.Thread(target=refresh, name="lisa-upgrade-refresh", daemon=True)
+    thread.start()
+    return thread

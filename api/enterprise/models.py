@@ -189,7 +189,7 @@ class KnowledgeSource(Base):
     branch: Mapped[str] = mapped_column(String(200), default="main")
     credential_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     folders: Mapped[dict] = mapped_column(JSON, default=dict)
-    interval_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=15)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_commit: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -198,6 +198,39 @@ class KnowledgeSource(Base):
 
 
 Index("ix_one_time_tokens_purpose_user", OneTimeToken.purpose, OneTimeToken.user_id)
+class MailAccount(Base):
+    """An e-mail account Lisa may use: a person's own (``owner_id``) or a shared mailbox the
+    administrator grants to roles or people (``owner_id`` None, access in ``mail_grants``).
+
+    kind: imap (IMAP + SMTP), google (Gmail API, the person's own Google sign-in) or microsoft (the
+    organisation's Microsoft 365 app, pinned to ``address``). ``allow`` caps what Lisa may do with it:
+    read < draft < send; every send is still confirmed by the person in the chat. Passwords and tokens
+    live on disk (``<knowledge dir>/.mail/<id>.json``), never in the database."""
+    __tablename__ = "mail_accounts"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    owner_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    address: Mapped[str] = mapped_column(String(320))
+    label: Mapped[str] = mapped_column(String(60))
+    display_name: Mapped[str] = mapped_column(String(200), default="")
+    settings: Mapped[dict] = mapped_column(JSON, default=dict)
+    allow: Mapped[str] = mapped_column(String(8), default="draft")
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MailGrant(Base):
+    """Who may use a shared mailbox. principal_type: user | role. level: read < draft < send."""
+    __tablename__ = "mail_grants"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("mail_accounts.id", ondelete="CASCADE"), index=True)
+    principal_type: Mapped[str] = mapped_column(String(16))
+    principal_id: Mapped[str] = mapped_column(String(64))
+    level: Mapped[str] = mapped_column(String(8))
+
+
 __all__ = ["Base", "Organization", "Department", "Role", "RolePermission", "RoleTemplate", "User",
-           "UserRole", "AuthSession", "OneTimeToken", "LoginAttempt", "AuditEvent", "TelegramLink", "KnowledgeArea", "AreaGrant", "KnowledgeDraft", "KnowledgeGap", "KnowledgeSource",
+           "UserRole", "AuthSession", "OneTimeToken", "LoginAttempt", "AuditEvent", "TelegramLink", "KnowledgeArea", "AreaGrant", "KnowledgeDraft", "KnowledgeGap", "KnowledgeSource", "MailAccount", "MailGrant",
            "utcnow"]

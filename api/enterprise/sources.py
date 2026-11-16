@@ -247,7 +247,7 @@ def _kept_grants(db, key: str, readers: set[str]) -> list[dict]:
 
 
 def save_source(db, actor: Actor, *, source_id: str | None, name: str, url: str, branch: str,
-                credential_id: str | None, folders: list[dict], interval_minutes: int = 60) -> KnowledgeSource:
+                credential_id: str | None, folders: list[dict], interval_minutes: int = 15) -> KnowledgeSource:
     """Create or update a source and its areas.
 
     folders: [{folder ("" = repository root), include, key, name, readers: [role keys]}]. Included
@@ -287,7 +287,7 @@ def save_source(db, actor: Actor, *, source_id: str | None, name: str, url: str,
         src.name, src.url, src.branch, src.folders = (name or src.name).strip(), url, branch or src.branch, mapping
         if credential_id:
             src.credential_id = credential_id
-    src.interval_minutes = max(15, min(int(interval_minutes or 60), 24 * 60))
+    src.interval_minutes = max(15, min(int(interval_minutes or 15), 24 * 60))
     db.flush()
     audit(db, actor, "knowledge.source_saved", src.id, url=url, branch=src.branch,
           folders={k: v for k, v in mapping.items()})

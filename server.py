@@ -576,6 +576,8 @@ def _start_enterprise() -> None:
             ensure_front_desk()
             from api.enterprise.sources import start_scheduler
             start_scheduler()  # company vaults (Git) are pulled on their interval
+            from api.enterprise.org_setup import refresh_after_upgrade
+            refresh_after_upgrade()  # an upgrade that brings new tools reaches every assistant
             print(f'[ok] Lisa Enterprise: database at revision {revision}', flush=True)
             return
         except Exception as exc:
