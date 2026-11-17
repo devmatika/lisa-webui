@@ -341,12 +341,14 @@
     <div class="page-head"><h1>Company knowledge</h1><p>Shared workflows, guidelines and know-how. Lisa answers from the areas a person may read.</p></div>
     <section class="card" id="vault-card" data-need="knowledge.manage">
       <h2>Company vault <span class="badge">Obsidian · Git</span></h2>
-      <p class="sub">Connect the company's Obsidian vault (a Git repository on GitLab, GitHub or your own server). Every
-        folder becomes an area, you choose who may read each one, and Lisa keeps it up to date by herself. She only
-        reads — she never changes the vault.</p>
+      <p class="sub">Connect the company's Obsidian vault — the <b>same Git repository</b> ops bind-mount for shared
+        Files / Fireflies promote (not a second copy). Every folder becomes an area, you choose who may read each one,
+        and Lisa keeps it up to date by herself. She only reads — she never changes the vault. Leave Inbox, Templates,
+        Archive and <code>files/</code> unticked; they are ops folders, not Knowledge areas.</p>
       <div class="callout" id="src-standard"><svg class="i"><use href="#i-info"/></svg><div>Lisa starts with the standard folders <b>01-People, 02-Companies,
         03-Projects, 04-Meetings, 05-Decisions, 06-Knowledge, 07-Daily, 08-Team-Briefing</b>, each with its access already
-        set. Use the same folder names in your vault and that access carries over. No vault yet?
+        set. Use the same folder names in your vault and that access carries over. One company vault for everyone —
+        people do not need their own Obsidian with this structure. No vault yet?
         <a href="/api/enterprise/knowledge/starter.zip" download>Download the starter vault</a>, put it in a private
         GitLab or GitHub repository and connect it here.</div></div>
       <div id="src-list"></div>
@@ -447,11 +449,13 @@
         <li><b>Your accounts</b> — if your role allows it, connect Google (mail, calendar, docs) under <i>My account</i>. ClickUp usually works without setup: Lisa finds the tasks assigned to your e-mail address.</li>
         <li><b>E-mail</b> — under <i>My account → E-mail accounts</i> add every mailbox you want help with: your work mailbox, a personal Gmail, an account at another company. Give each a name ("Work", "Personal") and choose what Lisa may do: read, write drafts, or also send. Then just ask: "anything new in my personal mail?", "answer the roofer from my work account". Every e-mail is shown to you before it leaves. Gmail, GMX, WEB.DE, Yahoo and iCloud need an <i>app password</i> (made in the provider's security settings), not your normal password.</li>
         <li><b>Company knowledge</b> — ask Lisa "how do we …?". She answers from the areas you may read and tells you when she does not know. To read the notes yourself, open the <i>Knowledge</i> tab in the chat's Workspace panel (next to Files): only the areas you may read are listed. Under <i>Knowledge</i> you can search yourself and <i>Teach Lisa</i>: your suggestion is published after an approver checks it.</li>
+        <li><b>Your Files</b> — the Files tab is your private Hermes workspace (drafts and working files). It is not the company Obsidian PARA tree. Company notes live in Knowledge; only editors maintain the shared vault.</li>
       </ol>
       <h3>Good to know</h3>
       <ul>
         <li>Lisa remembers things you tell her ("remember that …"); you can review that memory in the chat settings.</li>
         <li>Before Lisa sends an e-mail or creates something in another system, she asks you to confirm.</li>
+        <li>You do not need your own Obsidian with the company folders. A personal Obsidian is optional for private notes only — do not clone the company PARA structure.</li>
         <li>Missing something? Ask your administrator — your role decides which features you see.</li>
       </ul>
     </section>
@@ -461,7 +465,7 @@
         <li><b>Run the setup wizard</b> (button at the top) once: company, AI model for everyone, company tools (Telegram bot, Google, Microsoft 365, ClickUp), company knowledge and your team. Press <i>Apply</i> at the end: every assistant is refreshed and Lisa is back within about 20 seconds.</li>
         <li><b>Add people</b> under <i>Users</i> with a role. Send them the password link (or it is e-mailed automatically when e-mail is configured).</li>
         <li><b>Adjust roles</b> under <i>Roles</i>: what each role's assistant may do and which company tools it may use. The built-in roles are a good start: <i>Staff</i> for most people, <i>Manager</i> to approve knowledge, <i>Administrator</i> for people management, <i>Operator (IT)</i> for the setup wizard, AI model and server settings.</li>
-        <li><b>Connect the company vault</b> under <i>Knowledge → Company vault</i>: paste the Git address of the Obsidian vault, give Lisa read access (her key as a GitLab/GitHub deploy key, or a read-only token), then tick per folder who may read it — e.g. <i>Knowledge</i> for everyone, <i>Projects</i> for managers only. Lisa updates it by herself every 15 minutes (change it under <i>Folders &amp; access</i>, or press <i>Sync now</i>); nobody needs their own Obsidian.</li>
+        <li><b>Connect the company vault</b> under <i>Knowledge → Company vault</i>: paste the Git address of the <b>same</b> Obsidian repository the shared profile Files / Fireflies promote use, give Lisa read access (her key as a GitLab/GitHub deploy key, or a read-only token), then tick the standard PARA folders and who may read each — e.g. <i>Knowledge</i> for everyone, <i>Projects</i> for managers only. Leave Inbox / Templates / Archive / <code>files</code> off. Lisa updates it by herself every 15 minutes (change it under <i>Folders &amp; access</i>, or press <i>Sync now</i>). Do not create a company PARA Obsidian per employee.</li>
         <li><b>Team mailboxes</b> such as info@ or support@: add them under <i>Users → Team mailboxes</i> and tick the roles that work on them. Everyone else never sees them.</li>
         <li><b>Watch</b> <i>Status & audit log</i>: failed logins, denied requests and every change are recorded.</li>
       </ol>
@@ -472,7 +476,7 @@
         <li><b>Microsoft 365 / Outlook</b>: one company app; each person can add only their own work mailbox, shared mailboxes only an administrator can add.</li>
         <li><b>E-mail</b>: each person adds as many accounts as they like (Gmail via Google sign-in, Microsoft 365, any other provider via IMAP). Passwords stay in Lisa's server, never in anyone's assistant, and Lisa checks on every request which mailboxes a person may use.</li>
         <li><b>ClickUp</b>: connected once with a company token; each person sees the tasks assigned to their e-mail. A personal token is optional.</li>
-        <li><b>Knowledge</b>: one company vault, split into areas with their own access.</li>
+        <li><b>Knowledge</b>: one company vault (same Git remote as shared Files), split into areas with their own access. Staff and Viewer may read granted areas (<code>knowledge.read</code>); only Administrators manage the vault connection (<code>knowledge.manage</code>). Personal Files stay per-user Hermes workspaces.</li>
       </ul>
       <h3>Troubleshooting</h3>
       <ul>
@@ -698,8 +702,8 @@
   });
 
   // ── Roles ──
-  const ROLE_DESC = { viewer: 'Asks questions and reads company knowledge.', staff: 'The everyday assistant for most people.',
-    manager: 'Staff, plus approving company knowledge.', admin: 'Manages people, roles and company knowledge. No server access.',
+  const ROLE_DESC = { viewer: 'Asks questions and reads company knowledge (no personal company Obsidian needed).', staff: 'Everyday assistant: private Files workspace + company Knowledge read/contribute.',
+    manager: 'Staff, plus approving company knowledge.', admin: 'Manages people, roles and the company vault connection. No server access.',
     operator: 'IT: setup wizard, AI model, plugins and server settings.' };
   const GROUPS = [
     ['Assistant', 'What every assistant of this role can do.', (k) => ['chat.use', 'memory.own', 'files.workspace', 'cron.own', 'share.create', 'kanban.use'].includes(k)],

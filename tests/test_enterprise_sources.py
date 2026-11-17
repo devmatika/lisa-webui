@@ -40,7 +40,9 @@ def ent(tmp_path, monkeypatch, request):
     for rel, text in {"README.md": "# Company brain", "01-People/Anna.md": "# Anna\nSales lead",
                       "03-Projects/Hotel.md": "# Hotel pilot\nconfidential budget",
                       "06-Knowledge/Holidays.md": "# Holidays\nTwo weeks ahead",
-                      "90-Templates/Meeting.md": "# Template", ".obsidian/app.md": "x"}.items():
+                      "90-Templates/Meeting.md": "# Template",
+                      "files/offers/note.md": "# Offer draft\nnot knowledge",
+                      ".obsidian/app.md": "x"}.items():
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
         (repo / rel).write_text(text)
     _git(repo, "init", "-q", "-b", "main")
@@ -75,9 +77,9 @@ def test_the_vault_becomes_areas_with_their_own_readers_and_stays_in_sync(ent):
     url = f"file://{repo}"
     pre = sources.preview(url, "main", None)
     by = {f["folder"]: f for f in pre["folders"]}
-    assert set(by) == {"01-People", "03-Projects", "06-Knowledge", "90-Templates"} and pre["root_notes"] == 1
+    assert set(by) == {"01-People", "03-Projects", "06-Knowledge", "90-Templates", "files"} and pre["root_notes"] == 1
     assert by["03-Projects"]["key"] == "projects" and by["03-Projects"]["name"] == "Projects"
-    assert by["06-Knowledge"]["suggested"] and not by["90-Templates"]["suggested"]
+    assert by["06-Knowledge"]["suggested"] and not by["90-Templates"]["suggested"] and not by["files"]["suggested"]
     folders = [{"folder": "06-Knowledge", "include": True, "readers": ["staff", "manager"]},
                {"folder": "03-Projects", "include": True, "readers": ["manager"]},
                {"folder": "", "include": True, "key": "general", "name": "General", "readers": ["staff", "manager"]},

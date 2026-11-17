@@ -30,10 +30,10 @@ PERMISSIONS = {
     "integration.google": "Use Google Calendar/Docs/Drive with their own connected Google account",
     "integration.outlook": "Use Outlook mail tools on their own mailbox (Microsoft 365)",
     "integration.clickup": "Use ClickUp with their own personal ClickUp token",
-    "knowledge.read": "Search company knowledge areas they are granted",
+    "knowledge.read": "Search company knowledge areas they are granted (one shared vault; not a personal Obsidian)",
     "knowledge.contribute": "Submit knowledge drafts",
     "knowledge.approve": "Approve and publish knowledge drafts",
-    "knowledge.manage": "Create knowledge areas and decide who may read, contribute or approve",
+    "knowledge.manage": "Connect the company vault and decide who may read, contribute or approve (admin-only)",
     "org.users.manage": "Create, disable and edit users",
     "org.roles.manage": "Create and edit roles and their permissions",
     "org.audit.read": "Read the audit log",
@@ -42,6 +42,8 @@ PERMISSIONS = {
         "terminal", "git", "mcp", "providers", "settings", "profiles", "updates", "extensions", "gateway",
         "logs", "system", "setup", "skills")},
 }
+# files.workspace = that user's private Hermes workspace only (never the shared company vault).
+# knowledge.read on viewer + staff so they can ask company questions; knowledge.manage stays admin-only.
 _STAFF = ["chat.use", "memory.own", "files.workspace", "cron.own", "share.create", "integration.email",
           "knowledge.read", "knowledge.contribute"]
 _MANAGER = _STAFF + ["knowledge.approve"]  # no kanban.use: Hermes boards are host-wide, not per user

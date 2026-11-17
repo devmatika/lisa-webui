@@ -27,9 +27,10 @@ STANDARD_FOLDERS = [
     ("08-Team-Briefing", "team-briefing", "Team briefing", "Team updates and announcements.",
      ["viewer", "staff", "manager"], []),
 ]
-# in the starter vault, never read by Lisa
+# in the starter vault, never read by Lisa (ops / deliverables — not Knowledge areas)
 UNREAD_FOLDERS = [("00-Inbox", "New notes before they are sorted."),
-                  ("90-Templates", "Obsidian templates."), ("99-Archive", "Old notes nobody needs any more.")]
+                  ("90-Templates", "Obsidian templates."), ("99-Archive", "Old notes nobody needs any more."),
+                  ("files", "Offers, HTML/PDF and working deliverables (not searched as Knowledge).")]
 
 
 def standard_grants(readers: list[str], contributors: list[str]) -> list[dict]:
@@ -61,9 +62,12 @@ def starter_vault_zip(org_name: str = "") -> bytes:
         title = f"{org_name} company vault" if org_name else "Company vault"
         rows = "\n".join(f"| `{f}` | {about} |" for f, _k, _n, about, _r, _c in STANDARD_FOLDERS)
         rows += "\n" + "\n".join(f"| `{f}` | {about} Lisa does not read it. |" for f, about in UNREAD_FOLDERS)
-        z.writestr("company-vault/README.md", f"# {title}\n\nOpen this folder in Obsidian, put it in a private "
-                   "Git repository (GitLab or GitHub) and connect that repository in Lisa under Organization → "
-                   "Knowledge → Company vault. Who may read each folder is set there.\n\n| Folder | What "
+        z.writestr("company-vault/README.md", f"# {title}\n\nThis is the **one company vault** (PARA). Open it in "
+                   "Obsidian for editors, put it in a private Git repository, and connect **that same** repository "
+                   "in Lisa under Organization → Knowledge → Company vault. Team members do **not** each need a "
+                   "personal Obsidian with this structure — they use Lisa chat, the Knowledge tab (areas they may "
+                   "read), and their private Hermes Files workspace. A personal Obsidian is optional and free-form; "
+                   "do not clone this PARA tree per person. Who may read each folder is set in Lisa.\n\n| Folder | What "
                    f"belongs there |\n| --- | --- |\n{rows}\n")
         for folder, _k, name, about, _r, _c in STANDARD_FOLDERS:
             z.writestr(f"company-vault/{folder}/{name}.md", f"# {name}\n\n{about}\n")

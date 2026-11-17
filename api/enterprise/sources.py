@@ -46,8 +46,9 @@ _SSH_URL = re.compile(r"^(ssh://[\w.@:/~-]+|[\w.-]+@[\w.-]+:[\w./~-]+)$")
 _HTTPS_URL = re.compile(r"^https://[\w.-]+(:\d+)?/[\w./~%-]+$")
 _BRANCH = re.compile(r"^[\w./-]{1,200}$")
 _CRED = re.compile(r"^[a-f0-9]{32}$")
-# Folders a vault usually keeps for Obsidian itself rather than as knowledge.
-_DEFAULT_EXCLUDED = re.compile(r"(^|-)(templates?|archive|inbox|trash|attachments?)$", re.I)
+# Folders a vault usually keeps for Obsidian / deliverables rather than as Knowledge areas
+# (standard PARA areas are suggested; Inbox/Templates/Archive/files stay ops-only).
+_DEFAULT_EXCLUDED = re.compile(r"(^|-)(templates?|archive|inbox|trash|attachments?|files)$", re.I)
 _locks: dict[str, threading.Lock] = {}
 _again: set[str] = set()
 

@@ -58,7 +58,7 @@
   function areaList() {
     const q = st.filter.trim().toLowerCase();
     if (!st.areas.length) {
-      return '<div class="ck-empty"><b>Nothing to show yet</b>Your role cannot read any company knowledge area, or the company vault is not connected yet.</div>';
+      return '<div class="ck-empty"><b>Nothing to show yet</b>Your role cannot read any company knowledge area, or the company vault is not connected yet. Company notes live here — your Files tab is your private workspace, not a personal copy of the company vault.</div>';
     }
     const sorted = [...st.areas].sort((x, y) => (y.docs.length > 0) - (x.docs.length > 0));  // full areas first
     const blocks = sorted.map((a) => {
