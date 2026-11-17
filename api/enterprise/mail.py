@@ -20,6 +20,7 @@ from pathlib import Path
 from sqlalchemy import select
 
 from api.enterprise import mail_backends as mb
+from api.enterprise import secretbox
 from api.enterprise.directory import Actor, DirectoryError, audit, permissions_of
 from api.enterprise.models import MailAccount, MailGrant, User, utcnow
 
@@ -46,14 +47,12 @@ def _secret_path(account_id: str) -> Path:
 
 
 def _save_secret(account_id: str, secret: dict) -> None:
-    path = _secret_path(account_id)
-    path.write_text(json.dumps(secret))
-    path.chmod(0o600)
+    secretbox.write(_secret_path(account_id), json.dumps(secret).encode())
 
 
 def _secret(account_id: str) -> dict:
     try:
-        return json.loads(_secret_path(account_id).read_text())
+        return json.loads(secretbox.read(_secret_path(account_id)))
     except (OSError, ValueError):
         return {}
 

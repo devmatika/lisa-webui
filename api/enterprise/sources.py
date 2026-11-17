@@ -24,6 +24,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from datetime import timedelta
@@ -31,6 +32,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from api.enterprise import secretbox
 from api.enterprise.directory import Actor, DirectoryError, audit
 from api.enterprise.knowledge import (_SKIPPED_DIRS, MAX_IMPORT_BYTES, MAX_IMPORT_FILES, _area_dir, save_area,
                                       vault_root)
@@ -74,8 +76,9 @@ def new_deploy_key() -> dict:
     cred = secrets.token_hex(16)
     d = _cred_dir(cred)
     d.mkdir(parents=True, mode=0o700)
-    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "lisa-knowledge-read-only",
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "lisa-knowledge",
                     "-f", str(d / "deploy_key")], check=True, timeout=30, capture_output=True)
+    secretbox.upgrade_file(d / "deploy_key")
     return {"credential_id": cred, "public_key": (d / "deploy_key.pub").read_text().strip()}
 
 
@@ -84,9 +87,7 @@ def store_token(token: str, credential_id: str | None = None) -> str:
     cred = credential_id or secrets.token_hex(16)
     d = _cred_dir(cred)
     d.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path = d / "token"
-    path.write_text(token.strip())
-    path.chmod(0o600)
+    secretbox.write(d / "token", token.strip().encode())
     return cred
 
 
@@ -114,19 +115,25 @@ def _git(args: list[str], *, credential_id: str | None, cwd: Path | None = None)
            "GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": str(gitconfig), "LC_ALL": "C"}
     config = ["-c", "protocol.ext.allow=never", "-c", "safe.directory=*", "-c", "core.hooksPath=/dev/null",
               "-c", "core.symlinks=false"]
-    if credential_id:
-        d = _cred_dir(credential_id)
-        if (d / "deploy_key").is_file():
-            env["GIT_SSH_COMMAND"] = (f"ssh -i {d / 'deploy_key'} -o IdentitiesOnly=yes -o BatchMode=yes "
-                                      f"-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile={d / 'known_hosts'}")
-        if (d / "token").is_file():
-            basic = base64.b64encode(b"oauth2:" + (d / "token").read_bytes().strip()).decode()
-            config += ["-c", f"http.extraHeader=Authorization: Basic {basic}"]
-    try:
-        r = subprocess.run(["git", *config, *args], cwd=cwd, env=env, capture_output=True, text=True,
-                           timeout=GIT_TIMEOUT)
-    except subprocess.TimeoutExpired as exc:
-        raise DirectoryError("The repository did not answer in time") from exc
+    with tempfile.TemporaryDirectory(prefix="lisa-git-") as scratch:
+        if credential_id:
+            d = _cred_dir(credential_id)
+            if (d / "deploy_key").is_file():
+                # the key is encrypted at rest; ssh gets a plain copy only for this one command
+                key = Path(scratch) / "key"
+                fd = os.open(key, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, "wb") as f:
+                    f.write(secretbox.read(d / "deploy_key"))
+                env["GIT_SSH_COMMAND"] = (f"ssh -i {key} -o IdentitiesOnly=yes -o BatchMode=yes "
+                                          f"-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile={d / 'known_hosts'}")
+            if (d / "token").is_file():
+                basic = base64.b64encode(b"oauth2:" + secretbox.read(d / "token").strip()).decode()
+                config += ["-c", f"http.extraHeader=Authorization: Basic {basic}"]
+        try:
+            r = subprocess.run(["git", *config, *args], cwd=cwd, env=env, capture_output=True, text=True,
+                               timeout=GIT_TIMEOUT)
+        except subprocess.TimeoutExpired as exc:
+            raise DirectoryError("The repository did not answer in time") from exc
     if r.returncode:
         raise DirectoryError(_explain(r.stderr, local=any(a.startswith("file://") for a in args)))
     return r.stdout.strip()

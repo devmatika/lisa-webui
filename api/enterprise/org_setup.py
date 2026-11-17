@@ -15,6 +15,7 @@ import threading
 import yaml
 from sqlalchemy import func, select
 
+from api.enterprise import secretbox
 from api.enterprise import db as edb
 from api.enterprise import directory, integrations, mailer, provisioner
 from api.enterprise.models import KnowledgeArea, Role, TelegramLink, User
@@ -60,6 +61,7 @@ def org_setup_status() -> dict:
         "email": mailer.configured(),
         "public_url": bool(os.environ.get("LISA_PUBLIC_URL", "").strip()),
         "voice": len(os.environ.get("LISA_VOICE_SECRET", "")) >= 32,
+        "secret_key": secretbox.from_env(),
     }
     return {"steps": STEPS, "services": SERVICES, "model": model_name or "", "checks": checks,
             "counts": counts}
@@ -117,3 +119,16 @@ def refresh_after_upgrade() -> threading.Thread | None:
     thread = threading.Thread(target=refresh, name="lisa-upgrade-refresh", daemon=True)
     thread.start()
     return thread
+
+
+def seal_stored_secrets() -> int:
+    """Encrypt secrets saved before encryption at rest existed (mail accounts, vault credentials)."""
+    from api.enterprise import secretbox
+    from api.enterprise.knowledge import vault_root
+    root = vault_root()
+    files = [*(root / ".mail").glob("*.json"), *(root / ".sources" / "credentials").glob("*/token"),
+             *(root / ".sources" / "credentials").glob("*/deploy_key")]
+    sealed = sum(secretbox.upgrade_file(p) for p in files)
+    if sealed:
+        logger.info("Encrypted %d stored secret file(s)", sealed)
+    return sealed

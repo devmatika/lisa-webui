@@ -1803,6 +1803,7 @@ function _renderOrgChecklist(org) {
     ${row(c.outlook_app, 'Outlook (Microsoft 365)', c.outlook_app ? 'App registration ready' : 'Optional.')}
     ${row(c.clickup_company, 'Company ClickUp', c.clickup_company ? 'Each person sees their own tasks' : 'Optional.')}
     ${row(c.email, 'Invitations by e-mail', c.email ? 'SMTP configured' : 'Optional: without it you copy password links by hand (LISA_SMTP_* in the server .env).')}
+    ${row(c.secret_key, 'Stored passwords encrypted', c.secret_key ? 'With the key in the server .env (not in backups)' : 'Encrypted with a key kept beside the data: add LISA_SECRET_KEY to the server .env (upgrade.sh does it).')}
     ${row(c.public_url, 'Public address', c.public_url ? 'Set' : 'Needed for e-mailed links and Google sign-in: LISA_PUBLIC_URL in the server .env.')}
   </div>`;
 }
