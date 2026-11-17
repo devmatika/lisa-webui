@@ -39,9 +39,9 @@ def ent(tmp_path, monkeypatch, request):
     repo = tmp_path / "sources" / "vault"
     for rel, text in {"README.md": "# Company brain", "01-People/Anna.md": "# Anna\nSales lead",
                       "03-Projects/Hotel.md": "# Hotel pilot\nconfidential budget",
-                      "06-Knowledge/Holidays.md": "# Holidays\nTwo weeks ahead",
+                      "06-Company-Knowledge/Holidays.md": "# Holidays\nTwo weeks ahead",
                       "90-Templates/Meeting.md": "# Template",
-                      "files/offers/note.md": "# Offer draft\nnot knowledge",
+                      "10-Company-Files/offers/note.md": "# Offer draft\nnot knowledge",
                       ".obsidian/app.md": "x"}.items():
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
         (repo / rel).write_text(text)
@@ -77,10 +77,10 @@ def test_the_vault_becomes_areas_with_their_own_readers_and_stays_in_sync(ent):
     url = f"file://{repo}"
     pre = sources.preview(url, "main", None)
     by = {f["folder"]: f for f in pre["folders"]}
-    assert set(by) == {"01-People", "03-Projects", "06-Knowledge", "90-Templates", "files"} and pre["root_notes"] == 1
+    assert set(by) == {"01-People", "03-Projects", "06-Company-Knowledge", "90-Templates", "10-Company-Files"} and pre["root_notes"] == 1
     assert by["03-Projects"]["key"] == "projects" and by["03-Projects"]["name"] == "Projects"
-    assert by["06-Knowledge"]["suggested"] and not by["90-Templates"]["suggested"] and not by["files"]["suggested"]
-    folders = [{"folder": "06-Knowledge", "include": True, "readers": ["staff", "manager"]},
+    assert by["06-Company-Knowledge"]["suggested"] and not by["90-Templates"]["suggested"] and not by["10-Company-Files"]["suggested"]
+    folders = [{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff", "manager"]},
                {"folder": "03-Projects", "include": True, "readers": ["manager"]},
                {"folder": "", "include": True, "key": "general", "name": "General", "readers": ["staff", "manager"]},
                {"folder": "90-Templates", "include": False}]
@@ -101,9 +101,9 @@ def test_the_vault_becomes_areas_with_their_own_readers_and_stays_in_sync(ent):
     assert titles("mia", "template") == []  # left out
     # a note approved in Lisa lives next to the mirrored ones and survives every sync
     (knowledge.vault_root() / "knowledge" / "approved-in-lisa.md").write_text("# Parking\nBehind the barn")
-    os.remove(repo / "06-Knowledge" / "Holidays.md")
-    (repo / "06-Knowledge" / "Sub").mkdir()
-    (repo / "06-Knowledge" / "Sub" / "Expenses.md").write_text("# Expenses\nReceipts monthly")
+    os.remove(repo / "06-Company-Knowledge" / "Holidays.md")
+    (repo / "06-Company-Knowledge" / "Sub").mkdir()
+    (repo / "06-Company-Knowledge" / "Sub" / "Expenses.md").write_text("# Expenses\nReceipts monthly")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "edit")
     assert sources.sync(sid)["notes"] == 3
@@ -122,7 +122,7 @@ def test_a_failed_pull_is_reported_in_plain_words(ent, tmp_path):
     with edb.session() as db:
         sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{repo}",
                                   branch="main", credential_id=None,
-                                  folders=[{"folder": "06-Knowledge", "include": True, "readers": ["staff"]}]).id
+                                  folders=[{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff"]}]).id
     shutil.rmtree(repo)
     view = sources.sync(sid)
     assert view["last_error"] and view["last_sync_at"]
@@ -150,7 +150,7 @@ def test_a_vault_with_the_standard_folders_keeps_their_access(ent):
     from api.enterprise import directory, knowledge, sources
     edb, ids, repo = ent
     url = f"file://{repo}"
-    folders = [{"folder": "06-Knowledge", "include": True, "readers": ["staff", "manager"]},
+    folders = [{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff", "manager"]},
                {"folder": "03-Projects", "include": True, "readers": ["manager"]}]
     with edb.session() as db:
         sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=url, branch="main",
@@ -181,7 +181,7 @@ def test_an_approved_note_is_committed_to_the_vault_by_its_author(ent, tmp_path)
     with edb.session() as db:
         sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{bare}",
                                   branch="main", credential_id=None, write_back=True,
-                                  folders=[{"folder": "06-Knowledge", "include": True, "readers": ["staff"],
+                                  folders=[{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff"],
                                             "contributors": ["staff"]}]).id
         knowledge.save_area(db, directory.Actor(ids["boss"]), "knowledge", "Knowledge", [
             {"principal_type": "role", "principal_id": "staff", "level": "contribute"},
@@ -198,7 +198,7 @@ def test_an_approved_note_is_committed_to_the_vault_by_its_author(ent, tmp_path)
     log = subprocess.run(["git", "log", "-1", "--format=%an <%ae>|%s|%b", "main"], cwd=bare, capture_output=True,
                          text=True, check=True).stdout
     assert log.startswith("Anna <anna@ksp.example>|Lisa: Parking|Taught in Lisa and approved by boss@ksp.example")
-    shown = subprocess.run(["git", "show", "main:06-Knowledge/parking.md"], cwd=bare, capture_output=True,
+    shown = subprocess.run(["git", "show", "main:06-Company-Knowledge/parking.md"], cwd=bare, capture_output=True,
                            text=True, check=True).stdout
     assert "Behind the barn" in shown
     before = subprocess.run(["git", "rev-parse", "main"], cwd=bare, capture_output=True, text=True).stdout
@@ -212,7 +212,7 @@ def test_a_vault_lisa_may_not_write_to_keeps_the_note_and_says_why(ent, tmp_path
     with edb.session() as db:  # a checked-out (non-bare) repository refuses pushes to its branch
         sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{repo}",
                                   branch="main", credential_id=None, write_back=True,
-                                  folders=[{"folder": "06-Knowledge", "include": True, "readers": ["staff"]}]).id
+                                  folders=[{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff"]}]).id
         knowledge.save_area(db, directory.Actor(ids["boss"]), "knowledge", "Knowledge", [
             {"principal_type": "role", "principal_id": "staff", "level": "contribute"},
             {"principal_type": "role", "principal_id": "admin", "level": "approve"}])

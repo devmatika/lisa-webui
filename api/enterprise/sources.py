@@ -48,7 +48,8 @@ _BRANCH = re.compile(r"^[\w./-]{1,200}$")
 _CRED = re.compile(r"^[a-f0-9]{32}$")
 # Folders a vault usually keeps for Obsidian / deliverables rather than as Knowledge areas
 # (standard PARA areas are suggested; Inbox/Templates/Archive/files stay ops-only).
-_DEFAULT_EXCLUDED = re.compile(r"(^|-)(templates?|archive|inbox|trash|attachments?|files)$", re.I)
+_DEFAULT_EXCLUDED = re.compile(
+    r"(^|-)(templates?|archive|inbox|trash|attachments?|files|company-files)$", re.I)
 _locks: dict[str, threading.Lock] = {}
 _again: set[str] = set()
 
@@ -196,14 +197,27 @@ def _notes(base: Path):
 
 
 def _area_key_for(folder: str) -> str:
-    """'03-Projects' -> 'projects'; a name without Latin letters gets a stable hash."""
+    """'03-Projects' -> 'projects'; standard folders keep their stable Lisa area keys."""
     import hashlib
+    from api.enterprise.knowledge_defaults import STANDARD_FOLDERS
+    for std_folder, key, *_ in STANDARD_FOLDERS:
+        if folder == std_folder:
+            return key
+    # legacy rename: old vaults still named 06-Knowledge map to the same area
+    if folder in ("06-Knowledge", "Knowledge"):
+        return "knowledge"
     bare = re.sub(r"^\d+[\s._-]*", "", folder)
     key = re.sub(r"[^a-z0-9]+", "-", bare.lower()).strip("-")[:60].strip("-")
     return key or "area-" + hashlib.sha1(folder.encode()).hexdigest()[:8]
 
 
 def _area_name_for(folder: str) -> str:
+    from api.enterprise.knowledge_defaults import STANDARD_FOLDERS
+    for std_folder, _key, name, *_ in STANDARD_FOLDERS:
+        if folder == std_folder:
+            return name
+    if folder in ("06-Knowledge", "Knowledge"):
+        return "Company Knowledge"
     bare = re.sub(r"^\d+[\s._-]*", "", folder).replace("-", " ").replace("_", " ").strip()
     return bare or folder
 

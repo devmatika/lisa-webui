@@ -1612,13 +1612,15 @@ def scaffold_obsidian_vault(vault_path: str | None = None) -> dict[str, Any]:
         ("00-Inbox", "Quick-capture notes, voice memos, unprocessed briefings, and scratchpads."),
         ("01-People", "Team directory, leadership profiles, external partners, and individual wikilink notes."),
         ("02-Companies", "Clients, partners, corporate accounts, and external vendor profiles."),
-        ("03-Projects", "Active quarterly initiatives, project sprints, backlogs, and milestone tracking."),
+        ("03-Projects", "One folder per project: Project.md, notes/, and files/{{pdf,html,excel}}."),
         ("04-Meetings", "Meeting summaries, Fireflies transcription imports, and structured action items."),
         ("05-Decisions", "Architecture & Business Decision Records (ADRs), policy changes, and approved RFCs."),
-        ("06-Knowledge", "Standard Operating Procedures (SOPs), company playbooks, guides, and tech documentation."),
+        ("06-Company-Knowledge", "Company purpose, goals, policies, SOPs and FAQs every employee should know."),
         ("07-Daily", "Daily scratchpads, standup logs, and personal chronological notes."),
         ("08-Team-Briefing", "Daily team morning briefings delivered via Telegram and archived chronologically."),
-        ("files", "Working deliverables, exported PDFs, client proposals, and generated HTML artifacts."),
+        ("10-Company-Files", "Company deliverables by type (pdf/html/excel/word) and purpose (offers/analyses/tech)."),
+        ("90-Templates", "Obsidian note templates."),
+        ("99-Archive", "Retired notes and files."),
     ]
 
     created_dirs = []
@@ -1641,6 +1643,26 @@ def scaffold_obsidian_vault(vault_path: str | None = None) -> dict[str, Any]:
             )
             _atomic_write_text(readme_file, readme_content)
             created_files.append(f"{folder_name}/README.md")
+
+    from api.enterprise.knowledge_defaults import COMPANY_FILES_SUBDIRS, COMPANY_KNOWLEDGE_STARTERS
+    for sub in COMPANY_FILES_SUBDIRS:
+        sub_dir = target_vault / "10-Company-Files" / sub
+        sub_dir.mkdir(parents=True, exist_ok=True)
+        created_dirs.append(f"10-Company-Files/{sub}")
+    for fname, body in COMPANY_KNOWLEDGE_STARTERS:
+        path = target_vault / "06-Company-Knowledge" / fname
+        if not path.exists():
+            _atomic_write_text(path, body)
+            created_files.append(f"06-Company-Knowledge/{fname}")
+    projects_readme = target_vault / "03-Projects" / "README.md"
+    if projects_readme.exists():
+        # Replace the generic README with the per-project layout guide once.
+        if "One folder per project" not in projects_readme.read_text(errors="replace"):
+            _atomic_write_text(
+                projects_readme,
+                "# 03-Projects\n\nOne folder per project:\n\n"
+                "```text\n03-Projects/<project-slug>/\n  Project.md\n  notes/\n  files/{pdf,html,excel,word,other}/\n```\n",
+            )
 
     state = load_wizard_state()
     company = state.get("company_name", "Company")
@@ -1669,10 +1691,10 @@ def scaffold_obsidian_vault(vault_path: str | None = None) -> dict[str, Any]:
             f"- `03-Projects/` — Active workstreams and roadmaps\n"
             f"- `04-Meetings/` — Meeting summaries and action items\n"
             f"- `05-Decisions/` — Architectural and strategic decision records\n"
-            f"- `06-Knowledge/` — SOPs, documentation, and playbooks\n"
+            f"- `06-Company-Knowledge/` — Company purpose, goals, policies, SOPs\n"
             f"- `07-Daily/` — Daily briefings and logs\n"
             f"- `08-Team-Briefing/` — Daily morning briefings archive\n"
-            f"- `files/` — Deliverables and documents\n"
+            f"- `10-Company-Files/` — PDFs, HTML, Excel, Word (and offers/analyses/tech)\n"
         )
         _atomic_write_text(handbook, handbook_content)
         created_files.append("Company_Handbook.md")

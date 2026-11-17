@@ -1368,13 +1368,13 @@ function _renderStepKnowledge(el) {
                 <div class="cw-tree-item">📁 <strong>00-Inbox/</strong> — Quick-capture notes, voice memos, unprocessed briefings</div>
                 <div class="cw-tree-item">📁 <strong>01-People/</strong> — Company members, leadership directory, individual wikilink notes</div>
                 <div class="cw-tree-item">📁 <strong>02-Companies/</strong> — Clients, corporate partners, external vendor records</div>
-                <div class="cw-tree-item">📁 <strong>03-Projects/</strong> — Active quarterly roadmaps, deliverables, sprint backlogs</div>
+                <div class="cw-tree-item">📁 <strong>03-Projects/&lt;slug&gt;/</strong> — One folder per project (Project.md, notes/, files/)</div>
                 <div class="cw-tree-item">📁 <strong>04-Meetings/</strong> — Meeting summaries, Fireflies transcription imports, action items</div>
                 <div class="cw-tree-item">📁 <strong>05-Decisions/</strong> — Architecture & Business Decision Records (ADRs), policy changes</div>
-                <div class="cw-tree-item">📁 <strong>06-Knowledge/</strong> — Company SOPs, architecture specs, playbooks, tech docs</div>
+                <div class="cw-tree-item">📁 <strong>06-Company-Knowledge/</strong> — Company purpose, goals, policies, SOPs, FAQs</div>
                 <div class="cw-tree-item">📁 <strong>07-Daily/</strong> — Chronological daily logs & scratchpads</div>
                 <div class="cw-tree-item">📁 <strong>08-Team-Briefing/</strong> — Daily morning briefings archive</div>
-                <div class="cw-tree-item">📁 <strong>files/</strong> — Working deliverables, exported PDFs, client proposals</div>
+                <div class="cw-tree-item">📁 <strong>10-Company-Files/</strong> — pdf / html / excel / word (+ offers, analyses, tech)</div>
                 <div class="cw-tree-item">📄 <strong>Company_Handbook.md</strong> — Master company handbook linking to <code>[[01-People/...]]</code> and folders</div>
               </div>
             </div>
