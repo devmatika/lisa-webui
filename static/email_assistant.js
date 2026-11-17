@@ -100,6 +100,8 @@
       if (task) r.task = task === 'always';
       const list = row.querySelector('[data-r="list"]').value.trim();
       if (list) r.task_list = list;
+      const who = row.querySelector('[data-r="assignee"]').value.trim();
+      if (who) r.task_assignee = who;
       return r;
     }).filter(Boolean);
   }
@@ -220,9 +222,10 @@
           <option value="always" ${r.task === true ? 'selected' : ''}>Task: always</option>
           <option value="never" ${r.task === false ? 'selected' : ''}>Task: never</option></select>
         <input data-r="list" value="${esc(r.task_list || '')}" placeholder="ClickUp list id (optional)" aria-label="ClickUp list id" inputmode="numeric">
+        <input data-r="assignee" value="${esc(r.task_assignee || '')}" placeholder="Assign to: user id (optional)" aria-label="ClickUp user id to assign" inputmode="numeric">
         <button class="ea-link" data-ea-rule-del aria-label="Delete rule">✕</button></div>`;
     };
-    return `<p class="ea-muted">Fixed rules run before the AI (no cost). First match wins. Task: when a reply is needed, make a ClickUp task always / never / only if important (Lisa decides). List id: put this sender's tasks in that ClickUp list (the number in the list's URL).</p>
+    return `<p class="ea-muted">Fixed rules run before the AI (no cost). First match wins. Task: when a reply is needed, make a ClickUp task always / never / only if important (Lisa decides). List id: put this sender's tasks in that ClickUp list (the number in the list's URL). Assign to: ClickUp user id of the person (easier: tell Lisa "tasks from X go to Moh").</p>
       ${(EA.draft.rules || []).map(row).join('')}
       <button class="sm-btn" data-ea-rule-add>+ Rule</button>`;
   }

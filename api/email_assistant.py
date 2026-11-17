@@ -304,11 +304,12 @@ def validate_config(data: Any) -> dict[str, Any]:
             raise ValueError(f"rule '{rule[key]}': choose a category or skip")
         if r.get("task") in (True, False):  # ClickUp: always / never (absent = Lisa decides by priority)
             rule["task"] = r["task"]
-        task_list = str(r.get("task_list") or "").strip()
-        if task_list:
-            if not task_list.isdigit() or len(task_list) > 20:
-                raise ValueError(f"rule '{rule[key]}': ClickUp list id must be digits")
-            rule["task_list"] = task_list
+        for field, label in (("task_list", "ClickUp list id"), ("task_assignee", "ClickUp user id")):
+            value = str(r.get(field) or "").strip()
+            if value:
+                if not value.isdigit() or len(value) > 20:
+                    raise ValueError(f"rule '{rule[key]}': {label} must be digits")
+                rule[field] = value
         rules.append(rule)
     if len(rules) > MAX_RULES:
         raise ValueError(f"at most {MAX_RULES} rules")
