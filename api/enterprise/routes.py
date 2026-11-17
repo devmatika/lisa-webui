@@ -606,7 +606,8 @@ def _s_save(handler, body):
                                       url=body.get("url", ""), branch=body.get("branch") or "main",
                                       credential_id=body.get("credential_id") or None,
                                       folders=list(body.get("folders") or []),
-                                      interval_minutes=int(body.get("interval_minutes") or 15))
+                                      interval_minutes=int(body.get("interval_minutes") or 15),
+                                      write_back=bool(body.get("write_back")))
             out = sources.view(src)
     except (DirectoryError, ValueError) as exc:
         return bad(handler, str(exc), 400)
@@ -638,10 +639,18 @@ def _k_pending(handler, _body):
 
 
 def _k_decide(handler, body):
-    def run(db):
-        d = knowledge.decide(db, _actor(handler), _me_user(db, handler), body.get("id", ""), bool(body.get("approve")))
-        return {"ok": True, "status": d.status, "published_path": d.published_path}
-    return _knowledge_call(handler, run)
+    from api.helpers import bad, j
+    try:
+        with edb.session() as db:
+            d = knowledge.decide(db, _actor(handler), _me_user(db, handler), body.get("id", ""),
+                                 bool(body.get("approve")))
+            out = {"ok": True, "status": d.status, "published_path": d.published_path}
+            area = d.area_key
+    except DirectoryError as exc:
+        return bad(handler, str(exc), 403 if "cannot" in str(exc).lower() else 404 if "not found" in str(exc).lower() else 400)
+    if out["status"] == "approved":
+        sources.push_soon(area)  # after commit: vaults that take approved notes back get it now
+    return j(handler, out)
 
 
 def _k_gaps(handler, _body):

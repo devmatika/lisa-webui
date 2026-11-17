@@ -169,3 +169,57 @@ def test_the_starter_vault_has_every_standard_folder():
     for folder in [f[0] for f in STANDARD_FOLDERS] + [f[0] for f in UNREAD_FOLDERS]:
         assert any(n.startswith(f"company-vault/{folder}/") for n in names)
     assert "company-vault/README.md" in names
+
+
+def test_an_approved_note_is_committed_to_the_vault_by_its_author(ent, tmp_path):
+    from api.enterprise import directory, knowledge, sources
+    edb, ids, repo = ent
+    bare = tmp_path / "sources" / "vault.git"
+    subprocess.run(["git", "clone", "-q", "--bare", str(repo), str(bare)], check=True)
+    with edb.session() as db:
+        sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{bare}",
+                                  branch="main", credential_id=None, write_back=True,
+                                  folders=[{"folder": "06-Knowledge", "include": True, "readers": ["staff"],
+                                            "contributors": ["staff"]}]).id
+        knowledge.save_area(db, directory.Actor(ids["boss"]), "knowledge", "Knowledge", [
+            {"principal_type": "role", "principal_id": "staff", "level": "contribute"},
+            {"principal_type": "role", "principal_id": "admin", "level": "approve"}])
+    sources.sync(sid)
+    with edb.session() as db:
+        draft = knowledge.submit_draft(db, directory.Actor(ids["anna"]), directory.get_user(db, ids["anna"]),
+                                       "knowledge", "Parking", "Behind the barn")
+        did = draft.id
+    with edb.session() as db:
+        knowledge.decide(db, directory.Actor(ids["boss"]), directory.get_user(db, ids["boss"]), did, True)
+    view = sources.sync(sid)
+    assert view["push_error"] is None and view["last_error"] is None
+    log = subprocess.run(["git", "log", "-1", "--format=%an <%ae>|%s|%b", "main"], cwd=bare, capture_output=True,
+                         text=True, check=True).stdout
+    assert log.startswith("Anna <anna@ksp.example>|Lisa: Parking|Taught in Lisa and approved by boss@ksp.example")
+    shown = subprocess.run(["git", "show", "main:06-Knowledge/parking.md"], cwd=bare, capture_output=True,
+                           text=True, check=True).stdout
+    assert "Behind the barn" in shown
+    before = subprocess.run(["git", "rev-parse", "main"], cwd=bare, capture_output=True, text=True).stdout
+    sources.sync(sid)  # pushed once only
+    assert subprocess.run(["git", "rev-parse", "main"], cwd=bare, capture_output=True, text=True).stdout == before
+
+
+def test_a_vault_lisa_may_not_write_to_keeps_the_note_and_says_why(ent, tmp_path):
+    from api.enterprise import directory, knowledge, sources
+    edb, ids, repo = ent
+    with edb.session() as db:  # a checked-out (non-bare) repository refuses pushes to its branch
+        sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{repo}",
+                                  branch="main", credential_id=None, write_back=True,
+                                  folders=[{"folder": "06-Knowledge", "include": True, "readers": ["staff"]}]).id
+        knowledge.save_area(db, directory.Actor(ids["boss"]), "knowledge", "Knowledge", [
+            {"principal_type": "role", "principal_id": "staff", "level": "contribute"},
+            {"principal_type": "role", "principal_id": "admin", "level": "approve"}])
+        did = knowledge.submit_draft(db, directory.Actor(ids["anna"]), directory.get_user(db, ids["anna"]),
+                                     "knowledge", "Parking", "Behind the barn").id
+    with edb.session() as db:
+        knowledge.decide(db, directory.Actor(ids["boss"]), directory.get_user(db, ids["boss"]), did, True)
+    view = sources.sync(sid)
+    assert view["push_error"] and view["last_error"] is None
+    with edb.session() as db:
+        hits = knowledge.search(db, directory.get_user(db, ids["anna"]), "barn")["results"]
+    assert [h["title"] for h in hits] == ["Parking"]

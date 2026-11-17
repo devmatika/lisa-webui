@@ -166,6 +166,8 @@ class KnowledgeDraft(Base):
     published_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # set once an approved draft is committed to the company vault (sources with ``write_back``)
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class KnowledgeGap(Base):
@@ -194,6 +196,9 @@ class KnowledgeSource(Base):
     last_commit: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[int] = mapped_column(Integer, default=0)
+    # approved Teach-Lisa notes in this source's areas are committed and pushed to the repository
+    write_back: Mapped[bool] = mapped_column(Boolean, default=False)
+    push_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

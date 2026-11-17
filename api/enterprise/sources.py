@@ -36,7 +36,7 @@ from api.enterprise import secretbox
 from api.enterprise.directory import Actor, DirectoryError, audit
 from api.enterprise.knowledge import (_SKIPPED_DIRS, MAX_IMPORT_BYTES, MAX_IMPORT_FILES, _area_dir, save_area,
                                       vault_root)
-from api.enterprise.models import KnowledgeArea, KnowledgeSource, utcnow
+from api.enterprise.models import KnowledgeArea, KnowledgeDraft, KnowledgeSource, User, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ _CRED = re.compile(r"^[a-f0-9]{32}$")
 # Folders a vault usually keeps for Obsidian itself rather than as knowledge.
 _DEFAULT_EXCLUDED = re.compile(r"(^|-)(templates?|archive|inbox|trash|attachments?)$", re.I)
 _locks: dict[str, threading.Lock] = {}
+_again: set[str] = set()
 
 
 # ── storage ──────────────────────────────────────────────────────────────────
@@ -135,15 +136,22 @@ def _git(args: list[str], *, credential_id: str | None, cwd: Path | None = None)
         except subprocess.TimeoutExpired as exc:
             raise DirectoryError("The repository did not answer in time") from exc
     if r.returncode:
-        raise DirectoryError(_explain(r.stderr, local=any(a.startswith("file://") for a in args)))
+        raise DirectoryError(_explain(r.stderr, local=any(a.startswith("file://") for a in args),
+                                      push="push" in args))
     return r.stdout.strip()
 
 
-def _explain(stderr: str, local: bool = False) -> str:
+def _explain(stderr: str, local: bool = False, push: bool = False) -> str:
     """Git's error, in words an admin can act on (secrets never appear in stderr)."""
     s = stderr.lower()
     if local and ("could not read from remote" in s or "does not appear to be a git repository" in s):
         return "That folder on the server is not a Git repository Lisa can read."
+    if push and ("permission denied" in s or "403" in s or "401" in s or "not allowed" in s
+                 or "write access" in s or "protected branch" in s or "could not read from remote" in s):
+        return ("Lisa may only read this repository: give its deploy key write access (or use a token "
+                "with write access), or allow pushes to this branch.")
+    if push and ("rejected" in s or "non-fast-forward" in s or "fetch first" in s):
+        return "Someone changed the vault at the same moment; Lisa tries again on the next sync."
     if "permission denied (publickey)" in s or "could not read from remote" in s:
         return "Access denied: add Lisa's deploy key to the repository (read-only) and try again."
     if "authentication failed" in s or "403" in s or "401" in s:
@@ -225,7 +233,8 @@ def view(src: KnowledgeSource) -> dict:
             "interval_minutes": src.interval_minutes, "notes": src.notes, "last_commit": (src.last_commit or "")[:12],
             "last_sync_at": src.last_sync_at.isoformat() if src.last_sync_at else None, "last_error": src.last_error,
             "auth": _auth_kind(src.credential_id), "credential_id": src.credential_id,
-            "public_key": _public_key(src.credential_id)}
+            "public_key": _public_key(src.credential_id), "write_back": bool(src.write_back),
+            "push_error": src.push_error}
 
 
 def _auth_kind(credential_id: str | None) -> str:
@@ -254,7 +263,8 @@ def _kept_grants(db, key: str, readers: set[str]) -> list[dict]:
 
 
 def save_source(db, actor: Actor, *, source_id: str | None, name: str, url: str, branch: str,
-                credential_id: str | None, folders: list[dict], interval_minutes: int = 15) -> KnowledgeSource:
+                credential_id: str | None, folders: list[dict], interval_minutes: int = 15,
+                write_back: bool = False) -> KnowledgeSource:
     """Create or update a source and its areas.
 
     folders: [{folder ("" = repository root), include, key, name, readers: [role keys]}]. Included
@@ -295,9 +305,12 @@ def save_source(db, actor: Actor, *, source_id: str | None, name: str, url: str,
         if credential_id:
             src.credential_id = credential_id
     src.interval_minutes = max(15, min(int(interval_minutes or 15), 24 * 60))
+    if src.write_back and not write_back:
+        src.push_error = None
+    src.write_back = bool(write_back)
     db.flush()
     audit(db, actor, "knowledge.source_saved", src.id, url=url, branch=src.branch,
-          folders={k: v for k, v in mapping.items()})
+          folders={k: v for k, v in mapping.items()}, write_back=src.write_back)
     return src
 
 
@@ -359,19 +372,77 @@ def _mirror(src: KnowledgeSource, repo: Path | None) -> int:
     return sum(len(v) for v in new.values())
 
 
+def _push_approved(db, src: KnowledgeSource, repo: Path) -> int:
+    """Commit every approved Teach-Lisa note of this source's areas not yet in the vault (one commit
+    per note, authored by the person who wrote it) and push them. Returns the number pushed. A
+    failed push leaves the notes unpushed: the next sync starts from a fresh fetch and tries again."""
+    folder_of = {area: folder for folder, area in (src.folders or {}).items() if area}
+    drafts = list(db.scalars(select(KnowledgeDraft).where(
+        KnowledgeDraft.status == "approved", KnowledgeDraft.pushed_at.is_(None),
+        KnowledgeDraft.area_key.in_(list(folder_of))).order_by(KnowledgeDraft.decided_at)))
+    done = []
+    for d in drafts:
+        area, _, rel = (d.published_path or "").partition("/")
+        local = _area_dir(area) / rel
+        if not rel or not local.is_file():
+            d.pushed_at = utcnow()  # replaced or removed since: nothing to write
+            continue
+        base = repo / folder_of[area] if folder_of[area] else repo
+        target = (base / rel).resolve()
+        if repo.resolve() not in target.parents:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(local.read_bytes())
+        relpath = target.relative_to(repo.resolve()).as_posix()
+        _git(["add", "--", relpath], credential_id=None, cwd=repo)
+        if _git(["status", "--porcelain", "--", relpath], credential_id=None, cwd=repo):
+            author, reviewer = db.get(User, d.author_id), db.get(User, d.reviewer_id) if d.reviewer_id else None
+            who = f"{(author.display_name if author else 'Lisa').strip() or 'Lisa'} <{author.email if author else 'lisa@localhost'}>"
+            _git(["-c", "user.name=Lisa", "-c", "user.email=lisa@localhost", "commit", "-q", "--author", who,
+                  "-m", f"Lisa: {d.title}", "-m",
+                  f"Taught in Lisa and approved by {reviewer.email if reviewer else 'an approver'}."],
+                 credential_id=None, cwd=repo)
+        done.append(d)
+    if done:
+        _git(["push", "-q", "origin", f"HEAD:refs/heads/{src.branch}"], credential_id=src.credential_id, cwd=repo)
+        for d in done:
+            d.pushed_at = utcnow()
+    return len(done)
+
+
+def push_soon(area_key: str) -> None:
+    """After a note is approved: sync (and so push) the sources that write this area back."""
+    from api.enterprise import db as edb
+    with edb.session() as db:
+        ids = [s.id for s in db.scalars(select(KnowledgeSource).where(KnowledgeSource.write_back.is_(True)))
+               if area_key in (s.folders or {}).values()]
+    for sid in ids:
+        sync_in_background(sid)
+
+
 def sync(source_id: str) -> dict:
     """Pull the repository and mirror it. Safe to call from any thread; one sync per source at a time."""
     from api.enterprise import db as edb
     lock = _locks.setdefault(source_id, threading.Lock())
     if not lock.acquire(blocking=False):
+        _again.add(source_id)  # e.g. a note approved during a sync: run once more right after it
         return {"ok": False, "running": True}
     try:
+        _again.discard(source_id)
         with edb.session() as db:
             src = db.get(KnowledgeSource, source_id)
             if src is None:
                 raise DirectoryError("Source not found")
             try:
                 commit = _fetch(src.url, src.branch, src.credential_id, _repo_dir(src.id))
+                if src.write_back:
+                    try:
+                        if _push_approved(db, src, _repo_dir(src.id)):
+                            commit = _git(["rev-parse", "HEAD"], credential_id=None, cwd=_repo_dir(src.id))
+                        src.push_error = None
+                    except (DirectoryError, OSError, subprocess.SubprocessError) as exc:
+                        src.push_error = str(exc)
+                        logger.warning("Writing approved notes to source %s failed: %s", source_id, exc)
                 notes = _mirror(src, _repo_dir(src.id))
                 src.last_commit, src.notes, src.last_error = commit, notes, None
             except (DirectoryError, OSError, subprocess.SubprocessError) as exc:
@@ -379,10 +450,13 @@ def sync(source_id: str) -> dict:
                 logger.warning("Knowledge source %s failed to sync: %s", source_id, exc)
             src.last_sync_at = utcnow()
             audit(db, Actor(None, "sync"), "knowledge.source_synced", source_id,
-                  commit=(src.last_commit or "")[:12], notes=src.notes, error=src.last_error)
+                  commit=(src.last_commit or "")[:12], notes=src.notes, error=src.last_error,
+                  push_error=src.push_error)
             return view(src)
     finally:
         lock.release()
+        if source_id in _again:
+            sync_in_background(source_id)
 
 
 def sync_in_background(source_id: str) -> None:
