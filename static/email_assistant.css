@@ -30,7 +30,7 @@
 .ea-link{background:none;border:0;color:var(--muted);cursor:pointer;font:inherit;padding:4px 6px;border-radius:6px;margin-left:auto}
 .ea-link:hover{color:var(--text)}
 .ea-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.ea-rule{display:grid;grid-template-columns:150px 1fr 160px 150px 150px auto;gap:8px;align-items:center}
+.ea-rule{display:grid;grid-template-columns:150px 1fr 160px 150px 150px 150px auto;gap:8px;align-items:center}
 .ea-body .ea-choice{flex-direction:row;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text);cursor:pointer}
 .ea-choice span{line-height:1.45}
 .ea-muted{color:var(--muted);font-size:13px;margin:0}
