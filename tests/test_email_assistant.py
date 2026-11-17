@@ -37,6 +37,15 @@ def test_save_writes_the_file_the_cron_job_reads(home):
     assert saved["facts"] == "" and saved["only_from"] == [] and saved["notify"] == "actionable"
 
 
+def test_rule_task_options_are_saved(home):
+    ea.save_email_assistant_config(good_config(rules=[
+        {"from": "@geniessmi.it", "category": "customer", "task": True, "task_list": " 901 "},
+        {"from": "@x.at", "category": "customer", "task": False}, {"from": "@y.at", "category": "customer", "task": "maybe"}]))
+    saved = json.loads((home / "workspace/email-assistant/config.json").read_text())["rules"]
+    assert saved == [{"from": "@geniessmi.it", "category": "customer", "task": True, "task_list": "901"},
+                     {"from": "@x.at", "category": "customer", "task": False}, {"from": "@y.at", "category": "customer"}]
+
+
 def test_server_only_keys_are_kept_and_hidden(home):
     d = home / "workspace/email-assistant"
     d.mkdir(parents=True)
@@ -57,6 +66,7 @@ def test_server_only_keys_are_kept_and_hidden(home):
     {"categories": {"customer": {"tone": "x" * 301}}},
     {"rules": [{"from": "@x.at", "category": "missing"}]},
     {"rules": [{"category": "customer"}]},
+    {"rules": [{"from": "@x.at", "category": "customer", "task_list": "abc"}]},
     {"max_per_run": 99},
     {"only_from": "x@y.at"},
     {"facts": "x" * 2001},
