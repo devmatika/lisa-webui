@@ -451,10 +451,12 @@ def test_knowledge_step_and_obsidian_scaffolding(mock_hermes_env, tmp_path):
     assert (vault_dir / "03-Projects" / "README.md").is_file()
     assert (vault_dir / "04-Meetings" / "README.md").is_file()
     assert (vault_dir / "05-Decisions" / "README.md").is_file()
-    assert (vault_dir / "06-Knowledge" / "README.md").is_file()
+    assert (vault_dir / "06-Company-Knowledge" / "README.md").is_file()
+    assert (vault_dir / "10-Company-Files" / "pdf").is_dir()
+    assert (vault_dir / "10-Company-Files" / "README.md").is_file()
+    assert (vault_dir / "06-Company-Knowledge" / "Company.md").is_file()
     assert (vault_dir / "07-Daily" / "README.md").is_file()
     assert (vault_dir / "08-Team-Briefing" / "README.md").is_file()
-    assert (vault_dir / "files" / "README.md").is_file()
     assert (vault_dir / "Company_Handbook.md").is_file()
 
     # Save knowledge step with immediate file persistence

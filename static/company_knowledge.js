@@ -1,9 +1,9 @@
 // Company knowledge tab in the workspace panel (Lisa Enterprise): browse and read the company vault,
-// read-only, showing only the areas the signed-in person may read. The server decides access on every
-// request (/api/enterprise/knowledge/*); this file only displays what it returns.
+// read-only, showing only the areas the signed-in person may read. Nested folders inside an area are
+// shown as a tree (from each note's path). The server decides access on every request.
 (function () {
   'use strict';
-  const st = { areas: null, filter: '', open: {}, doc: null, results: null, loading: false };
+  const st = { areas: null, filter: '', open: {}, folders: {}, doc: null, results: null, loading: false };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const el = () => document.getElementById('workspaceKnowledge');
 
@@ -14,7 +14,6 @@
     return data;
   }
 
-  // Show the tab only to people whose role may read company knowledge.
   async function init() {
     try {
       const me = await get('/api/enterprise/me');
@@ -33,8 +32,6 @@
     return out;
   }
 
-  // Obsidian [[Note]] / [[Note|label]] / [[Note#part]] links lead to notes the person may read;
-  // anything else stays plain text. Front matter and embedded files are not shown.
   function renderNote(text) {
     const titles = byTitle();
     const links = [];
@@ -55,22 +52,80 @@
     return html;
   }
 
+  // Build a nested folder tree from flat docs. Path is "area/sub/.../note.md".
+  function docsToTree(docs) {
+    const root = { folders: {}, docs: [] };
+    for (const d of docs) {
+      const parts = String(d.path || '').split('/').filter(Boolean);
+      if (parts.length < 2) continue;
+      const rel = parts.slice(1);
+      let node = root;
+      for (let i = 0; i < rel.length - 1; i++) {
+        const name = rel[i];
+        if (!node.folders[name]) node.folders[name] = { name, folders: {}, docs: [] };
+        node = node.folders[name];
+      }
+      node.docs.push(d);
+    }
+    return root;
+  }
+
+  function countTree(node) {
+    let n = (node.docs || []).length;
+    for (const child of Object.values(node.folders || {})) n += countTree(child);
+    return n;
+  }
+
+  function folderOpen(id, force) {
+    if (force) return true;
+    if (!(id in st.folders)) return false;
+    return !!st.folders[id];
+  }
+
+  function renderNode(node, areaKey, prefix, depth, forceOpen) {
+    const folderNames = Object.keys(node.folders || {}).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    const parts = [];
+    for (const name of folderNames) {
+      const child = node.folders[name];
+      const id = areaKey + '/' + (prefix ? prefix + '/' : '') + name;
+      const open = folderOpen(id, forceOpen);
+      const n = countTree(child);
+      parts.push(`<div class="ck-folder" style="--ck-depth:${depth}">
+        <button type="button" class="ck-folder-head" data-ck-folder="${esc(id)}" aria-expanded="${open ? 'true' : 'false'}">
+          <span class="ck-chev" aria-hidden="true">${open ? '▾' : '▸'}</span>
+          <span class="ck-folder-name">${esc(name)}</span>
+          <span class="ck-count">${n}</span>
+        </button>
+        ${open ? `<div class="ck-folder-body">${renderNode(child, areaKey, prefix ? prefix + '/' + name : name, depth + 1, forceOpen)}</div>` : ''}
+      </div>`);
+    }
+    const docs = [...(node.docs || [])].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+    for (const d of docs) {
+      parts.push(`<button type="button" class="ck-doc" style="--ck-depth:${depth}" data-ck-open="${esc(d.path)}"><span class="ck-doc-title">${esc(d.title)}</span></button>`);
+    }
+    return parts.join('') || (depth === 0 ? '<div class="ck-none">No notes in this area yet.</div>' : '');
+  }
+
   function areaList() {
     const q = st.filter.trim().toLowerCase();
     if (!st.areas.length) {
       return '<div class="ck-empty"><b>Nothing to show yet</b>Your role cannot read any company knowledge area, or the company vault is not connected yet. Company notes live here — your Files tab is your private workspace, not a personal copy of the company vault.</div>';
     }
-    const sorted = [...st.areas].sort((x, y) => (y.docs.length > 0) - (x.docs.length > 0));  // full areas first
+    const sorted = [...st.areas].sort((x, y) => (y.docs.length > 0) - (x.docs.length > 0));
     const blocks = sorted.map((a) => {
-      const docs = q ? a.docs.filter((d) => d.title.toLowerCase().includes(q) || d.path.toLowerCase().includes(q)) : a.docs;
+      const docs = q
+        ? a.docs.filter((d) => d.title.toLowerCase().includes(q) || d.path.toLowerCase().includes(q))
+        : a.docs;
       if (q && !docs.length) return '';
       const open = q || st.open[a.key];
-      const rows = open ? docs.map((d) => {
-        const folder = d.path.split('/').slice(1, -1).join(' / ');
-        return `<button type="button" class="ck-doc" data-ck-open="${esc(d.path)}"><span class="ck-doc-title">${esc(d.title)}</span>${folder ? `<span class="ck-doc-folder">${esc(folder)}</span>` : ''}</button>`;
-      }).join('') || '<div class="ck-none">No notes in this area yet.</div>' : '';
-      return `<div class="ck-area${a.docs.length ? '' : ' ck-area-empty'}"><button type="button" class="ck-area-head" data-ck-area="${esc(a.key)}" aria-expanded="${open ? 'true' : 'false'}">
-        <span class="ck-chev" aria-hidden="true">${open ? '▾' : '▸'}</span><span class="ck-area-name">${esc(a.name)}</span><span class="ck-count">${docs.length}${a.truncated ? '+' : ''}</span></button>${rows}</div>`;
+      const tree = docsToTree(docs);
+      const body = open ? `<div class="ck-area-body">${renderNode(tree, a.key, '', 0, !!q)}</div>` : '';
+      return `<div class="ck-area${a.docs.length ? '' : ' ck-area-empty'}">
+        <button type="button" class="ck-area-head" data-ck-area="${esc(a.key)}" aria-expanded="${open ? 'true' : 'false'}">
+          <span class="ck-chev" aria-hidden="true">${open ? '▾' : '▸'}</span>
+          <span class="ck-area-name">${esc(a.name)}</span>
+          <span class="ck-count">${docs.length}${a.truncated ? '+' : ''}</span>
+        </button>${body}</div>`;
     }).join('');
     return blocks || `<div class="ck-empty"><b>No note title matches</b>Press Enter to search inside the notes.</div>`;
   }
@@ -125,11 +180,16 @@
   }
 
   function onClick(e) {
-    const t = e.target.closest('[data-ck-open],[data-ck-area],[data-ck-back],[data-ck-ask],[data-ck-clear]');
+    const t = e.target.closest('[data-ck-open],[data-ck-area],[data-ck-folder],[data-ck-back],[data-ck-ask],[data-ck-clear]');
     if (!t) return;
     e.preventDefault();
     if (t.dataset.ckOpen) return openDoc(t.dataset.ckOpen);
     if (t.dataset.ckArea) { st.open[t.dataset.ckArea] = !st.open[t.dataset.ckArea]; return render(); }
+    if (t.dataset.ckFolder) {
+      const id = t.dataset.ckFolder;
+      st.folders[id] = !folderOpen(id, false);
+      return render();
+    }
     if (t.hasAttribute('data-ck-back')) { st.doc = null; return render(); }
     if (t.hasAttribute('data-ck-clear')) { st.results = null; st.filter = ''; render(); const f = document.getElementById('ckFilter'); if (f) f.focus(); return; }
     if (t.hasAttribute('data-ck-ask')) {
@@ -172,7 +232,6 @@
     root.addEventListener('keydown', onKey);
   }
 
-  // Called by switchWorkspacePanelTab('knowledge'): refresh each time so new notes and changed access show.
   window.renderCompanyKnowledge = function () { wire(); if (!st.doc) load(); else render(); };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });

@@ -414,6 +414,18 @@ function switchWorkspacePanelTab(tab){
   if(_workspacePanelActiveTab === 'todos') _loadWorkspacePanelTodos();
   const knowledge = $('workspaceKnowledge');
   if(knowledge) knowledge.hidden = _workspacePanelActiveTab !== 'knowledge';
+  const fileTree = $('fileTree');
+  if(fileTree){
+    // Belt-and-suspenders with CSS: Knowledge must not leave the Files tree taking flex space.
+    if(_workspacePanelActiveTab === 'knowledge') fileTree.setAttribute('hidden', '');
+    else fileTree.removeAttribute('hidden');
+  }
+  const filesOnly = ['btnNewFile', 'btnNewFolder', 'btnUploadWorkspace'];
+  for(const id of filesOnly){
+    const btn = $(id);
+    if(!btn) continue;
+    btn.hidden = _workspacePanelActiveTab === 'knowledge';
+  }
   if(_workspacePanelActiveTab === 'knowledge' && typeof window.renderCompanyKnowledge === 'function') window.renderCompanyKnowledge();
 }
 

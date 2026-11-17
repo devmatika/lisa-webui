@@ -6842,17 +6842,27 @@ main.main > .main-view:not([id="mainChat"]):not([id="mainSettings"]) .main-view-
 .ck-list{padding:6px 8px 16px;}
 .ck-area{margin-bottom:4px;}
 .ck-area-empty .ck-area-head{color:var(--muted);font-weight:500;}
-.ck-area-head{display:flex;align-items:center;gap:6px;width:100%;border:0;background:transparent;color:var(--text);padding:7px 6px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;text-align:left;min-height:34px;}
-.ck-area-head:hover{background:var(--surface-subtle);}
-.ck-chev{width:12px;color:var(--muted);font-size:11px;}
-.ck-area-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ck-count{color:var(--muted);font-size:11px;font-weight:500;border:1px solid var(--border);border-radius:999px;padding:0 7px;}
-.ck-doc{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:6px 8px 6px 24px;border-radius:7px;cursor:pointer;min-height:32px;}
+.ck-area-head,.ck-folder-head{display:flex;align-items:center;gap:6px;width:100%;border:0;background:transparent;color:var(--text);padding:7px 6px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;text-align:left;min-height:34px;}
+.ck-folder-head{font-weight:500;padding-left:calc(6px + (var(--ck-depth,0) * 14px));}
+.ck-area-head:hover,.ck-folder-head:hover{background:var(--surface-subtle);}
+.ck-chev{width:12px;color:var(--muted);font-size:11px;flex-shrink:0;}
+.ck-area-name,.ck-folder-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ck-count{color:var(--muted);font-size:11px;font-weight:500;border:1px solid var(--border);border-radius:999px;padding:0 7px;flex-shrink:0;}
+.ck-area-body{padding:0 0 4px;}
+.ck-folder-body{padding:0;}
+.ck-doc{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:6px 8px 6px calc(24px + (var(--ck-depth,0) * 14px));border-radius:7px;cursor:pointer;min-height:32px;}
 .ck-results-head + .ck-doc,.ck-results-head ~ .ck-doc{padding-left:8px;}
 .ck-doc:hover,.ck-doc:focus-visible{background:var(--surface-subtle);}
 .ck-doc-title{display:block;font-size:13px;overflow-wrap:anywhere;}
 .ck-doc-folder{display:block;font-size:11px;color:var(--muted);overflow-wrap:anywhere;margin-top:1px;}
 .ck-none{padding:6px 8px 6px 24px;color:var(--muted);font-size:12px;}
+/* Knowledge tab: hide Files-only chrome */
+.rightpanel[data-active-tab="knowledge"] #btnNewFile,
+.rightpanel[data-active-tab="knowledge"] #btnNewFolder,
+.rightpanel[data-active-tab="knowledge"] #btnUploadWorkspace,
+.rightpanel[data-active-tab="knowledge"] #btnUpDir{display:none!important;}
+.rightpanel[data-active-tab="knowledge"] #fileTree{display:none!important;flex:0!important;}
+.rightpanel[data-active-tab="knowledge"] .workspace-knowledge{flex:1;min-height:0;}
 .ck-empty{padding:28px 14px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6;}
 .ck-empty b{display:block;color:var(--text);font-size:13px;margin-bottom:4px;}
 .ck-results-head{display:flex;align-items:center;justify-content:space-between;padding:4px 8px 6px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
