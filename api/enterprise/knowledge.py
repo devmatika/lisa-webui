@@ -224,6 +224,49 @@ def save_area(db, actor: Actor, key: str, name: str, grants: list[dict]) -> Know
     return area
 
 
+def delete_area(db, actor: Actor, key: str) -> None:
+    """Remove an area, its grants/drafts, vault folder, and any Git-source folder mapping to it.
+
+    Unticking a folder under Folders & access stops syncing but leaves the area row; use this to
+    drop stale areas (e.g. legacy ``files`` / ``knowledge``) from Areas and access."""
+    import json
+    import shutil
+
+    from api.enterprise import sources as knowledge_sources
+    from api.enterprise.models import KnowledgeSource
+
+    key = (key or "").strip().lower()
+    area = db.get(KnowledgeArea, key)
+    if area is None:
+        raise DirectoryError("Area not found")
+    unmapped: list[str] = []
+    for src in db.scalars(select(KnowledgeSource)):
+        folders = dict(src.folders or {})
+        changed = False
+        for folder, mapped in list(folders.items()):
+            if mapped == key:
+                folders[folder] = None
+                changed = True
+                unmapped.append(f"{src.name}:{folder or 'top level'}")
+        if not changed:
+            continue
+        if not any(folders.values()):
+            raise DirectoryError(
+                f'"{area.name}" is the last folder Lisa reads from "{src.name}". '
+                "Map another folder under Folders & access, or disconnect the vault first.")
+        src.folders = folders
+        mfile = knowledge_sources._manifest_path(src.id)
+        if mfile.is_file():
+            data = json.loads(mfile.read_text())
+            if key in data:
+                data.pop(key, None)
+                mfile.write_text(json.dumps(data))
+    db.delete(area)
+    db.flush()
+    shutil.rmtree(_area_dir(key), ignore_errors=True)
+    audit(db, actor, "knowledge.area_removed", key, unmapped=unmapped)
+
+
 MAX_IMPORT_FILES = 5000
 MAX_IMPORT_BYTES = 100 * 1024 * 1024  # uncompressed Markdown
 _SKIPPED_DIRS = {".obsidian", ".trash", ".history", ".git", "__MACOSX"}

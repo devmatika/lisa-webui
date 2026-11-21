@@ -24,6 +24,7 @@ def ent(tmp_path, monkeypatch, request):
         request.getfixturevalue("allow_outbound_network")
     monkeypatch.setenv("LISA_ENTERPRISE", "1")
     monkeypatch.setenv("LISA_DATABASE_URL", url)
+    monkeypatch.setenv("LISA_KNOWLEDGE_DIR", str(tmp_path / "knowledge"))
     edb.reset_for_tests()
     if url.startswith("postgresql"):
         with edb.engine().begin() as conn:
@@ -112,7 +113,10 @@ def test_organisation_checklist_reflects_the_template_and_directory(ent):
     from api.enterprise.org_setup import org_setup_status
     _, _, root = ent
     status = org_setup_status()
-    assert status["steps"] == ["company", "provider", "services", "orgknowledge", "team", "finish"]
+    assert status["steps"] == [
+        "company", "provider", "capabilities", "services",
+        "approvals", "knowledge", "orgknowledge", "team", "briefing", "finish",
+    ]
     assert status["checks"]["model"] is False and status["counts"]["users"] == 2
     assert status["counts"]["users_waiting_for_password"] == 1  # anna has not redeemed her link
     (root / "config.yaml").write_text("model:\n  default: some/model\n  provider: openrouter\n")
@@ -132,7 +136,8 @@ def test_apply_refreshes_every_assistant_and_the_front_desk_then_restarts(ent, m
     monkeypatch.setattr(routes, "_actor", lambda h: routes.Actor(ids["boss"], "10.0.0.1"))
     monkeypatch.setattr(provisioner, "ensure_front_desk", lambda refresh=False: calls.append(("desk", refresh)))
     monkeypatch.setattr(provisioner, "restart_gateway", lambda: (calls.append("restart"), done.set()))
-    assert org_setup.after_org_setup(object()) == {"refreshing": 2, "gateway_restart": True}
+    result = org_setup.after_org_setup(object())
+    assert result["refreshing"] == 2 and result["gateway_restart"] is True
     assert done.wait(5)
     assert sorted(refreshed) == sorted(ids.values()) and calls == [("desk", True), "restart"]
 
@@ -265,3 +270,61 @@ def test_single_user_onboarding_never_covers_the_organisation_wizard(monkeypatch
     monkeypatch.setattr(routes, "j", lambda handler, data, *a, **k: sent.update(data) or True)
     routes.handle_get(SimpleNamespace(wfile=io.BytesIO(), headers={}), urlparse("/api/onboarding/status"))
     assert sent["completed"] is True
+
+
+def test_provisioner_enables_approval_companions_and_copies_approvals(ent):
+    from api.enterprise.provisioner import companion_plugins, render_config
+    assert companion_plugins(["integration.google", "integration.clickup"]) == [
+        "business-action-approval", "clickup-approval",
+    ]
+    cfg = render_config(
+        {"approvals": {"policies": {"calendar_write": "ask", "clickup_write": "ask"}}},
+        ["memory"], "u-x",
+        ["integration.google", "integration.clickup"], "a@x.com",
+        permissions={"integration.google", "integration.clickup"},
+    )
+    enabled = cfg["plugins"]["enabled"]
+    assert "business-action-approval" in enabled and "clickup-approval" in enabled
+    assert cfg["approvals"]["policies"]["calendar_write"] == "ask"
+
+
+def test_provisioner_seeds_persona_from_default_template(ent, monkeypatch):
+    from api.enterprise import provisioner
+    _, _, root = ent
+    (root / "SOUL.md").write_text("# Company Soul\n", encoding="utf-8")
+    (root / "memories").mkdir(parents=True)
+    (root / "memories" / "MEMORY.md").write_text("# Memory\n", encoding="utf-8")
+    (root / "memories" / "USER.md").write_text("# Template User\n", encoding="utf-8")
+    (root / "config.yaml").write_text("model: {default: m}\n")
+    (root / "profiles" / "u-anna").mkdir(parents=True)  # skip hermes create_profile
+    monkeypatch.setattr(provisioner, "_install_plugins", lambda home, integ=(): None)
+    monkeypatch.setattr(provisioner, "allowed_tools", lambda ts: [])
+    monkeypatch.setattr(provisioner, "rescan", lambda: None)
+    monkeypatch.setattr(provisioner, "_invalidate_webui_profile_cache", lambda: None)
+    provisioner._build("u-anna", ["memory"], owner="a", integrations=[], email="a@x")
+    home = root / "profiles" / "u-anna"
+    assert (home / "SOUL.md").read_text(encoding="utf-8") == "# Company Soul\n"
+    assert (home / "memories" / "MEMORY.md").read_text(encoding="utf-8") == "# Memory\n"
+    assert (home / "memories" / "USER.md").read_text(encoding="utf-8") == "# Template User\n"
+    (home / "memories" / "USER.md").write_text("# Personalized\n", encoding="utf-8")
+    (root / "memories" / "USER.md").write_text("# New Template\n", encoding="utf-8")
+    provisioner._build("u-anna", ["memory"], owner="a", integrations=[], email="a@x")
+    assert (home / "memories" / "USER.md").read_text(encoding="utf-8") == "# Personalized\n"
+    assert (home / "SOUL.md").read_text(encoding="utf-8") == "# Company Soul\n"
+
+
+def test_capability_grants_add_missing_integration_permissions(ent, monkeypatch, tmp_path):
+    from api.enterprise import directory, org_setup
+    from api.enterprise.models import Role
+    from sqlalchemy import select
+    edb, ids, root = ent
+    monkeypatch.setattr("api.customer_wizard.load_wizard_state", lambda: {
+        "capabilities": ["email_assistant", "task_assistant"],
+    })
+    monkeypatch.setattr("api.profiles.get_active_hermes_home", lambda: root)
+    with edb.session() as db:
+        applied = org_setup.apply_capability_grants(db)
+        staff = db.scalar(select(Role).where(Role.key == "staff"))
+        perms = {p.permission for p in staff.permissions}
+    assert "integration.clickup" in perms
+    assert any(a.startswith("staff:") for a in applied)

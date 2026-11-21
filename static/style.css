@@ -6827,13 +6827,34 @@ main.main > .main-view:not([id="mainChat"]):not([id="mainSettings"]) .main-view-
   .workspace-artifact-directory-tail{flex:0 0 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
   .workspace-artifact-meta{display:inline-block;margin-top:4px;padding:1px 5px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:11px;line-height:1.3;}
 .workspace-artifacts-count{opacity:.65;font-size:11px;}
-.rightpanel[data-active-tab="artifacts"] .breadcrumb-bar,.rightpanel[data-active-tab="artifacts"] .file-tree,.rightpanel[data-active-tab="artifacts"] #wsEmptyState{display:none!important;}
+.workspace-resources-heading{font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);padding:8px 4px 6px;}
+.workspace-resource-badge{display:inline-block;padding:1px 6px;border-radius:999px;border:1px solid var(--border);font-size:10px;color:var(--muted);}
+.workspace-resources-available{margin-top:12px;padding-top:8px;border-top:1px solid var(--border);}
+.workspace-resource-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 8px;}
+.workspace-resource-chip{display:inline-flex;align-items:center;min-height:32px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:var(--surface-subtle);color:var(--text);font-size:12px;cursor:pointer;text-decoration:none;transition:border-color .2s ease,background .2s ease;}
+.workspace-resource-chip:hover{border-color:var(--accent);}
+.workspace-resource-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.workspace-files-source{padding:6px 8px 0;border-bottom:1px solid var(--border);}
+.workspace-source-switch{display:flex;gap:4px;padding-bottom:6px;}
+.workspace-source-btn{flex:1;min-height:32px;border:1px solid transparent;background:transparent;color:var(--muted);border-radius:7px;padding:5px 8px;font-size:12px;cursor:pointer;transition:background .2s ease,color .2s ease,border-color .2s ease;}
+.workspace-source-btn.active{background:var(--surface-subtle);color:var(--text);border-color:var(--border2);}
+.workspace-source-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.workspace-drive-banner{font-size:11px;line-height:1.45;color:var(--muted);padding:0 2px 8px;}
+.workspace-drive-banner a{color:var(--accent);}
+.workspace-drive-row{display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:6px;}
+.workspace-drive-row:hover{background:var(--surface-subtle);}
+.workspace-drive-open{display:inline-flex;align-items:center;gap:8px;flex:1;min-width:0;border:0;background:transparent;color:var(--text);cursor:pointer;font-size:13px;text-align:left;padding:6px 4px;min-height:32px;}
+.workspace-drive-open span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.workspace-drive-actions{display:flex;gap:4px;flex-shrink:0;}
+.workspace-drive-action{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;text-decoration:none;min-height:28px;display:inline-flex;align-items:center;}
+.workspace-drive-action:hover{border-color:var(--accent);}
+.rightpanel[data-active-tab="artifacts"] .breadcrumb-bar,.rightpanel[data-active-tab="artifacts"] .file-tree,.rightpanel[data-active-tab="artifacts"] #wsEmptyState,.rightpanel[data-active-tab="artifacts"] .workspace-files-source{display:none!important;}
 .rightpanel[data-active-tab="artifacts"] .workspace-artifacts{display:block;}
 .rightpanel[data-active-tab="files"] .workspace-artifacts{display:none!important;}
-.rightpanel[data-active-tab="todos"] .breadcrumb-bar,.rightpanel[data-active-tab="todos"] .file-tree,.rightpanel[data-active-tab="todos"] #wsEmptyState,.rightpanel[data-active-tab="todos"] .workspace-artifacts{display:none!important;}
+.rightpanel[data-active-tab="todos"] .breadcrumb-bar,.rightpanel[data-active-tab="todos"] .file-tree,.rightpanel[data-active-tab="todos"] #wsEmptyState,.rightpanel[data-active-tab="todos"] .workspace-artifacts,.rightpanel[data-active-tab="todos"] .workspace-files-source{display:none!important;}
 .rightpanel:not([data-active-tab="todos"]) .workspace-todos{display:none!important;}
 /* Company knowledge tab (Lisa Enterprise): read-only browser of the vault areas the person may read */
-.rightpanel[data-active-tab="knowledge"] .breadcrumb-bar,.rightpanel[data-active-tab="knowledge"] .file-tree,.rightpanel[data-active-tab="knowledge"] #wsEmptyState,.rightpanel[data-active-tab="knowledge"] .workspace-artifacts,.rightpanel[data-active-tab="knowledge"] .workspace-todos{display:none!important;}
+.rightpanel[data-active-tab="knowledge"] .breadcrumb-bar,.rightpanel[data-active-tab="knowledge"] .file-tree,.rightpanel[data-active-tab="knowledge"] #wsEmptyState,.rightpanel[data-active-tab="knowledge"] .workspace-artifacts,.rightpanel[data-active-tab="knowledge"] .workspace-todos,.rightpanel[data-active-tab="knowledge"] .workspace-files-source{display:none!important;}
 .rightpanel:not([data-active-tab="knowledge"]) .workspace-knowledge{display:none!important;}
 .workspace-knowledge{flex:1;overflow:auto;min-height:0;display:flex;flex-direction:column;}
 .ck-search{position:sticky;top:0;z-index:1;padding:8px;background:var(--bg);border-bottom:1px solid var(--border);}
@@ -8772,6 +8793,116 @@ html[data-conversation-outline="enabled"] #outlineToggleBtn:not([hidden]){displa
     gap: 8px;
   }
 }
+
+/* ── Onboarding / Getting-started wizard — light theme ───────────────────
+   Base .onboarding-card uses a dark gradient; in light mode --text/--muted are
+   dark too, so without these overrides body copy is unreadable. */
+:root:not(.dark) .onboarding-overlay{
+  background:rgba(15,20,30,.45);
+}
+:root:not(.dark) .onboarding-card{
+  background:linear-gradient(180deg,#ffffff,#f7f8fb);
+  border-color:var(--border,#e2e6ee);
+  color:var(--text,#1a1f2c);
+  box-shadow:0 18px 50px rgba(15,23,42,.14);
+}
+:root:not(.dark) .onboarding-sidebar{
+  background:linear-gradient(180deg,rgba(2,136,168,.08),#f4f6fa);
+  border-right-color:var(--border,#e2e6ee);
+}
+:root:not(.dark) .onboarding-sidebar h2{
+  color:var(--strong,#0f172a);
+}
+:root:not(.dark) .onboarding-sidebar p,
+:root:not(.dark) .onboarding-step-desc,
+:root:not(.dark) .onboarding-copy,
+:root:not(.dark) .member-ob-stepno,
+:root:not(.dark) .member-ob-list,
+:root:not(.dark) .member-ob-check span{
+  color:var(--muted,#5b6472);
+}
+:root:not(.dark) .onboarding-badge{
+  background:rgba(2,136,168,.12);
+  color:var(--blue,#0288a8);
+  border:1px solid rgba(2,136,168,.25);
+}
+:root:not(.dark) .onboarding-step{
+  background:rgba(15,23,42,.03);
+  border-color:transparent;
+  color:var(--text,#1a1f2c);
+}
+:root:not(.dark) .onboarding-step.active,
+:root:not(.dark) .onboarding-step.done{
+  background:rgba(2,136,168,.1);
+  border-color:rgba(2,136,168,.28);
+}
+:root:not(.dark) .onboarding-step-title,
+:root:not(.dark) .onboarding-main h3,
+:root:not(.dark) .onboarding-check strong,
+:root:not(.dark) .member-ob-check strong,
+:root:not(.dark) .member-ob-list b{
+  color:var(--strong,#0f172a);
+}
+:root:not(.dark) .onboarding-step-index{
+  background:rgba(15,23,42,.08);
+  color:var(--text,#1a1f2c);
+}
+:root:not(.dark) .onboarding-step.active .onboarding-step-index,
+:root:not(.dark) .onboarding-step.done .onboarding-step-index{
+  background:var(--blue,#0288a8);
+  color:#fff;
+}
+:root:not(.dark) .onboarding-main{
+  color:var(--text,#1a1f2c);
+}
+:root:not(.dark) .onboarding-check,
+:root:not(.dark) .member-ob-check,
+:root:not(.dark) .onboarding-summary div,
+:root:not(.dark) .onboarding-oauth-card{
+  background:#fff;
+  border-color:var(--border,#e2e6ee);
+}
+:root:not(.dark) .onboarding-check.ok,
+:root:not(.dark) .member-ob-check.ok{
+  background:rgba(61,139,64,.1);
+  border-color:rgba(61,139,64,.35);
+}
+:root:not(.dark) .member-ob-check.wait{
+  background:rgba(180,130,20,.1);
+  border-color:rgba(180,130,20,.35);
+}
+:root:not(.dark) .member-ob-progress{
+  background:rgba(15,23,42,.08);
+}
+:root:not(.dark) .member-ob-badge{
+  background:rgba(15,23,42,.06);
+  color:var(--muted,#5b6472);
+}
+:root:not(.dark) .member-ob-badge.opt{
+  color:#2f7a38;
+  background:rgba(61,139,64,.12);
+}
+:root:not(.dark) .member-ob-field input,
+:root:not(.dark) .onboarding-field input,
+:root:not(.dark) .onboarding-field select{
+  background:#fff;
+  border-color:#cbd5e1;
+  color:#0f172a;
+}
+:root:not(.dark) .onboarding-actions .sm-btn,
+:root:not(.dark) .member-ob-actions .sm-btn{
+  background:#fff;
+  border:1px solid var(--border,#d0d5dd);
+  color:var(--text,#1a1f2c);
+}
+:root:not(.dark) .onboarding-actions .sm-btn.member-ob-cta,
+:root:not(.dark) .member-ob-cta{
+  background:rgba(2,136,168,.1);
+  border-color:rgba(2,136,168,.35)!important;
+  color:var(--blue,#0288a8)!important;
+}
+:root:not(.dark) .onboarding-step .member-ob-dot{color:var(--muted,#5b6472)}
+:root:not(.dark) .onboarding-step .member-ob-dot.ok{color:#2f7a38}
 
 /* ── Customer Wizard Light Mode Full Theme Adaptation ──────────────────── */
 :root:not(.dark) .customer-wizard-card {

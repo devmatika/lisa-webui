@@ -247,6 +247,12 @@ def _create_user(handler, body):
     except DirectoryError as exc:
         return bad(handler, str(exc), 400)
     profile = _provision(user_id)
+    try:
+        with edb.session() as db:
+            from api.enterprise import identity_mapping
+            identity_mapping.sync(db)  # keep identity-mapping.json (ClickUp/Telegram directory) in sync
+    except Exception:
+        logger.exception("Could not sync identity-mapping after creating user %s", user_id)
     from api.enterprise import mailer
     emailed = False
     if mailer.configured():
@@ -275,6 +281,13 @@ def _set_status(handler, body):
     if unlinked:
         with edb.session() as db:
             telegram.apply(db)
+    else:
+        try:
+            with edb.session() as db:
+                from api.enterprise import identity_mapping
+                identity_mapping.sync(db)
+        except Exception:
+            logger.exception("Could not sync identity-mapping after status change")
     return j(handler, {"ok": True, "sessions_revoked": revoked, "telegram_unlinked": unlinked})
 
 
@@ -392,7 +405,69 @@ def _integrations(handler, _body):
     from api.enterprise import integrations
     u = current_user(handler)
     return j(handler, {**integrations.status(u.hermes_profile),
-                       "google_allowed": u.can("integration.google"), "clickup_allowed": u.can("integration.clickup")})
+                       "google_allowed": u.can("integration.google"),
+                       "google_drive_write": u.can("integration.google.drive_write"),
+                       "outlook_allowed": u.can("integration.outlook"),
+                       "email_allowed": u.can("integration.email"),
+                       "clickup_allowed": u.can("integration.clickup")})
+
+
+def _connect_onboarding(handler, _body):
+    from api.helpers import j
+    from api.enterprise import connect_onboarding
+    u = current_user(handler)
+    with edb.session() as db:
+        return j(handler, connect_onboarding.status(db, u))
+
+
+def _member_onboarding_mutate(handler, body, action: str):
+    from api.helpers import bad, j
+    from api.enterprise import connect_onboarding
+    u = current_user(handler)
+    if not u.hermes_profile:
+        return bad(handler, "Your assistant profile is not ready yet.", 400)
+    try:
+        if action == "dismiss":
+            connect_onboarding.dismiss(u.hermes_profile)
+        elif action == "complete":
+            connect_onboarding.complete(u.hermes_profile)
+        elif action == "reopen":
+            connect_onboarding.reopen(u.hermes_profile)
+        elif action == "step":
+            connect_onboarding.set_step(u.hermes_profile, str((body or {}).get("step") or ""))
+        elif action == "skip":
+            step = str((body or {}).get("step") or "")
+            if step not in ("google", "microsoft", "telegram"):
+                return bad(handler, "Unknown step to skip", 400)
+            connect_onboarding.skip_action(u.hermes_profile, step)
+        else:
+            return bad(handler, "Unknown action", 400)
+    except DirectoryError as exc:
+        return bad(handler, str(exc), 400)
+    with edb.session() as db:
+        directory.audit(db, _actor(handler), f"onboarding.member_{action}", u.user_id,
+                        step=str((body or {}).get("step") or "") or None)
+        return j(handler, {"ok": True, **connect_onboarding.status(db, u)})
+
+
+def _connect_onboarding_dismiss(handler, body):
+    return _member_onboarding_mutate(handler, body, "dismiss")
+
+
+def _connect_onboarding_complete(handler, body):
+    return _member_onboarding_mutate(handler, body, "complete")
+
+
+def _connect_onboarding_reopen(handler, body):
+    return _member_onboarding_mutate(handler, body, "reopen")
+
+
+def _connect_onboarding_step(handler, body):
+    return _member_onboarding_mutate(handler, body, "step")
+
+
+def _connect_onboarding_skip(handler, body):
+    return _member_onboarding_mutate(handler, body, "skip")
 
 
 def _google_start(handler, _body):
@@ -426,7 +501,8 @@ def _google_callback(handler, _body):
         return _redirect(handler, "/lisa?error=" + quote(msg) + "#account")
     with edb.session() as db:
         directory.audit(db, _actor(handler), "integration.google_connected", u.user_id)
-    return _redirect(handler, "/lisa?connected=google")
+    # Chat home: first-login overlay can continue with Microsoft; My account also works from there.
+    return _redirect(handler, "/?connected=google")
 
 
 def _google_disconnect(handler, _body):
@@ -436,6 +512,80 @@ def _google_disconnect(handler, _body):
     with edb.session() as db:
         directory.audit(db, _actor(handler), "integration.google_disconnected", current_user(handler).user_id)
     return j(handler, {"ok": True})
+
+
+def _drive_call(handler, fn):
+    from api.helpers import bad, j
+    from api.enterprise import drive
+    u = current_user(handler)
+    if not u.can("integration.google"):
+        return bad(handler, "Your role cannot use Google Drive", 403)
+    try:
+        return j(handler, fn(u))
+    except DirectoryError as exc:
+        return bad(handler, str(exc), 403 if "denied" in str(exc).lower() or "refusing" in str(exc).lower()
+                   or "Connect Google" in str(exc) else 400)
+
+
+def _drive_status(handler, _body):
+    from api.enterprise import drive
+    return _drive_call(handler, lambda u: drive.status(
+        u.hermes_profile, can_browse=u.can("integration.google"),
+        can_write=u.can("integration.google.drive_write")))
+
+
+def _drive_roots(handler, _body):
+    from api.enterprise import drive
+    return _drive_call(handler, lambda u: drive.roots(u.hermes_profile, u.user_id))
+
+
+def _drive_list(handler, _body):
+    from api.enterprise import drive
+    return _drive_call(handler, lambda u: drive.list_files(
+        u.hermes_profile, u.user_id, corpus=_query(handler, "corpus") or "user",
+        drive_id=_query(handler, "drive_id"), folder_id=_query(handler, "folder_id")))
+
+
+def _drive_meta(handler, _body):
+    from api.enterprise import drive
+    return _drive_call(handler, lambda u: drive.meta(u.hermes_profile, u.user_id, _query(handler, "file_id")))
+
+
+def _drive_import(handler, body):
+    from api.helpers import bad, j
+    from api.enterprise import drive
+    u = current_user(handler)
+    if not u.can("integration.google"):
+        return bad(handler, "Your role cannot use Google Drive", 403)
+    try:
+        out = drive.import_to_workspace(u.hermes_profile, u.user_id, str(body.get("file_id") or ""),
+                                        dest_dir=str(body.get("dest_dir") or "drive-imports"))
+        with edb.session() as db:
+            directory.audit(db, _actor(handler), "integration.google.drive_import", u.user_id,
+                            path=out.get("path"), file_id=body.get("file_id"))
+        return j(handler, out)
+    except DirectoryError as exc:
+        return bad(handler, str(exc), 400)
+
+
+def _drive_upload(handler, body):
+    from api.helpers import bad, j
+    from api.enterprise import drive
+    u = current_user(handler)
+    if not u.can("integration.google"):
+        return bad(handler, "Your role cannot use Google Drive", 403)
+    if not u.can("integration.google.drive_write"):
+        return bad(handler, "Your role can browse Google Drive, not upload", 403)
+    try:
+        out = drive.upload_from_workspace(
+            u.hermes_profile, u.user_id, relative_path=str(body.get("path") or ""),
+            parent_id=str(body.get("parent_id") or ""), name=str(body.get("name") or ""))
+        with edb.session() as db:
+            directory.audit(db, _actor(handler), "integration.google.drive_upload", u.user_id,
+                            path=body.get("path"), file_id=out.get("id"))
+        return j(handler, out)
+    except DirectoryError as exc:
+        return bad(handler, str(exc), 400)
 
 
 def _clickup_token(handler, body):
@@ -542,6 +692,11 @@ def _k_areas(handler, _body):
 def _k_save_area(handler, body):
     return _knowledge_call(handler, lambda db: {"ok": True, "key": knowledge.save_area(
         db, _actor(handler), body.get("key", ""), body.get("name", ""), list(body.get("grants") or [])).key})
+
+
+def _k_delete_area(handler, body):
+    return _knowledge_call(handler, lambda db: (knowledge.delete_area(db, _actor(handler), str(body.get("key") or "")),
+                                                {"ok": True})[1])
 
 
 def _k_import(handler, body):
@@ -706,10 +861,22 @@ ROUTES = {
     ("GET", "/api/enterprise/audit"): (_audit, "org.audit.read"),
     ("GET", "/api/enterprise/ops"): (_ops, "org.audit.read"),
     ("GET", "/api/enterprise/integrations"): (_integrations, "chat.use"),
+    ("GET", "/api/enterprise/onboarding/connect"): (_connect_onboarding, "signed-in"),
+    ("POST", "/api/enterprise/onboarding/connect/dismiss"): (_connect_onboarding_dismiss, "signed-in"),
+    ("POST", "/api/enterprise/onboarding/connect/complete"): (_connect_onboarding_complete, "signed-in"),
+    ("POST", "/api/enterprise/onboarding/connect/reopen"): (_connect_onboarding_reopen, "signed-in"),
+    ("POST", "/api/enterprise/onboarding/connect/step"): (_connect_onboarding_step, "signed-in"),
+    ("POST", "/api/enterprise/onboarding/connect/skip"): (_connect_onboarding_skip, "signed-in"),
     ("GET", "/api/enterprise/google/start"): (_google_start, "integration.google"),
     # signed-in only: the Google tools need integration.google, Gmail accounts integration.email (checked inside)
     ("GET", "/api/enterprise/google/callback"): (_google_callback, "signed-in"),
     ("POST", "/api/enterprise/google/disconnect"): (_google_disconnect, "integration.google"),
+    ("GET", "/api/enterprise/google/drive/status"): (_drive_status, "integration.google"),
+    ("GET", "/api/enterprise/google/drive/roots"): (_drive_roots, "integration.google"),
+    ("GET", "/api/enterprise/google/drive/list"): (_drive_list, "integration.google"),
+    ("GET", "/api/enterprise/google/drive/meta"): (_drive_meta, "integration.google"),
+    ("POST", "/api/enterprise/google/drive/import"): (_drive_import, "integration.google"),
+    ("POST", "/api/enterprise/google/drive/upload"): (_drive_upload, "integration.google.drive_write"),
     ("POST", "/api/enterprise/integrations/clickup"): (_clickup_token, "integration.clickup"),
     ("GET", "/api/enterprise/telegram"): (_telegram_status, "chat.use"),
     ("POST", "/api/enterprise/telegram/link"): (_telegram_link, "chat.use"),
@@ -722,6 +889,7 @@ ROUTES = {
     ("GET", "/api/enterprise/knowledge/drafts"): (_k_pending, "knowledge.approve"),
     ("POST", "/api/enterprise/knowledge/drafts/decide"): (_k_decide, "knowledge.approve"),
     ("POST", "/api/enterprise/knowledge/areas"): (_k_save_area, "knowledge.manage"),
+    ("POST", "/api/enterprise/knowledge/areas/delete"): (_k_delete_area, "knowledge.manage"),
     ("GET", "/api/enterprise/knowledge/gaps"): (_k_gaps, "knowledge.manage"),
     ("POST", "/api/enterprise/knowledge/import"): (_k_import, "knowledge.manage"),
     ("POST", "/api/enterprise/knowledge/defaults"): (_k_defaults, "knowledge.manage"),

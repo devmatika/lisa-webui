@@ -571,6 +571,8 @@ def _start_enterprise() -> None:
             revision = edb.migrate()
             with edb.session() as db:
                 seed(db)
+                from api.enterprise.directory import apply_default_grant_releases
+                apply_default_grant_releases(db)  # one-shot Staff Google/Outlook defaults; never re-add
             from api.enterprise.provisioner import ensure_front_desk, ensure_root_gateway_url
             ensure_root_gateway_url()
             ensure_front_desk()

@@ -94,6 +94,27 @@
     });
   }
 
+  function addGettingStartedMenu() {
+    const menu = document.querySelector('.settings-menu-items');
+    if (!menu || menu.querySelector('[data-lisa-getting-started]')) return;
+    // Place near the top of the settings list so new people find it quickly.
+    const first = menu.querySelector('.side-menu-item');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'side-menu-item';
+    b.dataset.lisaGettingStarted = '1';
+    b.innerHTML = ICONS.guide.replace('width="18" height="18"', 'width="16" height="16"') + '<span>Getting started</span>';
+    b.addEventListener('click', () => {
+      if (window.LISA_MEMBER_ONBOARDING && typeof window.LISA_MEMBER_ONBOARDING.reopen === 'function') {
+        window.LISA_MEMBER_ONBOARDING.reopen();
+      } else {
+        location.href = '/?getting_started=1';
+      }
+    });
+    if (first) menu.insertBefore(b, first);
+    else menu.appendChild(b);
+  }
+
   async function init() {
     let me;
     try {
@@ -109,6 +130,7 @@
     const pages = PAGES.filter(([, , perm]) => !perm || perms.has(perm));
     addRail(perms.has('org.users.manage') ? 'users' : 'account');
     addSideMenu(pages);
+    addGettingStartedMenu();
     hideOperatorOnly(perms);
     // /#setup (linked from the Organization page) opens the setup wizard where it was left.
     if (location.hash === '#setup' && perms.has('operator.setup') && typeof loadCustomerWizard === 'function') {

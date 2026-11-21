@@ -43,6 +43,7 @@ def tg(tmp_path, monkeypatch, request):
         request.getfixturevalue("allow_outbound_network")
     monkeypatch.setenv("LISA_ENTERPRISE", "1")
     monkeypatch.setenv("LISA_DATABASE_URL", url)
+    monkeypatch.setenv("LISA_KNOWLEDGE_DIR", str(tmp_path / "knowledge"))
     edb.reset_for_tests()
     if url.startswith("postgresql"):
         with edb.engine().begin() as conn:
@@ -160,3 +161,62 @@ def test_identity_mapping_is_generated_from_the_user_directory(tg):
     anna = next(p for p in people if p["email"] == "anna@ksp.example")
     assert anna["telegram"] == {"user_id": "111"} and anna["person_id"] == ids["anna"]
     assert "telegram" not in next(p for p in people if p["email"] == "ben@ksp.example")
+
+
+def test_identity_mapping_preserves_clickup_aliases_and_external_people(tg):
+    edb, telegram, pairing, root, ids, restarts = tg
+    from api.enterprise.directory import Actor
+    mapping = root / "config" / "identity-mapping.json"
+    mapping.parent.mkdir(parents=True, exist_ok=True)
+    mapping.write_text(json.dumps({
+        "people": [
+            {
+                "person_id": "old-anna",
+                "canonical_name": "Anna Berger",
+                "name": "Anna Berger",
+                "email": "anna@ksp.example",
+                "emails": ["anna@ksp.example", "anna.personal@example"],
+                "role": "CEO",
+                "aliases": ["Anna", "AB"],
+                "clickup": {"user_id": 57259309, "member_name": "anna"},
+                "telegram": {"user_id": "999", "display_name": "Anna", "username": "@anna"},
+            },
+            {
+                "person_id": "stakeholder-1",
+                "canonical_name": "External Partner",
+                "name": "External Partner",
+                "email": "partner@client.example",
+                "emails": ["partner@client.example"],
+                "role": "Partner",
+                "clickup": {"user_id": 111, "member_name": "partner"},
+                "aliases": ["Partner"],
+            },
+        ],
+        "aliases": {"anna": "old-anna", "partner@client.example": "stakeholder-1"},
+    }, indent=1))
+    pairing.codes["ANNA2345"] = "111"
+    with edb.session() as db:
+        telegram.link(db, Actor(ids["anna"]), ids["anna"], "ANNA2345")
+    with edb.session() as db:
+        telegram.apply(db)
+    data = json.loads(mapping.read_text())
+    people = data["people"]
+    anna = next(p for p in people if "anna@ksp.example" in (p.get("emails") or [p.get("email")]))
+    assert anna["person_id"] == ids["anna"]
+    assert anna["clickup"] == {"user_id": 57259309, "member_name": "anna"}
+    assert anna["role"] == "CEO"
+    assert anna["telegram"]["user_id"] == "111"
+    assert anna["telegram"]["username"] == "@anna"
+    assert "anna.personal@example" in anna["emails"]
+    partner = next(p for p in people if p["email"] == "partner@client.example")
+    assert partner["clickup"]["user_id"] == 111 and partner["person_id"] == "stakeholder-1"
+    assert data["aliases"]["anna"] == ids["anna"]
+    assert data["aliases"]["partner@client.example"] == "stakeholder-1"
+    # Assistants read the file from their own profile home — publish a copy there too.
+    profile_copy = root / "profiles" / "u-anna" / "config" / "identity-mapping.json"
+    profile_copy.parent.mkdir(parents=True, exist_ok=True)
+    with edb.session() as db:
+        telegram.apply(db)
+    assert profile_copy.is_file()
+    copied = json.loads(profile_copy.read_text())
+    assert next(p for p in copied["people"] if p["person_id"] == ids["anna"])["clickup"]["user_id"] == 57259309

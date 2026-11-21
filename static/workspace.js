@@ -415,18 +415,24 @@ function switchWorkspacePanelTab(tab){
   const knowledge = $('workspaceKnowledge');
   if(knowledge) knowledge.hidden = _workspacePanelActiveTab !== 'knowledge';
   const fileTree = $('fileTree');
+  const onFiles = _workspacePanelActiveTab === 'files';
+  const onDrive = onFiles && window.LisaDrive && LisaDrive.source === 'drive';
   if(fileTree){
     // Belt-and-suspenders with CSS: Knowledge must not leave the Files tree taking flex space.
-    if(_workspacePanelActiveTab === 'knowledge') fileTree.setAttribute('hidden', '');
+    if(_workspacePanelActiveTab === 'knowledge' || _workspacePanelActiveTab === 'artifacts' || _workspacePanelActiveTab === 'todos') fileTree.setAttribute('hidden', '');
     else fileTree.removeAttribute('hidden');
   }
+  const srcBar = $('workspaceFilesSource');
+  if(srcBar) srcBar.hidden = !onFiles || !window.LISA_ENTERPRISE;
+  if(window.LisaDrive && typeof LisaDrive.syncChrome === 'function') LisaDrive.syncChrome();
   const filesOnly = ['btnNewFile', 'btnNewFolder', 'btnUploadWorkspace'];
   for(const id of filesOnly){
     const btn = $(id);
     if(!btn) continue;
-    btn.hidden = _workspacePanelActiveTab === 'knowledge';
+    btn.hidden = !onFiles || onDrive || _workspacePanelActiveTab === 'knowledge';
   }
   if(_workspacePanelActiveTab === 'knowledge' && typeof window.renderCompanyKnowledge === 'function') window.renderCompanyKnowledge();
+  if(onDrive && typeof switchWorkspaceFileSource === 'function') switchWorkspaceFileSource('drive');
 }
 
 function _loadWorkspacePanelTodos(){
@@ -602,6 +608,28 @@ async function refreshOpenPreviewIfMutated(){
   await openFile(_previewCurrentPath, { bustCache: true });
 }
 
+function _mediaRefsFromText(text){
+  if(typeof text !== 'string' || !text.includes('MEDIA:')) return [];
+  const out = [];
+  const re = /MEDIA:([^\s\)\]]+)/g;
+  let m;
+  while((m = re.exec(text))){
+    const ref = String(m[1] || '').trim();
+    if(ref) out.push(ref);
+  }
+  return out;
+}
+
+function _attachmentPathsFromMessage(msg){
+  const files = msg && (msg.files || msg.attachments || msg.uploaded_files);
+  if(!Array.isArray(files)) return [];
+  return files.map((f) => {
+    if(!f) return '';
+    if(typeof f === 'string') return f;
+    return f.path || f.filepath || f.name || '';
+  }).filter(Boolean);
+}
+
 function collectSessionArtifacts(){
   const items = [];
   const seen = new Set();
@@ -615,16 +643,32 @@ function collectSessionArtifacts(){
   for(const tc of (S.toolCalls || [])){
     for(const a of _artifactCandidatesFromToolCall(tc)) push(a.path, a.kind || tc.name || 'tool');
   }
-  // Source 2 & 3: message-level data — both text-mined diffs and structured
-  // tool_calls / tool_use content blocks that survive the S.toolCalls clear.
+  // Source 2–4: message-level writes, MEDIA outputs, and user uploads.
   for(const msg of (S.messages || [])){
     if(!msg) continue;
     const text = msg.content || msg.text || msg.message || '';
-    // Text-mined diff/patch fences (existing path).
     if(typeof text === 'string'){
       for(const a of _artifactCandidatesFromText(text)) push(a.path, a.kind);
+      for(const ref of _mediaRefsFromText(text)) push(ref, 'media');
     }
-    // Structured tool_calls array (OpenAI format: {function:{name,arguments}}).
+    if(Array.isArray(msg.content)){
+      for(const block of msg.content){
+        if(!block) continue;
+        if(typeof block === 'string'){
+          for(const ref of _mediaRefsFromText(block)) push(ref, 'media');
+          continue;
+        }
+        if(block.type === 'text' && typeof block.text === 'string'){
+          for(const ref of _mediaRefsFromText(block.text)) push(ref, 'media');
+        }
+        if(block.type === 'tool_use'){
+          let inp = block.input || {};
+          if(typeof inp === 'string'){ try{ inp = JSON.parse(inp); }catch(_){} }
+          const fakeTc = {name: block.name || '', args: inp, result: block.result || ''};
+          for(const a of _artifactCandidatesFromToolCall(fakeTc)) push(a.path, a.kind || block.name || 'tool');
+        }
+      }
+    }
     if(Array.isArray(msg.tool_calls)){
       for(const tc of msg.tool_calls){
         if(!tc || typeof tc !== 'object') continue;
@@ -636,18 +680,36 @@ function collectSessionArtifacts(){
         for(const a of _artifactCandidatesFromToolCall(fakeTc)) push(a.path, a.kind || name || 'tool');
       }
     }
-    // Structured content array with tool_use blocks (Anthropic format).
-    if(Array.isArray(msg.content)){
-      for(const block of msg.content){
-        if(!block || block.type !== 'tool_use') continue;
-        let inp = block.input || {};
-        if(typeof inp === 'string'){ try{ inp = JSON.parse(inp); }catch(_){} }
-        const fakeTc = {name: block.name || '', args: inp, result: block.result || ''};
-        for(const a of _artifactCandidatesFromToolCall(fakeTc)) push(a.path, a.kind || block.name || 'tool');
-      }
+    if(msg.role === 'user' || msg.role === 'human'){
+      for(const p of _attachmentPathsFromMessage(msg)) push(p, 'upload');
     }
   }
   return items.slice(0, 50);
+}
+
+function _resourceSourceLabel(source){
+  const key = String(source || '').toLowerCase();
+  if(key === 'upload' || key === 'attachment') return 'Upload';
+  if(key === 'media') return 'Lisa';
+  if(key === 'drive') return 'Drive';
+  if(key === 'knowledge') return 'Knowledge';
+  if(key.includes('write') || key.includes('edit') || key.includes('patch') || key.includes('create')) return 'Lisa';
+  return source || 'Session';
+}
+
+function _resourcesAvailableHtml(){
+  const chips = [];
+  chips.push(`<button type="button" class="workspace-resource-chip" onclick="switchWorkspacePanelTab('files')">Open Files</button>`);
+  const knowTab = $('workspaceKnowledgeTab');
+  if(knowTab && !knowTab.hidden){
+    chips.push(`<button type="button" class="workspace-resource-chip" onclick="switchWorkspacePanelTab('knowledge')">Company Knowledge</button>`);
+  }
+  if(window.LisaDrive && LisaDrive.ready){
+    chips.push(`<button type="button" class="workspace-resource-chip" onclick="switchWorkspacePanelTab('files'); switchWorkspaceFileSource('drive')">Google Drive</button>`);
+  } else if(window.LisaDrive && LisaDrive.browseAllowed && !LisaDrive.connected){
+    chips.push(`<a class="workspace-resource-chip" href="/lisa#account">Connect Google</a>`);
+  }
+  return `<div class="workspace-resources-available"><div class="workspace-resources-heading">Available</div><div class="workspace-resource-chips">${chips.join('')}</div></div>`;
 }
 
 function renderSessionArtifacts(){
@@ -656,12 +718,13 @@ function renderSessionArtifacts(){
   if(!root) return;
   const items = collectSessionArtifacts();
   if(count) count.textContent = String(items.length);
+  const available = _resourcesAvailableHtml();
   if(!S.session){
-    root.innerHTML = '<div class="workspace-artifact-empty">Open a conversation to see files changed in this session.</div>';
+    root.innerHTML = '<div class="workspace-artifact-empty">Open a conversation to see files from this chat.</div>' + available;
     return;
   }
   if(!items.length){
-    root.innerHTML = '<div class="workspace-artifact-empty">No artifacts detected yet. Files created or edited during this session will appear here.</div>';
+    root.innerHTML = '<div class="workspace-artifact-empty">Nothing in this chat yet. Uploads, images Lisa creates, and files she edits will show up here.</div>' + available;
     return;
   }
   // Strip workspace prefix for display so long absolute paths don't clutter the list.
@@ -682,16 +745,16 @@ function renderSessionArtifacts(){
       tail: directory.slice(parentSlash + 1),
     };
   };
-  root.innerHTML = items.map(item => {
+  const list = items.map(item => {
     const path = displayPath(item.path);
     const parts = splitArtifactDisplayPath(path);
     const directory = (parts.head || parts.tail)
       ? `<div class="workspace-artifact-directory"><span class="workspace-artifact-directory-head">${esc(parts.head)}</span><span class="workspace-artifact-directory-tail">${esc(parts.tail)}</span></div>`
       : '';
-    const source = item.source ? esc(item.source) : esc(t('workspace_artifact_source_session') || 'session');
-    const sourceAttrs = item.source ? '' : ' data-i18n="workspace_artifact_source_session"';
-    return `<button type="button" class="workspace-artifact-item" title="${esc(path)}" data-artifact-path="${esc(item.path)}" onclick="openArtifactPath(this.dataset.artifactPath)"><div class="workspace-artifact-filename">${esc(parts.name)}</div>${directory}<div class="workspace-artifact-meta"${sourceAttrs}>${source}</div></button>`;
+    const source = esc(_resourceSourceLabel(item.source));
+    return `<button type="button" class="workspace-artifact-item" title="${esc(path)}" data-artifact-path="${esc(item.path)}" onclick="openArtifactPath(this.dataset.artifactPath)"><div class="workspace-artifact-filename">${esc(parts.name)}</div>${directory}<div class="workspace-artifact-meta"><span class="workspace-resource-badge">${source}</span></div></button>`;
   }).join('');
+  root.innerHTML = `<div class="workspace-resources-heading">In this chat</div>${list}${available}`;
 }
 
 function projectSessionArtifactsForOwner(sessionId){

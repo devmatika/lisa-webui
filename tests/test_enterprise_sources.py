@@ -114,6 +114,31 @@ def test_the_vault_becomes_areas_with_their_own_readers_and_stays_in_sync(ent):
     assert titles("anna", "receipts") == [] and titles("anna", "barn") == ["Parking"]
 
 
+def test_switching_source_url_reclones_instead_of_fetching_stale_origin(ent, tmp_path):
+    """Restart / reconnect: changing git@… → file:// must not keep failing on the old deploy key."""
+    from api.enterprise import directory, sources
+    edb, ids, repo = ent
+    other = tmp_path / "sources" / "other"
+    (other / "06-Company-Knowledge").mkdir(parents=True)
+    (other / "06-Company-Knowledge" / "New.md").write_text("# New\nfrom file mount")
+    _git(other, "init", "-q", "-b", "main")
+    _git(other, "add", "-A")
+    _git(other, "commit", "-qm", "other")
+    with edb.session() as db:
+        sid = sources.save_source(
+            db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{repo}",
+            branch="main", credential_id=None,
+            folders=[{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff"]}]).id
+    assert sources.sync(sid)["last_error"] is None
+    from api.enterprise.models import KnowledgeSource
+    with edb.session() as db:
+        db.get(KnowledgeSource, sid).url = f"file://{other}"
+    view = sources.sync(sid)
+    assert view["last_error"] is None
+    assert (sources._repo_dir(sid) / "06-Company-Knowledge" / "New.md").is_file()
+    assert sources._origin_url(sources._repo_dir(sid)) == f"file://{other.resolve()}"
+
+
 def test_a_failed_pull_is_reported_in_plain_words(ent, tmp_path):
     from api.enterprise import directory, sources
     edb, ids, repo = ent

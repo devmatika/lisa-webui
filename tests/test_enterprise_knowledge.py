@@ -188,3 +188,47 @@ def test_browsing_lists_only_the_areas_a_person_may_read(kb):
     assert [(a["key"], a["name"], a["level"]) for a in anna["areas"]] == [("farm", "Farm", "contribute")]
     assert [d["path"] for d in anna["areas"][0]["docs"]] == ["farm/milking.md"]  # never .history or other areas
     assert ben["areas"] == [] and "salaries" not in str(anna)
+
+
+def test_delete_area_removes_grants_folder_and_source_mapping(kb, tmp_path, monkeypatch):
+    import json
+
+    from api.enterprise import knowledge, sources
+    from api.enterprise.directory import Actor, DirectoryError
+    from api.enterprise.models import KnowledgeArea, KnowledgeSource
+
+    edb, ids, vault = kb
+    local = tmp_path / "sources"
+    repo = local / "vault"
+    (repo / "Stale").mkdir(parents=True)
+    (repo / "Keep").mkdir(parents=True)
+    (repo / "Stale" / "x.md").write_text("# x\n")
+    (repo / "Keep" / "y.md").write_text("# y\n")
+    monkeypatch.setattr(sources, "LOCAL_SOURCES", local)
+    with edb.session() as db:
+        actor = Actor(ids["boss"])
+        src = sources.save_source(
+            db, actor, source_id=None, name="Vault", url=f"file://{repo}", branch="main",
+            credential_id=None,
+            folders=[{"folder": "Stale", "include": True, "key": "stale", "name": "Stale files",
+                      "readers": ["staff"]},
+                     {"folder": "Keep", "include": True, "key": "keep", "name": "Keep",
+                      "readers": ["staff"]}])
+        sid = src.id
+        (vault / "stale").mkdir(parents=True, exist_ok=True)
+        (vault / "stale" / "old.md").write_text("# old\n")
+        sources._manifest_path(sid).parent.mkdir(parents=True, exist_ok=True)
+        sources._manifest_path(sid).write_text('{"stale": ["old.md"], "keep": []}')
+    with edb.session() as db:
+        knowledge.delete_area(db, Actor(ids["boss"]), "stale")
+        assert db.get(KnowledgeArea, "stale") is None
+        assert db.get(KnowledgeArea, "keep") is not None
+        mapped = db.get(KnowledgeSource, sid).folders
+        assert mapped["Stale"] is None and mapped["Keep"] == "keep"
+    assert not (vault / "stale").exists()
+    assert "stale" not in json.loads(sources._manifest_path(sid).read_text())
+    with edb.session() as db:
+        with pytest.raises(DirectoryError, match="not found"):
+            knowledge.delete_area(db, Actor(ids["boss"]), "stale")
+        with pytest.raises(DirectoryError, match="last folder"):
+            knowledge.delete_area(db, Actor(ids["boss"]), "keep")

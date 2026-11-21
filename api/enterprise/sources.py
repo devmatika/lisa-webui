@@ -6,12 +6,14 @@ included and which roles may read it. Lisa then pulls the repository on a schedu
 never pushes) and mirrors the Markdown notes into the areas. Who may read what is always the
 area's grants (``knowledge.py``); nothing in the repository grants anything.
 
-Access to the repository:
+Access to the repository (preferred on Docker servers first):
+- ``file://`` below ``LOCAL_SOURCES`` (bind-mount the host clone under
+  ``/opt/lisa/sources/<name>``). Survives container restarts; no deploy key or token in the
+  container. Ops keep the clone fresh on the host (cron / ``obsidian-vault-sync``).
 - SSH (``git@gitlab.com:org/vault.git``): Lisa generates a deploy key; the admin adds its public
-  half as a read-only deploy key in GitLab / GitHub.
+  half as a read-only deploy key in GitLab / GitHub. Keys live under the knowledge volume; if they
+  are lost after a wipe/restore, reconnect or prefer ``file://``.
 - HTTPS: an access token with read access, sent as an HTTP header (never stored in a URL).
-- ``file://`` only below ``LOCAL_SOURCES`` (a folder mounted into the container); anything else on
-  the server, such as the Hermes profiles, can never become a source.
 
 Secrets and clones live under ``<vault>/.sources/`` (a dot folder: never searchable).
 """
@@ -105,7 +107,8 @@ def _check_url(url: str) -> str:
         if local == LOCAL_SOURCES.resolve() or LOCAL_SOURCES.resolve() not in local.parents:
             raise DirectoryError(f"A folder on the server must be inside {LOCAL_SOURCES} (mounted into the container)")
         return "file://" + str(local)
-    raise DirectoryError("Use the repository's SSH address (git@…) or HTTPS address (https://…)")
+    raise DirectoryError(
+        "Use a mounted folder (file:///opt/lisa/sources/…), SSH (git@…), or HTTPS (https://…)")
 
 
 def _git(args: list[str], *, credential_id: str | None, cwd: Path | None = None) -> str:
@@ -168,11 +171,24 @@ def _explain(stderr: str, local: bool = False, push: bool = False) -> str:
     return "Git: " + tail[0][:300]
 
 
+def _origin_url(target: Path) -> str:
+    try:
+        return _git(["remote", "get-url", "origin"], credential_id=None, cwd=target).strip()
+    except DirectoryError:
+        return ""
+
+
 def _fetch(url: str, branch: str, credential_id: str | None, target: Path) -> str:
-    """Clone or update ``target`` to the branch's newest commit (shallow); returns the commit."""
+    """Clone or update ``target`` to the branch's newest commit (shallow); returns the commit.
+
+    If the existing clone's ``origin`` no longer matches ``url`` (e.g. switching from GitLab SSH to
+    a mounted ``file://`` vault), re-clone so a stale remote cannot keep failing with deploy-key
+    errors after a restart."""
     if not _BRANCH.match(branch or ""):
         raise DirectoryError("Branch: letters, digits, . / - or _")
-    if (target / ".git").is_dir():
+    url = _check_url(url)
+    reuse = (target / ".git").is_dir() and _origin_url(target) == url
+    if reuse:
         _git(["fetch", "--depth", "1", "origin", branch], credential_id=credential_id, cwd=target)
         _git(["reset", "--hard", "FETCH_HEAD"], credential_id=credential_id, cwd=target)
         _git(["clean", "-fdx"], credential_id=credential_id, cwd=target)

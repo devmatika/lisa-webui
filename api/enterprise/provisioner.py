@@ -27,11 +27,21 @@ logger = logging.getLogger(__name__)
 
 SURFACES = ("cli", "telegram", "api_server")
 # Bump when what a profile gets changes (new tools, settings): on the next start Lisa rebuilds every
-# assistant once, so an upgrade needs no "Apply" in the setup wizard. 2 = mail tools.
-PROFILE_LAYOUT = 2
+# assistant once, so an upgrade needs no "Apply" in the setup wizard. 2 = mail tools;
+# 3 = Staff/Manager/Admin default Google + Outlook plugins after grant release;
+# 4 = companion approval plugins + copy approvals/persona from the organisation template.
+PROFILE_LAYOUT = 4
 FRONT_DESK = "front-desk"
 PLUGIN_SOURCE = Path("/opt/lisa/plugins")  # mounted read-only by the Lisa stack
 REQUIRED_PLUGINS = ("org-authz",)
+# Write-gate companions installed whenever the matching integration is granted.
+APPROVAL_COMPANIONS = {
+    "integration.google": ("business-action-approval",),
+    "integration.outlook": ("business-action-approval",),
+    "integration.email": ("business-action-approval",),
+    "integration.clickup": ("clickup-approval",),
+}
+ALL_APPROVAL_PLUGINS = frozenset({"business-action-approval", "clickup-approval"})
 # Role toolsets that are provided by Lisa plugins rather than Hermes core.
 PLUGIN_TOOLSETS = {"knowledge": "lisa_knowledge"}
 GOOGLE_SCRIPT = "/opt/hermes/skills/productivity/google-workspace/scripts/google_api.py"
@@ -57,7 +67,15 @@ INTEGRATIONS = {
                           "user_env": (), "settings": None},
 }
 MEDIA_POLICY = {"profile_isolation": True, "strict": True, "trust_recent_files": False}
-COPIED_CONFIG_KEYS = ("model", "providers", "custom_providers", "fallback_providers", "auxiliary", "timezone")
+COPIED_CONFIG_KEYS = ("model", "providers", "custom_providers", "fallback_providers", "auxiliary",
+                      "timezone", "approvals")
+
+
+def companion_plugins(integrations: list[str]) -> list[str]:
+    out: list[str] = []
+    for key in integrations:
+        out.extend(APPROVAL_COMPANIONS.get(key, ()))
+    return list(dict.fromkeys(out))
 # The setup wizard stores the Microsoft app and the company ClickUp token under these names; the
 # Outlook plugin reads MS_GRAPH_*, and CLICKUP_API_KEY in a user's profile would read as their own.
 ENV_ALIASES = {"MICROSOFT_TENANT_ID": "MS_GRAPH_TENANT_ID", "MICROSOFT_CLIENT_ID": "MS_GRAPH_CLIENT_ID",
@@ -124,18 +142,39 @@ def _surface_toolsets(toolsets: list[str], integrations: list[str]) -> list[str]
     return core + [INTEGRATIONS[i]["toolset"] for i in integrations]
 
 
+def _google_plugin_settings(email: str, permissions) -> dict:
+    """Google plugin settings for this user: write/upload only when the role grants drive_write."""
+    base = INTEGRATIONS["integration.google"]["settings"](email) or {}
+    settings = dict(base)
+    caps = dict(settings.get("capabilities") or {})
+    caps["drive_read"] = True
+    caps["drive_upload"] = "integration.google.drive_write" in set(permissions or ())
+    settings["capabilities"] = caps
+    return settings
+
+
 def render_config(default_cfg: dict, toolsets: list[str], profile_name: str | None = None,
-                  integrations: list[str] = (), email: str = "") -> dict:
+                  integrations: list[str] = (), email: str = "", permissions=()) -> dict:
     cfg = {k: default_cfg[k] for k in COPIED_CONFIG_KEYS if k in default_cfg}
     if profile_name:
         # WebUI chat runs on the gateway under this profile's own route and key, never in-process.
         cfg["webui_gateway_base_url"] = f"{gateway_url()}/p/{profile_name}"
     cfg["platform_toolsets"] = {surface: _surface_toolsets(toolsets, list(integrations)) for surface in SURFACES}
     cfg["gateway"] = dict(MEDIA_POLICY)
-    plugins = list(dict.fromkeys(list(REQUIRED_PLUGINS) + [INTEGRATIONS[i]["plugin"] for i in integrations]))
+    plugins = list(dict.fromkeys(
+        list(REQUIRED_PLUGINS)
+        + [INTEGRATIONS[i]["plugin"] for i in integrations]
+        + companion_plugins(list(integrations))
+    ))
     cfg["plugins"] = {"enabled": plugins}
-    entries = {INTEGRATIONS[i]["plugin"]: {"settings": INTEGRATIONS[i]["settings"](email)}
-               for i in integrations if INTEGRATIONS[i]["settings"]}
+    entries = {}
+    for i in integrations:
+        if not INTEGRATIONS[i]["settings"]:
+            continue
+        if i == "integration.google":
+            entries[INTEGRATIONS[i]["plugin"]] = {"settings": _google_plugin_settings(email, permissions)}
+        else:
+            entries[INTEGRATIONS[i]["plugin"]] = {"settings": INTEGRATIONS[i]["settings"](email)}
     if entries:
         cfg["plugins"]["entries"] = entries
     return cfg
@@ -149,10 +188,15 @@ def allowed_tools(toolsets: list[str]) -> list[str]:
 
 def _install_plugins(home: Path, integrations: list[str] = ()) -> None:
     import shutil
-    wanted = list(dict.fromkeys(list(REQUIRED_PLUGINS) + [INTEGRATIONS[i]["plugin"] for i in integrations]))
+    wanted = list(dict.fromkeys(
+        list(REQUIRED_PLUGINS)
+        + [INTEGRATIONS[i]["plugin"] for i in integrations]
+        + companion_plugins(integrations)
+    ))
+    removable = ({v["plugin"] for v in INTEGRATIONS.values()} | ALL_APPROVAL_PLUGINS) - set(REQUIRED_PLUGINS)
     for stale in (home / "plugins").glob("*") if (home / "plugins").is_dir() else []:
-        if stale.name not in wanted and stale.name in {v["plugin"] for v in INTEGRATIONS.values()} - set(REQUIRED_PLUGINS):
-            shutil.rmtree(stale, ignore_errors=True)  # an integration whose grant was removed
+        if stale.name not in wanted and stale.name in removable:
+            shutil.rmtree(stale, ignore_errors=True)  # grant or companion no longer needed
     for name in wanted:
         src = PLUGIN_SOURCE / name
         if not (src / "plugin.yaml").is_file():
@@ -160,6 +204,23 @@ def _install_plugins(home: Path, integrations: list[str] = ()) -> None:
         dst = home / "plugins" / name
         shutil.rmtree(dst, ignore_errors=True)
         shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "tests", "test_*"))
+
+
+def _seed_persona_from_default(home: Path, root: Path) -> None:
+    """Copy company SOUL/MEMORY from the default template; seed USER.md only on first provision."""
+    soul_src = root / "SOUL.md"
+    if soul_src.is_file():
+        (home / "SOUL.md").write_text(soul_src.read_text(encoding="utf-8"), encoding="utf-8")
+    mem_src = root / "memories"
+    mem_dst = home / "memories"
+    mem_dst.mkdir(parents=True, exist_ok=True)
+    memory_src = mem_src / "MEMORY.md"
+    if memory_src.is_file():
+        (mem_dst / "MEMORY.md").write_text(memory_src.read_text(encoding="utf-8"), encoding="utf-8")
+    user_dst = mem_dst / "USER.md"
+    user_src = mem_src / "USER.md"
+    if not user_dst.is_file() and user_src.is_file():
+        user_dst.write_text(user_src.read_text(encoding="utf-8"), encoding="utf-8")
 
 
 def _write_allowlist(home: Path, toolsets: list[str], integrations: list[str] = ()) -> None:
@@ -179,8 +240,9 @@ def provision(user_id: str, toolsets: list[str], permissions=(), email: str = ""
     """Create (or refresh) the user's profile; returns its name. Idempotent: run it again after any
     role change and the profile matches the roles exactly (grants added, revoked ones removed)."""
     name = profile_name_for(user_id)
-    integrations = [p for p in INTEGRATIONS if p in set(permissions)]
-    _build(name, toolsets, owner=user_id, integrations=integrations, email=email)
+    perms = set(permissions or ())
+    integrations = [p for p in INTEGRATIONS if p in perms]
+    _build(name, toolsets, owner=user_id, integrations=integrations, email=email, permissions=perms)
     return name
 
 
@@ -192,7 +254,7 @@ def ensure_front_desk(refresh: bool = False) -> None:
 
 
 def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str] = (),
-           email: str = "") -> None:
+           email: str = "", permissions=()) -> None:
     home = _home(name)
     if not home.exists():
         from hermes_cli.profiles import create_profile
@@ -200,11 +262,11 @@ def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str
     root = root_home()
     default_cfg = yaml.safe_load((root / "config.yaml").read_text()) if (root / "config.yaml").is_file() else {}
     (home / "config.yaml").write_text(yaml.safe_dump(
-        render_config(default_cfg or {}, toolsets, name, integrations, email), sort_keys=False))
+        render_config(default_cfg or {}, toolsets, name, integrations, email, permissions), sort_keys=False))
     root_env = _read_env(root / ".env")
-    for alias, name in ENV_ALIASES.items():
-        if root_env.get(alias) and not root_env.get(name):
-            root_env[name] = root_env[alias]
+    for alias, canonical in ENV_ALIASES.items():
+        if root_env.get(alias) and not root_env.get(canonical):
+            root_env[canonical] = root_env[alias]
     if root_env.get("MS_GRAPH_CLIENT_SECRET"):
         # each user's mailbox is pinned by address, which only app (client-credentials) auth allows
         root_env.setdefault("MS_GRAPH_AUTH_MODE", "app")
@@ -227,7 +289,16 @@ def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str
     _write_private(home / ".env", "".join(f"{k}={v}\n" for k, v in env.items()))
     _install_plugins(home, integrations)
     _write_allowlist(home, toolsets, integrations)
+    try:
+        _seed_persona_from_default(home, root)
+    except Exception:
+        logger.warning("Could not seed persona files for profile %s", name, exc_info=True)
     (home / "lisa-owner.json").write_text(json.dumps({"user_id": owner}))  # last: enforcement starts here
+    try:  # ClickUp / meetings read config/identity-mapping.json relative to this profile
+        from api.enterprise import identity_mapping
+        identity_mapping.publish_existing(root)
+    except Exception:
+        logger.warning("Could not publish identity-mapping into profiles", exc_info=True)
     _invalidate_webui_profile_cache()
     rescan()
 

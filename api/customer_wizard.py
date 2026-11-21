@@ -1560,6 +1560,15 @@ def save_identity_mapping(people_list: list[dict[str, Any]] | dict[str, Any], al
     }
     _atomic_write_text(mapping_file, json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    try:
+        from api.enterprise import enabled as _enterprise_on
+        if _enterprise_on():
+            # Assistants read config/identity-mapping.json from their own profile home.
+            from api.enterprise import identity_mapping as _idmap
+            _idmap.publish(payload)
+    except Exception as e:
+        logger.warning("Failed to publish identity-mapping to enterprise profiles: %s", e)
+
     # Sync to USER.md
     try:
         _sync_team_to_user_md(home, normalized_people)

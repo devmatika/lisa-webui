@@ -22,13 +22,25 @@ from api.enterprise.models import KnowledgeArea, Role, TelegramLink, User
 
 logger = logging.getLogger(__name__)
 
-# The wizard steps that mean something for a whole organisation. Capabilities come from roles,
-# persona/briefings belong to each user's own assistant, and approval policies have no consumer.
-# ``orgknowledge`` and ``team`` work directly on the directory (areas, users), not on the draft.
-STEPS = ["company", "provider", "services", "orgknowledge", "team", "finish"]
+# Organisation setup mirrors the classic onboarding surface, adapted for multi-user Lisa:
+# capabilities nudge role grants + plugins; approvals are copied into every assistant and enforced
+# by companion plugins; knowledge seeds company SOUL/MEMORY on the default template; team owns
+# identity-mapping; briefing schedules the company morning cron on the shared bot profile.
+STEPS = [
+    "company", "provider", "capabilities", "services",
+    "approvals", "knowledge", "orgknowledge", "team", "briefing", "finish",
+]
 # Company-wide connections. Google stays one sign-in per person (the OAuth client is the company's);
 # the company ClickUp account shows each person the tasks assigned to their own e-mail.
 SERVICES = ["telegram", "google_workspace", "microsoft_graph", "clickup"]
+
+# Capability → permissions added to staff/manager/admin when selected (missing only; never strips).
+_CAPABILITY_GRANTS = {
+    "email_assistant": ("integration.google", "integration.outlook"),
+    "calendar_assistant": ("integration.google", "integration.outlook"),
+    "task_assistant": ("integration.clickup",),
+}
+_CAPABILITY_ROLES = ("staff", "manager", "admin")
 
 
 def _root_config() -> dict:
@@ -67,13 +79,39 @@ def org_setup_status() -> dict:
             "counts": counts}
 
 
+def apply_capability_grants(db) -> list[str]:
+    """Grant missing integration permissions on staff+ roles from the wizard's selected capabilities."""
+    from api.customer_wizard import load_wizard_state
+    from api.enterprise.models import RolePermission
+
+    caps = set(load_wizard_state().get("capabilities") or [])
+    wanted: set[str] = set()
+    for cap, perms in _CAPABILITY_GRANTS.items():
+        if cap in caps:
+            wanted.update(perms)
+    if not wanted:
+        return []
+    applied: list[str] = []
+    for role_key in _CAPABILITY_ROLES:
+        role = db.scalar(select(Role).where(Role.key == role_key))
+        if role is None:
+            continue
+        have = {p.permission for p in role.permissions}
+        for perm in sorted(wanted - have):
+            role.permissions.append(RolePermission(permission=perm))
+            applied.append(f"{role_key}:{perm}")
+    return applied
+
+
 def after_org_setup(handler) -> dict:
     """Rebuild every assistant (and the front desk) from the new organisation settings, then
     restart the gateway gracefully. Runs in the background: each rebuild copies plugins."""
     from api.enterprise.routes import _actor, _provision
     with edb.session() as db:
+        grants = apply_capability_grants(db)
         user_ids = list(db.scalars(select(User.id).where(User.hermes_profile.is_not(None))))
-        directory.audit(db, _actor(handler), "org.setup.applied", "", assistants=len(user_ids))
+        directory.audit(db, _actor(handler), "org.setup.applied", "",
+                        assistants=len(user_ids), capability_grants=grants)
 
     def refresh() -> None:
         for user_id in user_ids:
@@ -85,7 +123,7 @@ def after_org_setup(handler) -> dict:
         provisioner.restart_gateway()
 
     threading.Thread(target=refresh, name="lisa-org-refresh", daemon=True).start()
-    return {"refreshing": len(user_ids), "gateway_restart": True}
+    return {"refreshing": len(user_ids), "gateway_restart": True, "capability_grants": grants}
 
 
 def refresh_after_upgrade() -> threading.Thread | None:

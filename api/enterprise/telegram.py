@@ -12,28 +12,27 @@ Lisa is the source of truth afterwards. ``apply()`` makes the gateway match Post
     Pairing approvals are not: under multiplexing the pairing store consulted is the routed profile's
     (front-desk for strangers, the user's own once linked), so Lisa uses pairing only as proof of the
     Telegram id and revokes every approval it finds in the shared stores
-  * ``config/identity-mapping.json`` is regenerated for the meeting / briefing services
+  * ``config/identity-mapping.json`` is merged and published to every assistant profile
+    (see ``api.enterprise.identity_mapping``)
   * the gateway restarts gracefully (control socket, drains running turns) only when routes changed;
     Hermes reads routes at boot. Until then a newly approved user lands on the front desk.
 Disabling a user parks their profile first (immediate) and unlinks Telegram.
 """
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
 import yaml
 from sqlalchemy import select
 
-from api.enterprise import provisioner
+from api.enterprise import identity_mapping, provisioner
 from api.enterprise.directory import Actor, DirectoryError, audit
 from api.enterprise.models import TelegramLink, User, utcnow
 
 logger = logging.getLogger(__name__)
 PLATFORM = "telegram"
 FRONT_DESK = "front-desk"
-
 
 PAIRING_STORES = (FRONT_DESK, "default")  # strangers are routed to front-desk once routes exist
 
@@ -120,13 +119,8 @@ def _write_routes(root: Path, routes: list[dict]) -> bool:
 
 
 def _write_identity_mapping(root: Path, db) -> None:
-    linked = {lnk.user_id: lnk.telegram_user_id for lnk, _ in _active_pairs(db)}
-    people = [{"person_id": u.id, "name": u.display_name, "email": u.email,
-               **({"telegram": {"user_id": linked[u.id]}} if u.id in linked else {})}
-              for u in db.scalars(select(User).where(User.status == "active").order_by(User.email))]
-    out = root / "config" / "identity-mapping.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"generated_by": "lisa-enterprise", "people": people}, indent=1))
+    """Upsert active Lisa users into identity-mapping.json and publish into every profile."""
+    identity_mapping.sync(db, root)
 
 
 def _revoke_pairing_approvals() -> list[str]:

@@ -45,9 +45,13 @@ const CUSTOMER_WIZARD = {
 const CW_ORG_STEP_TITLES = {
   company: 'Company & Assistant',
   provider: 'AI Model',
+  capabilities: 'Capabilities',
   services: 'Company Tools',
+  approvals: 'Action Approvals',
+  knowledge: 'Persona',
   orgknowledge: 'Company Knowledge',
-  team: 'Team',
+  team: 'Team & Directory',
+  briefing: 'Daily Briefing',
   finish: 'Review & Apply',
 };
 // What each company connection means for the people using Lisa (shown on the Company Tools step).
@@ -158,7 +162,11 @@ function _saveCurrentStepDraft() {
   const currentStepName = CUSTOMER_WIZARD.steps[CUSTOMER_WIZARD.step];
   if (!currentStepName || ['finish', 'orgknowledge', 'team'].includes(currentStepName)) return _wizardSaveChain;
   _collectCurrentStepData(currentStepName);
-  const body = JSON.stringify({ step: currentStepName, data: CUSTOMER_WIZARD.draft[currentStepName] || {} });
+  // capabilities is a top-level array in the draft; the API expects { capabilities: [...] }.
+  const stepData = currentStepName === 'capabilities'
+    ? { capabilities: CUSTOMER_WIZARD.draft.capabilities || [] }
+    : (CUSTOMER_WIZARD.draft[currentStepName] || {});
+  const body = JSON.stringify({ step: currentStepName, data: stepData });
   _wizardSaveChain = _wizardSaveChain
     .then(() => api('/api/customer-wizard/step', { method: 'POST', body }))
     .catch((err) => {
@@ -239,7 +247,7 @@ function _collectCurrentStepData(stepName) {
       api_key: ($('cwApiKey') ? $('cwApiKey').value : '').trim(),
     };
   } else if (stepName === 'capabilities') {
-    CUSTOMER_WIZARD.draft.capabilities = _getSelectedCheckboxes('cwCapabilities');
+    // draft.capabilities is maintained by _toggleCapability checkboxes
   } else if (stepName === 'approvals') {
     // approvals are updated in CUSTOMER_WIZARD.draft.approvals on change
   } else if (stepName === 'knowledge') {
@@ -584,18 +592,24 @@ async function _testProviderConnection() {
 function _renderStepCapabilities(el) {
   const caps = (CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.capabilities) || [];
   const selected = new Set(CUSTOMER_WIZARD.draft.capabilities || []);
+  const isOrg = _isOrgWizard();
 
   el.innerHTML = `
     <div class="cw-step-pane">
       <div class="cw-pane-head">
         <h3>Choose Assistant Capabilities</h3>
-        <p>Enable specialized capabilities for your business. Verified dependencies are reflected below.</p>
+        <p>${isOrg
+          ? 'Turn on the company-wide features every assistant should support. Selected items nudge staff+ role grants and enable the matching plugins when you Apply.'
+          : 'Enable specialized capabilities for your business. Verified dependencies are reflected below.'}</p>
       </div>
 
       <div class="cw-cap-grid">
         ${caps.map(c => {
           const isChecked = selected.has(c.id);
           const badgeCls = `cw-badge-${c.status}`;
+          const meetingNote = (isOrg && c.id === 'meeting_assistant')
+            ? '<div class="cw-cap-deps"><small>Meeting transcripts come from the separate Fireflies ingestion service — this flag documents intent only.</small></div>'
+            : '';
           return `
             <div class="cw-cap-card ${isChecked ? 'selected' : ''}" onclick="_toggleCapability('${c.id}', event)">
               <div class="cw-cap-header">
@@ -605,8 +619,9 @@ function _renderStepCapabilities(el) {
               </div>
               <p class="cw-cap-desc">${_escapeHtml(c.description)}</p>
               <div class="cw-cap-deps">
-                <small>Requires: ${c.required_integrations.join(', ')}</small>
+                <small>Requires: ${(c.required_integrations || []).join(', ') || '—'}</small>
               </div>
+              ${meetingNote}
             </div>
           `;
         }).join('')}
@@ -1078,48 +1093,9 @@ function _resetApprovalsToDefault() {
 
 // ── Step F: Persona & Knowledge Base (SOUL, USER, MEMORY & Obsidian) ─────────
 
-function _renderStepKnowledge(el) {
-  const k = CUSTOMER_WIZARD.draft.knowledge || {};
-  const activeTab = k.activeTab || 'team';
-  const teamMembers = k.team_members || [];
-
-  el.innerHTML = `
-    <div class="cw-step-pane">
-      <div class="cw-pane-head">
-        <h3>Assistant Persona & Knowledge Architecture</h3>
-        <p>Customize Lisa's core identity, organization context, institutional memory, team members directory, and connect your team's Obsidian vault.</p>
-      </div>
-
-      <div class="cw-tabs-bar" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:8px; margin-bottom:18px; padding:6px; border-radius:10px; overflow:visible;">
-        <button type="button" class="cw-tab-btn ${activeTab === 'team' ? 'active' : ''}" onclick="_switchKnowledgeTab('team')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
-          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">👥</span>
-          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Team Directory</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">identity-mapping</span>
-        </button>
-        <button type="button" class="cw-tab-btn ${activeTab === 'soul' ? 'active' : ''}" onclick="_switchKnowledgeTab('soul')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
-          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">🔮</span>
-          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Lisa Soul</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">SOUL.md</span>
-        </button>
-        <button type="button" class="cw-tab-btn ${activeTab === 'user' ? 'active' : ''}" onclick="_switchKnowledgeTab('user')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
-          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">👤</span>
-          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">User Profile</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">USER.md</span>
-        </button>
-        <button type="button" class="cw-tab-btn ${activeTab === 'memory' ? 'active' : ''}" onclick="_switchKnowledgeTab('memory')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
-          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">🧠</span>
-          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Institutional Memory</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">MEMORY.md</span>
-        </button>
-        <button type="button" class="cw-tab-btn ${activeTab === 'obsidian' ? 'active' : ''}" onclick="_switchKnowledgeTab('obsidian')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
-          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">📓</span>
-          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Obsidian Vault</span>
-          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Handbook & Notes</span>
-        </button>
-      </div>
-
-      <div class="cw-tab-content">
-        ${activeTab === 'team' ? `
+function _teamDirectoryHtml(teamMembers) {
+  teamMembers = teamMembers || [];
+  return `
           <div class="cw-tab-pane">
             <div class="cw-tab-intro">
               <div>
@@ -1275,7 +1251,68 @@ function _renderStepKnowledge(el) {
               </ul>
             </div>
           </div>
-        ` : ''}
+  `;
+}
+
+function _isOrgWizard() {
+  // Prefer the server flag; also detect from the step list so a stale cache cannot show
+  // Team Directory both here and on the dedicated Team step.
+  if (CUSTOMER_WIZARD.status && CUSTOMER_WIZARD.status.enterprise) return true;
+  const steps = CUSTOMER_WIZARD.steps || [];
+  return steps.includes('team') && steps.includes('orgknowledge');
+}
+
+function _renderStepKnowledge(el) {
+  const k = CUSTOMER_WIZARD.draft.knowledge || {};
+  const isOrg = _isOrgWizard();
+  // Enterprise: Team Directory lives only on the Team step; company vault on Company Knowledge.
+  const allowedTabs = isOrg ? ['soul', 'user', 'memory'] : ['team', 'soul', 'user', 'memory', 'obsidian'];
+  let activeTab = k.activeTab || (isOrg ? 'soul' : 'team');
+  if (!allowedTabs.includes(activeTab)) activeTab = allowedTabs[0];
+  CUSTOMER_WIZARD.draft.knowledge = { ...k, activeTab };
+  const teamMembers = k.team_members || [];
+
+  el.innerHTML = `
+    <div class="cw-step-pane">
+      <div class="cw-pane-head">
+        <h3>${isOrg ? 'Company Persona Template' : 'Assistant Persona & Knowledge Architecture'}</h3>
+        <p>${isOrg
+          ? 'These files seed every new assistant from the organisation template. Team ClickUp/Telegram IDs are on the <b>Team</b> step; the shared vault is under <b>Company Knowledge</b>.'
+          : 'Customize Lisa\'s core identity, organization context, institutional memory, team members directory, and connect your team\'s Obsidian vault.'}</p>
+      </div>
+
+      <div class="cw-tabs-bar" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:8px; margin-bottom:18px; padding:6px; border-radius:10px; overflow:visible;">
+        ${!isOrg ? `
+        <button type="button" class="cw-tab-btn ${activeTab === 'team' ? 'active' : ''}" onclick="_switchKnowledgeTab('team')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
+          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">👥</span>
+          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Team Directory</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">identity-mapping</span>
+        </button>` : ''}
+        <button type="button" class="cw-tab-btn ${activeTab === 'soul' ? 'active' : ''}" onclick="_switchKnowledgeTab('soul')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
+          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">🔮</span>
+          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Lisa Soul</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">SOUL.md</span>
+        </button>
+        <button type="button" class="cw-tab-btn ${activeTab === 'user' ? 'active' : ''}" onclick="_switchKnowledgeTab('user')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
+          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">👤</span>
+          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">User Profile</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">USER.md</span>
+        </button>
+        <button type="button" class="cw-tab-btn ${activeTab === 'memory' ? 'active' : ''}" onclick="_switchKnowledgeTab('memory')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
+          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">🧠</span>
+          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Institutional Memory</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">MEMORY.md</span>
+        </button>
+        ${!isOrg ? `
+        <button type="button" class="cw-tab-btn ${activeTab === 'obsidian' ? 'active' : ''}" onclick="_switchKnowledgeTab('obsidian')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; min-width:0; box-sizing:border-box;">
+          <span class="cw-tab-icon" style="font-size:16px; line-height:1;">📓</span>
+          <span class="cw-tab-title" style="font-size:12px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Obsidian Vault</span>
+          <span class="cw-tab-sub" style="font-size:10px; opacity:0.85; font-family:monospace; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">Handbook & Notes</span>
+        </button>` : ''}
+      </div>
+
+      <div class="cw-tab-content">
+        ${(!isOrg && activeTab === 'team') ? _teamDirectoryHtml(teamMembers) : ''}
 
         ${activeTab === 'soul' ? `
           <div class="cw-tab-pane">
@@ -1735,56 +1772,114 @@ async function _renderStepTeam(el) {
   el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Team</h3><p><span class="cw-spinner"></span> Loading…</p></div></div>`;
   let users = [], roles = [];
   try {
-    const [u, r] = await Promise.all([api('/api/enterprise/users'), api('/api/enterprise/roles')]);
+    const [u, r, mapping] = await Promise.all([
+      api('/api/enterprise/users'),
+      api('/api/enterprise/roles'),
+      api('/api/customer-wizard/team').catch(() => null),
+    ]);
     users = u.users || []; roles = r.roles || [];
+    if (mapping && Array.isArray(mapping.people)) {
+      CUSTOMER_WIZARD.draft.knowledge = CUSTOMER_WIZARD.draft.knowledge || {};
+      CUSTOMER_WIZARD.draft.knowledge.team_members = mapping.people;
+    }
   } catch (err) {
     el.innerHTML = `<div class="cw-step-pane"><div class="cw-pane-head"><h3>Team</h3><p>${_escapeHtml(err.message)}</p></div></div>`;
     return;
   }
+  await _seedDirectoryFromLisaUsers(users);
   const roleName = (k) => (roles.find((r) => r.key === k) || { name: k }).name;
   const ROLE_HELP = { viewer: 'asks questions, reads company knowledge', staff: 'everyday assistant: tasks, e-mail, knowledge',
     manager: 'staff + approves knowledge', admin: 'manages people, roles and knowledge', operator: 'IT: setup wizard, model, server' };
+  const teamMembers = (CUSTOMER_WIZARD.draft.knowledge && CUSTOMER_WIZARD.draft.knowledge.team_members) || [];
   el.innerHTML = `
     <div class="cw-step-pane">
       <div class="cw-pane-head">
         <h3>Team</h3>
-        <p>Add the people who will use Lisa. Each person gets their own private assistant (their chats, memory and
-          accounts are never visible to anyone else) and a single-use link to choose a password.
-          Their <b>role</b> decides what their assistant may do.</p>
+        <p>Two linked directories for the same people: <b>Lisa logins</b> (who can sign in and which role they get),
+          and the <b>organization directory</b> (ClickUp IDs, Telegram IDs, aliases and extra e-mails Lisa uses for
+          meetings, tasks and briefings). Match them by e-mail so everything stays in sync.</p>
       </div>
-      <div class="cw-form-row">
-        <div class="cw-form-group"><label for="cwTmName">Full name</label><input id="cwTmName" autocomplete="off" placeholder="Anna Berger"></div>
-        <div class="cw-form-group"><label for="cwTmEmail">E-mail</label><input id="cwTmEmail" type="email" autocomplete="off" placeholder="anna@company.com"></div>
+      <div class="cw-summary-card" style="margin-bottom:18px">
+        <h4>Lisa logins</h4>
+        <p class="cw-muted" style="margin-top:0">Each person gets their own private assistant. Their <b>role</b> decides what the assistant may do.
+          After you add someone, send them the password link (or let SMTP e-mail it).</p>
+        <div class="cw-form-row">
+          <div class="cw-form-group"><label for="cwTmName">Full name</label><input id="cwTmName" autocomplete="off" placeholder="Anna Berger"></div>
+          <div class="cw-form-group"><label for="cwTmEmail">E-mail</label><input id="cwTmEmail" type="email" autocomplete="off" placeholder="anna@company.com"></div>
+        </div>
+        <div class="cw-form-row">
+          <div class="cw-form-group"><label for="cwTmRole">Role</label>
+            <select id="cwTmRole">${roles.map((r) => `<option value="${_escapeHtml(r.key)}" ${r.key === 'staff' ? 'selected' : ''}>${_escapeHtml(r.name)}${ROLE_HELP[r.key] ? ' — ' + ROLE_HELP[r.key] : ''}</option>`).join('')}</select></div>
+          <div class="cw-form-group"><label for="cwTmDept">Department <span class="cw-opt">(optional)</span></label><input id="cwTmDept" placeholder="Sales"></div>
+        </div>
+        <button type="button" class="sm-btn" id="cwTmAdd">Add person</button>
+        <div class="cw-service-msg" id="cwTmMsg" role="status"></div>
+        <div style="margin-top:14px">
+          <h4 style="margin-bottom:8px">People (${users.length})</h4>
+          <ul>${users.map((u) => `<li><strong>${_escapeHtml(u.display_name || u.email)}</strong> · ${_escapeHtml(u.email)} ·
+            ${u.roles.map(roleName).map(_escapeHtml).join(', ')} · ${u.status !== 'active' ? 'disabled' : (u.has_password ? 'active' : '<em>invited, no password yet</em>')}</li>`).join('') || '<li class="cw-muted">No logins yet.</li>'}</ul>
+          <small class="cw-muted">Change roles, disable people or send a new password link on the <a href="/lisa#users" target="_blank" rel="noopener">Users page</a>.</small>
+        </div>
       </div>
-      <div class="cw-form-row">
-        <div class="cw-form-group"><label for="cwTmRole">Role</label>
-          <select id="cwTmRole">${roles.map((r) => `<option value="${_escapeHtml(r.key)}" ${r.key === 'staff' ? 'selected' : ''}>${_escapeHtml(r.name)}${ROLE_HELP[r.key] ? ' — ' + ROLE_HELP[r.key] : ''}</option>`).join('')}</select></div>
-        <div class="cw-form-group"><label for="cwTmDept">Department <span class="cw-opt">(optional)</span></label><input id="cwTmDept" placeholder="Sales"></div>
-      </div>
-      <button type="button" class="sm-btn" id="cwTmAdd">Add person</button>
-      <div class="cw-service-msg" id="cwTmMsg" role="status"></div>
-      <div class="cw-summary-card" style="margin-top:16px">
-        <h4>People (${users.length})</h4>
-        <ul>${users.map((u) => `<li><strong>${_escapeHtml(u.display_name || u.email)}</strong> · ${_escapeHtml(u.email)} ·
-          ${u.roles.map(roleName).map(_escapeHtml).join(', ')} · ${u.status !== 'active' ? 'disabled' : (u.has_password ? 'active' : '<em>invited, no password yet</em>')}</li>`).join('')}</ul>
-        <small class="cw-muted">Change roles, disable people or send a new password link on the <a href="/lisa#users" target="_blank" rel="noopener">Users page</a>.</small>
+      <div class="cw-summary-card">
+        <h4>Organization directory (identity-mapping)</h4>
+        <p class="cw-muted" style="margin-top:0">Enter ClickUp user IDs, Telegram IDs, aliases and extra e-mails. Lisa uses this for task
+          assignment, meeting action items and notifications. Prefer the same work e-mail as the Lisa login above.</p>
+        ${_teamDirectoryHtml(teamMembers)}
       </div>
     </div>`;
   $('cwTmAdd').onclick = async () => {
     const m = $('cwTmMsg');
     try {
+      const email = $('cwTmEmail').value.trim();
+      const display_name = $('cwTmName').value.trim();
       const r = await api('/api/enterprise/users', { method: 'POST', body: JSON.stringify({
-        email: $('cwTmEmail').value.trim(), display_name: $('cwTmName').value.trim(),
+        email, display_name,
         department: $('cwTmDept').value.trim() || null, roles: [$('cwTmRole').value] }) });
+      await _seedDirectoryFromLisaUsers([{ email, display_name, status: 'active' }], { sync: true });
       const link = location.origin + r.password_link;
       m.className = 'cw-service-msg ok';
       m.innerHTML = r.invitation_emailed
-        ? `✓ Added. The invitation was e-mailed to ${_escapeHtml($('cwTmEmail').value.trim())}.`
+        ? `✓ Added. The invitation was e-mailed to ${_escapeHtml(email)}. Fill ClickUp / Telegram IDs in the directory below.`
         : `✓ Added. Send this single-use link (valid 48 h) so they choose a password:<br><code>${_escapeHtml(link)}</code>
-           <button type="button" class="sm-btn" onclick="navigator.clipboard.writeText('${_escapeHtml(link)}');this.textContent='Copied'">Copy</button>`;
+           <button type="button" class="sm-btn" onclick="navigator.clipboard.writeText('${_escapeHtml(link)}');this.textContent='Copied'">Copy</button>
+           <div style="margin-top:6px">Then fill ClickUp / Telegram IDs in the directory below.</div>`;
       setTimeout(() => { const keep = m.innerHTML; _renderStepTeam(el).then(() => { const n = $('cwTmMsg'); if (n) { n.className = 'cw-service-msg ok'; n.innerHTML = keep; } }); }, 300);
     } catch (err) { m.className = 'cw-service-msg error'; m.textContent = err.message; }
   };
+}
+
+async function _seedDirectoryFromLisaUsers(users, options = {}) {
+  CUSTOMER_WIZARD.draft.knowledge = CUSTOMER_WIZARD.draft.knowledge || {};
+  const members = CUSTOMER_WIZARD.draft.knowledge.team_members || [];
+  const byEmail = new Set();
+  for (const m of members) {
+    const emails = Array.isArray(m.emails) ? m.emails : (m.email ? [m.email] : []);
+    emails.forEach((e) => { if (e) byEmail.add(String(e).toLowerCase()); });
+  }
+  let added = 0;
+  for (const u of users || []) {
+    if (!u || u.status === 'disabled') continue;
+    const email = (u.email || '').trim();
+    if (!email || byEmail.has(email.toLowerCase())) continue;
+    const name = (u.display_name || email).trim();
+    members.push({
+      canonical_name: name,
+      name,
+      role: 'Team Member',
+      emails: [email],
+      email,
+      telegram: { user_id: '', display_name: name, username: '' },
+      clickup: { member_name: name.split(/\s+/)[0].toLowerCase(), user_id: '' },
+      aliases: [name],
+    });
+    byEmail.add(email.toLowerCase());
+    added += 1;
+  }
+  CUSTOMER_WIZARD.draft.knowledge.team_members = members;
+  if (added && options.sync) {
+    await _syncTeamMembersNow();
+  }
 }
 
 function _renderOrgChecklist(org) {
@@ -1794,11 +1889,18 @@ function _renderOrgChecklist(org) {
       <span class="cw-check-icon">${ok ? '✓' : '—'}</span>
       <div class="cw-check-info"><strong>${title}</strong><small>${detail}</small></div>
     </div>`;
+  const briefing = (CUSTOMER_WIZARD.draft && CUSTOMER_WIZARD.draft.briefing) || {};
+  const briefingOn = !!(briefing.enabled && briefing.recipient);
+  const caps = (CUSTOMER_WIZARD.draft && CUSTOMER_WIZARD.draft.capabilities) || [];
+  const approvals = (CUSTOMER_WIZARD.draft && CUSTOMER_WIZARD.draft.approvals) || {};
   return `<div class="cw-checks-list">
     ${row(c.model, 'AI model for everyone', c.model ? _escapeHtml(org.model) : 'Required: set it in the "AI Model" step.')}
+    ${row(caps.length > 0, 'Capabilities', caps.length ? caps.join(', ') : 'None selected yet')}
+    ${row(Object.keys(approvals).length > 0, 'Action approvals', Object.keys(approvals).length ? `${Object.keys(approvals).length} policies` : 'Defaults will apply on Apply')}
     ${row(n.users > 1, 'Team', `${n.users} person(s)${n.users_waiting_for_password ? `, ${n.users_waiting_for_password} still have to set a password` : ''}`)}
     ${row(n.knowledge_areas > 0, 'Company knowledge', `${n.knowledge_areas} area(s)`)}
     ${row(c.telegram_bot, 'Company Telegram bot', c.telegram_bot ? `${n.telegram_links} person(s) linked` : 'Optional: add it under Company Tools.')}
+    ${row(briefingOn, 'Daily briefing', briefingOn ? `Daily at ${briefing.time || '08:30'} → ${briefing.recipient}` : 'Optional: enable under Daily Briefing')}
     ${row(c.google_client, 'Google for everyone', c.google_client ? 'Each person signs in under My account' : 'Optional.')}
     ${row(c.outlook_app, 'Outlook (Microsoft 365)', c.outlook_app ? 'App registration ready' : 'Optional.')}
     ${row(c.clickup_company, 'Company ClickUp', c.clickup_company ? 'Each person sees their own tasks' : 'Optional.')}

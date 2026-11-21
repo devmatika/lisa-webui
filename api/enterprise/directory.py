@@ -27,7 +27,8 @@ PERMISSIONS = {
     "share.create": "Share their own conversations by link",
     "kanban.use": "Use the Kanban board",
     "integration.email": "Use the e-mail assistant on their own mailbox",
-    "integration.google": "Use Google Calendar/Docs/Drive with their own connected Google account",
+    "integration.google": "Use Google Calendar/Docs/Drive with their own connected Google account (browse My Drive and Shared drives)",
+    "integration.google.drive_write": "Upload files to their own Google Drive (Shared drives they can write to). Browse still needs integration.google",
     "integration.outlook": "Use Outlook mail tools on their own mailbox (Microsoft 365)",
     "integration.clickup": "Use ClickUp with their own personal ClickUp token",
     "knowledge.read": "Search company knowledge areas they are granted (one shared vault; not a personal Obsidian)",
@@ -44,8 +45,9 @@ PERMISSIONS = {
 }
 # files.workspace = that user's private Hermes workspace only (never the shared company vault).
 # knowledge.read on viewer + staff so they can ask company questions; knowledge.manage stays admin-only.
+# integration.google / outlook: each person connects their own account; company OAuth apps come from setup.
 _STAFF = ["chat.use", "memory.own", "files.workspace", "cron.own", "share.create", "integration.email",
-          "knowledge.read", "knowledge.contribute"]
+          "integration.google", "integration.outlook", "knowledge.read", "knowledge.contribute"]
 _MANAGER = _STAFF + ["knowledge.approve"]  # no kanban.use: Hermes boards are host-wide, not per user
 BUILTIN_ROLES = {  # key -> (name, permissions, profile toolsets)
     "viewer": ("Viewer", ["chat.use", "memory.own", "knowledge.read"], ["memory", "session_search", "knowledge"]),
@@ -56,6 +58,15 @@ BUILTIN_ROLES = {  # key -> (name, permissions, profile toolsets)
               ["memory", "todo", "session_search", "web", "delegation", "knowledge"]),
     "operator": ("Operator (IT)", [p for p in PERMISSIONS if p.startswith("operator.")] + ["kanban.use"],
                  ["memory", "todo", "session_search", "web", "delegation"]),
+}
+# One-shot upgrades for existing orgs. Each release id is recorded in organization.settings after it
+# runs, so an admin who later removes a grant keeps that edit; a later start never re-adds it.
+DEFAULT_GRANT_RELEASES = {
+    "2026-11-staff-google-outlook": {
+        "staff": ["integration.google", "integration.outlook"],
+        "manager": ["integration.google", "integration.outlook"],
+        "admin": ["integration.google", "integration.outlook"],
+    },
 }
 # Toolsets an organisation role may grant. Never file/terminal/code/browser: a Hermes profile is not an
 # OS boundary, so those would reach colleagues' profiles (Phase 0). Integrations arrive as plugins.
@@ -81,7 +92,8 @@ def audit(db: Session, actor: Actor, action: str, target: str = "", **detail) ->
 
 
 def seed(db: Session) -> None:
-    """Add missing built-in roles, permissions and templates; never overwrite edited ones."""
+    """Create built-in roles that are still missing. Never rewrite an existing role's grants or
+    templates — those belong to the organisation after first create (see ``apply_default_grant_releases``)."""
     existing = {r.key: r for r in db.scalars(select(Role))}
     for key, (name, perms, toolsets) in BUILTIN_ROLES.items():
         if key in existing:
@@ -91,6 +103,43 @@ def seed(db: Session) -> None:
         role.template = RoleTemplate(toolsets=list(toolsets), plugins=[], skills=[])
         db.add(role)
     db.flush()
+
+
+def apply_default_grant_releases(db: Session) -> list[str]:
+    """Add newly shipped default grants to built-in roles once per organisation.
+
+    Returns the role keys that gained at least one permission (callers re-provision those users).
+    Releases already recorded in ``organization.settings["applied_grant_releases"]`` are skipped, so
+    removing a grant after the release has run is permanent.
+    """
+    org = db.scalar(select(Organization).limit(1))
+    if org is None:
+        return []
+    settings = dict(org.settings or {})
+    applied = set(settings.get("applied_grant_releases") or [])
+    roles = {r.key: r for r in db.scalars(select(Role).where(Role.builtin.is_(True)))}
+    changed: set[str] = set()
+    for release_id, by_role in DEFAULT_GRANT_RELEASES.items():
+        if release_id in applied:
+            continue
+        for key, perms in by_role.items():
+            role = roles.get(key)
+            if role is None:
+                continue
+            have = {p.permission for p in role.permissions}
+            for perm in perms:
+                if perm in have or perm not in PERMISSIONS:
+                    continue
+                role.permissions.append(RolePermission(permission=perm))
+                have.add(perm)
+                changed.add(key)
+        applied.add(release_id)
+    if applied != set(settings.get("applied_grant_releases") or []):
+        settings["applied_grant_releases"] = sorted(applied)
+        org.settings = settings
+        audit(db, Actor(None, "upgrade"), "org.default_grants_applied", "",
+              releases=sorted(applied), roles=sorted(changed))
+    return sorted(changed)
 
 
 def needs_setup(db: Session) -> bool:

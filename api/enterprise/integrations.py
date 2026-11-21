@@ -161,6 +161,29 @@ def status(profile: str) -> dict:
             "google_ready": _google_ready()}
 
 
+def load_google_token(profile: str) -> dict | None:
+    """Return the profile's authorized_user token dict, or None when not connected."""
+    path = provisioner._home(profile) / GOOGLE_TOKEN
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) and data.get("refresh_token") else None
+
+
+def save_google_access_token(profile: str, access_token: str) -> None:
+    """Refresh the cached access token after a successful OAuth refresh (keep refresh_token)."""
+    data = load_google_token(profile)
+    if not data or not access_token:
+        return
+    data["token"] = access_token
+    path = provisioner._home(profile) / GOOGLE_TOKEN
+    path.write_text(json.dumps(data))
+    path.chmod(0o600)
+
+
 def _google_ready() -> bool:
     try:
         _google_client()
@@ -169,4 +192,5 @@ def _google_ready() -> bool:
     return True
 
 
-__all__ = ["google_start", "google_finish", "google_disconnect", "clickup_set", "status"]
+__all__ = ["google_start", "google_finish", "google_disconnect", "clickup_set", "status",
+           "load_google_token", "save_google_access_token", "GOOGLE_TOKEN"]

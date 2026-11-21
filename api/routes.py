@@ -16286,8 +16286,13 @@ def handle_get(handler, parsed) -> bool:
             if _enterprise_on():  # menu entries for My account + Organization, filtered by permission
                 from urllib.parse import quote as _quote
                 from api.updates import WEBUI_VERSION
-                html = html.replace("</body>", '<script src="static/enterprise_nav.js?v='
-                                    + _quote(WEBUI_VERSION, safe="") + '" defer></script></body>', 1)
+                v = _quote(WEBUI_VERSION, safe="")
+                html = html.replace(
+                    "</body>",
+                    f'<script src="static/enterprise_nav.js?v={v}" defer></script>'
+                    f'<script src="static/connect_onboarding.js?v={v}" defer></script></body>',
+                    1,
+                )
             return t(
                 handler,
                 inject_extension_tags(html),

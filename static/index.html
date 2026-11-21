@@ -1779,9 +1779,16 @@
     <input type="file" id="workspaceFileInput" class="file-input-visually-hidden" tabindex="-1" multiple accept="image/*,text/*,.pdf,.json,.csv,.md,.py,.js,.ts,.yaml,.yml,.toml,.zip,.tar,.gz,.tgz,.bz2,.xz">
     <div class="workspace-panel-tabs" role="tablist" aria-label="Workspace panel views" data-i18n-aria-label="workspace_panel_views">
       <button class="workspace-panel-tab active" id="workspaceFilesTab" type="button" onclick="switchWorkspacePanelTab('files')" role="tab" aria-selected="true" data-i18n="workspace_files_tab">Files</button>
-      <button class="workspace-panel-tab" id="workspaceArtifactsTab" type="button" onclick="switchWorkspacePanelTab('artifacts')" role="tab" aria-selected="false"><span data-i18n="workspace_artifacts_tab">Artifacts</span> <span id="workspaceArtifactsCount" class="workspace-artifacts-count">0</span></button>
+      <button class="workspace-panel-tab" id="workspaceArtifactsTab" type="button" onclick="switchWorkspacePanelTab('artifacts')" role="tab" aria-selected="false"><span data-i18n="workspace_artifacts_tab">Resources</span> <span id="workspaceArtifactsCount" class="workspace-artifacts-count">0</span></button>
       <button class="workspace-panel-tab" id="workspaceKnowledgeTab" type="button" onclick="switchWorkspacePanelTab('knowledge')" role="tab" aria-selected="false" hidden title="Company knowledge you may read">Knowledge</button>
       <button class="workspace-panel-tab" id="workspaceTodosTab" type="button" onclick="switchWorkspacePanelTab('todos')" role="tab" aria-selected="false" hidden data-i18n="tab_todos">Todos</button>
+    </div>
+    <div class="workspace-files-source" id="workspaceFilesSource" hidden>
+      <div class="workspace-source-switch" role="tablist" aria-label="File source">
+        <button type="button" class="workspace-source-btn active" id="wsSourceWorkspace" data-source="workspace" onclick="switchWorkspaceFileSource('workspace')">Workspace</button>
+        <button type="button" class="workspace-source-btn" id="wsSourceDrive" data-source="drive" onclick="switchWorkspaceFileSource('drive')" hidden>Google Drive</button>
+      </div>
+      <div class="workspace-drive-banner" id="workspaceDriveBanner" hidden></div>
     </div>
     <div class="breadcrumb-bar" id="breadcrumbBar" style="display:none"></div>
     <div class="file-tree" id="fileTree"></div>
@@ -1893,6 +1900,7 @@
 <script src="static/customer_wizard.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/email_assistant.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/company_knowledge.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/google_drive.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/boot.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/outline.js?v=__WEBUI_VERSION__" defer></script>
 

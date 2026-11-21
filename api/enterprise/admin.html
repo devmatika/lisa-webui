@@ -211,6 +211,15 @@
   <!-- ── My account ─────────────────────────────────────────── -->
   <div id="account" data-tab="My account" data-icon="account" data-group="You" hidden>
     <div class="page-head"><h1>My account</h1><p>Your private assistant. Your chats, memory and connected accounts are visible only to you — administrators cannot read them.</p></div>
+    <section class="card" id="getting-started-card">
+      <h2>Getting started</h2>
+      <p class="sub">Your private guide: how Lisa works, then connect Google, Microsoft 365 and Telegram when you are ready.</p>
+      <div id="gs-checklist" class="hint" style="margin:8px 0 12px"></div>
+      <div class="actions">
+        <a class="btn primary" id="gs-open" href="/?getting_started=1">Open getting started</a>
+        <a class="btn sm" href="/lisa#guide">Guide</a>
+      </div>
+    </section>
     <section class="card">
       <h2>Telegram</h2>
       <p class="sub">Talk to your assistant from your phone through the company bot.</p>
@@ -281,7 +290,7 @@
     <div class="page-head"><h1>Users</h1><p>Everyone who uses Lisa. Each person gets a private assistant; their role decides what it may do.</p></div>
     <section class="card">
       <h2>Add a person</h2>
-      <p class="sub">They receive a single-use link (valid 48 h) to choose their own password.</p>
+      <p class="sub">They receive a single-use link (valid 48 h) to choose their own password. After first sign-in they see a private Getting started guide (Connect Google / Microsoft / Telegram).</p>
       <div class="fields">
         <div class="field"><label for="nu-name">Full name</label><input id="nu-name" autocomplete="off"></div>
         <div class="field"><label for="nu-email">E-mail</label><input id="nu-email" type="email" autocomplete="off"></div>
@@ -341,10 +350,10 @@
     <div class="page-head"><h1>Company knowledge</h1><p>Shared workflows, guidelines and know-how. Lisa answers from the areas a person may read.</p></div>
     <section class="card" id="vault-card" data-need="knowledge.manage">
       <h2>Company vault <span class="badge">Obsidian · Git</span></h2>
-      <p class="sub">Connect the company's Obsidian vault — the <b>same Git repository</b> ops bind-mount for shared
-        Files / Fireflies promote (not a second copy). Every folder becomes an area, you choose who may read each one,
-        and Lisa keeps it up to date by herself. She only reads — she never changes the vault. Leave Inbox, Templates,
-        Archive and <code>10-Company-Files/</code> unticked; they are ops folders, not Knowledge areas.</p>
+      <p class="sub">Connect the company's Obsidian vault — preferably the <b>host clone</b> bind-mounted at
+        <code>file:///opt/lisa/sources/company-vault</code> (same tree ops use for shared Files / Fireflies; no deploy
+        key inside Docker). Every folder becomes an area, you choose who may read each one, and Lisa mirrors it on a
+        schedule. She only reads. Leave Inbox, Templates, Archive and <code>10-Company-Files/</code> unticked.</p>
       <div class="callout" id="src-standard"><svg class="i"><use href="#i-info"/></svg><div>Lisa starts with the standard folders <b>01-People, 02-Companies,
         03-Projects, 04-Meetings, 05-Decisions, 06-Company-Knowledge, 07-Daily, 08-Team-Briefing</b>, each with its access already
         set. Use the same folder names in your vault and that access carries over. Put one folder per project under
@@ -360,8 +369,10 @@
         <div id="src-step1">
           <div class="fields">
             <div class="field" style="grid-column:span 2"><label for="src-url">Repository address</label>
-              <input id="src-url" autocomplete="off" spellcheck="false" placeholder="git@gitlab.com:company/obsidian-vault.git">
-              <span class="hint">Copy it from GitLab/GitHub → <i>Clone</i>. SSH (git@…) or HTTPS (https://…).</span></div>
+              <input id="src-url" autocomplete="off" spellcheck="false" placeholder="file:///opt/lisa/sources/company-vault">
+              <span class="hint">On Docker servers prefer the mounted clone:
+                <code>file:///opt/lisa/sources/company-vault</code> (set <code>COMPANY_VAULT_HOST</code> in compose).
+                Otherwise SSH (<code>git@…</code>) or HTTPS from GitLab/GitHub → <i>Clone</i>.</span></div>
             <div class="field"><label for="src-branch">Branch</label><input id="src-branch" value="main" spellcheck="false"></div>
           </div>
           <div class="keybox" id="src-ssh" hidden>
@@ -411,7 +422,7 @@
     <section class="card" data-need="knowledge.approve"><h2>Waiting for approval</h2><div id="k-drafts"></div></section>
     <section class="card" data-need="knowledge.manage">
       <h2>Areas and access</h2>
-      <p class="sub">An area is a folder of notes. Choose who may <b>read</b> it, <b>contribute</b> (suggest changes) or <b>approve</b> (publish). Administrators see nothing unless they are listed here too.</p>
+      <p class="sub">An area is a folder of notes. Choose who may <b>read</b> it, <b>contribute</b> (suggest changes) or <b>approve</b> (publish). Administrators see nothing unless they are listed here too. Clearing every access row only hides the notes — the area stays. Use <b>Remove area</b> to drop it from Lisa (the Git vault itself is not deleted).</p>
       <div class="table-wrap"><table id="ka-table"></table></div>
       <div class="actions" id="ka-standard" hidden><button class="btn sm" id="ka-standard-add"><svg class="i"><use href="#i-plus"/></svg>Add the standard folders</button>
         <span class="hint" id="ka-standard-hint"></span></div>
@@ -446,18 +457,21 @@
       <h2>For everyone</h2>
       <ol class="steps">
         <li><b>Sign in</b> with the link you received by e-mail or from your admin, and choose a password. Forgot it? Use "Forgot password" on the sign-in page.</li>
-        <li><b>Chat</b> — click <i>Back to chat</i>. Your assistant is private: your conversations, memory and files are never visible to colleagues or administrators.</li>
-        <li><b>Telegram</b> (optional) — under <i>My account</i>, link your Telegram with the pairing code the company bot sends you. Then you can talk to Lisa from your phone.</li>
-        <li><b>Your accounts</b> — if your role allows it, connect Google (mail, calendar, docs) under <i>My account</i>. ClickUp usually works without setup: Lisa finds the tasks assigned to your e-mail address.</li>
+        <li><b>Getting started</b> — on first login you see a private wizard (welcome, how Lisa works, Connect Google / Microsoft 365, optional Telegram). Reopen anytime under <i>My account → Getting started</i> or from Settings → Getting started.</li>
+        <li><b>Chat</b> — click <i>Back to chat</i>. Your assistant is private: conversations, memory and files are never visible to colleagues or administrators.</li>
+        <li><b>Connect your accounts</b> — under <i>My account</i>: Google (calendar, docs, Drive), Microsoft 365 work mailbox, and optional Telegram. ClickUp usually works without setup: Lisa finds tasks assigned to your e-mail.</li>
         <li><b>E-mail</b> — under <i>My account → E-mail accounts</i> add every mailbox you want help with: your work mailbox, a personal Gmail, an account at another company. Give each a name ("Work", "Personal") and choose what Lisa may do: read, write drafts, or also send. Then just ask: "anything new in my personal mail?", "answer the roofer from my work account". Every e-mail is shown to you before it leaves. Gmail, GMX, WEB.DE, Yahoo and iCloud need an <i>app password</i> (made in the provider's security settings), not your normal password.</li>
         <li><b>Company knowledge</b> — ask Lisa "how do we …?". She answers from the areas you may read and tells you when she does not know. To read the notes yourself, open the <i>Knowledge</i> tab in the chat's Workspace panel (next to Files): only the areas you may read are listed. Under <i>Knowledge</i> you can search yourself and <i>Teach Lisa</i>: your suggestion is published after an approver checks it.</li>
         <li><b>Your Files</b> — the Files tab is your private Hermes workspace (drafts and working files). It is not the company Obsidian PARA tree. Company notes live in Knowledge; only editors maintain the shared vault.</li>
+        <li><b>Resources</b> — in the workspace panel, Resources lists uploads, images and files from <i>this chat</i>, plus shortcuts to Files, Knowledge and (if connected) your Google Drive.</li>
+        <li><b>Google Drive</b> — if your role allows it, connect <i>your</i> Google account under My account. In Files you can switch to Google Drive to browse My Drive and Shared drives you already have access to. Uploading to Drive is a separate permission your admin can grant.</li>
       </ol>
       <h3>Good to know</h3>
       <ul>
         <li>Lisa remembers things you tell her ("remember that …"); you can review that memory in the chat settings.</li>
         <li>Before Lisa sends an e-mail or creates something in another system, she asks you to confirm.</li>
         <li>You do not need your own Obsidian with the company folders. A personal Obsidian is optional for private notes only — do not clone the company PARA structure.</li>
+        <li>Google Drive in Lisa is always <b>your</b> Google account (including company Shared drives Google already shared with you) — not a separate company Drive login.</li>
         <li>Missing something? Ask your administrator — your role decides which features you see.</li>
       </ul>
     </section>
@@ -465,8 +479,9 @@
       <h2>For administrators</h2>
       <ol class="steps">
         <li><b>Run the setup wizard</b> (button at the top) once: company, AI model for everyone, company tools (Telegram bot, Google, Microsoft 365, ClickUp), company knowledge and your team. Press <i>Apply</i> at the end: every assistant is refreshed and Lisa is back within about 20 seconds.</li>
-        <li><b>Add people</b> under <i>Users</i> with a role. Send them the password link (or it is e-mailed automatically when e-mail is configured).</li>
-        <li><b>Adjust roles</b> under <i>Roles</i>: what each role's assistant may do and which company tools it may use. The built-in roles are a good start: <i>Staff</i> for most people, <i>Manager</i> to approve knowledge, <i>Administrator</i> for people management, <i>Operator (IT)</i> for the setup wizard, AI model and server settings.</li>
+        <li><b>Google for everyone</b> — in the setup wizard (or by placing <code>google_client_secret.json</code> in the default Hermes profile), register a Google OAuth client of type <i>Web application</i> with redirect URI <code>{your Lisa URL}/api/enterprise/google/callback</code>. Until that is done, people see “Not available yet” and cannot Connect Google. Each person still signs in with <b>their own</b> Google account afterwards.</li>
+        <li><b>Add people</b> under <i>Users</i> with a role (default Staff includes Google + Outlook + e-mail). They get a password link and, on first chat login, the private Getting started wizard.</li>
+        <li><b>Adjust roles</b> under <i>Roles</i>: what each role's assistant may do and which company tools it may use. Built-in: <i>Staff</i> for most people, <i>Manager</i> to approve knowledge, <i>Administrator</i> for people management, <i>Operator (IT)</i> for the setup wizard, AI model and server settings.</li>
         <li><b>Connect the company vault</b> under <i>Knowledge → Company vault</i>: paste the Git address of the <b>same</b> Obsidian repository the shared profile Files / Fireflies promote use, give Lisa read access (her key as a GitLab/GitHub deploy key, or a read-only token), then tick the standard PARA folders and who may read each — e.g. <i>Knowledge</i> for everyone, <i>Projects</i> for managers only. Leave Inbox / Templates / Archive / <code>files</code> off. Lisa updates it by herself every 15 minutes (change it under <i>Folders &amp; access</i>, or press <i>Sync now</i>). Do not create a company PARA Obsidian per employee.</li>
         <li><b>Team mailboxes</b> such as info@ or support@: add them under <i>Users → Team mailboxes</i> and tick the roles that work on them. Everyone else never sees them.</li>
         <li><b>Watch</b> <i>Status & audit log</i>: failed logins, denied requests and every change are recorded.</li>
@@ -479,6 +494,7 @@
         <li><b>E-mail</b>: each person adds as many accounts as they like (Gmail via Google sign-in, Microsoft 365, any other provider via IMAP). Passwords stay in Lisa's server, never in anyone's assistant, and Lisa checks on every request which mailboxes a person may use.</li>
         <li><b>ClickUp</b>: connected once with a company token; each person sees the tasks assigned to their e-mail. A personal token is optional.</li>
         <li><b>Knowledge</b>: one company vault (same Git remote as shared Files), split into areas with their own access. Staff and Viewer may read granted areas (<code>knowledge.read</code>); only Administrators manage the vault connection (<code>knowledge.manage</code>). Personal Files stay per-user Hermes workspaces.</li>
+        <li><b>Google</b>: each person connects their own Google account. Staff includes <code>integration.google</code> and <code>integration.outlook</code> by default; grant <code>integration.google.drive_write</code> only to roles that may upload. There is no separate company Drive service account in Lisa.</li>
       </ul>
       <h3>Troubleshooting</h3>
       <ul>
@@ -529,7 +545,22 @@
     document.querySelectorAll(`#${id} [data-need]`).forEach((el) => { el.hidden = !can(el.dataset.need); });
     window.scrollTo(0, 0);
     ({ users: loadUsers, roles: loadRoles, audit: loadAudit, knowledge: loadKnowledge,
-       account: () => { loadTelegram(); loadIntegrations(); if (can('integration.email')) loadMail(); } })[id]?.()?.catch?.((e) => toast(e.message, true));
+       account: () => { loadGettingStarted(); loadTelegram(); loadIntegrations(); if (can('integration.email')) loadMail(); } })[id]?.()?.catch?.((e) => toast(e.message, true));
+  }
+
+  async function loadGettingStarted() {
+    const box = $('gs-checklist');
+    if (!box) return;
+    try {
+      const s = await api('/api/enterprise/onboarding/connect');
+      const icon = { done: '✓', waiting: '…', skipped: '–', todo: '○' };
+      const rows = (s.checklist || []).map((c) =>
+        `<div style="margin:4px 0"><b>${icon[c.status] || '·'} ${esc(c.label)}</b> — <span class="hint">${esc(c.detail || '')}</span></div>`).join('');
+      box.innerHTML = rows || '<span class="hint">Open the guide to connect your accounts.</span>';
+      $('gs-open').textContent = s.completed ? 'Replay getting started' : (s.show ? 'Continue getting started' : 'Open getting started');
+    } catch (_) {
+      box.innerHTML = '';
+    }
   }
 
   // ── My account ──
@@ -550,7 +581,11 @@
     $('integrations').hidden = !(s.google_allowed || s.clickup_allowed);
     $('int-google').hidden = !s.google_allowed; $('int-clickup').hidden = !s.clickup_allowed;
     $('g-state').innerHTML = s.google ? '<span class="badge ok">Connected</span>'
-      : (s.google_ready === false ? 'Not available yet — the administrator has to add Google in the setup wizard.' : 'Mail, calendar and documents from your own Google account.');
+      : (s.google_ready === false
+        ? (can('operator.setup')
+          ? 'Not available yet — add the company Google app in the <a href="/#setup">setup wizard</a> (OAuth type <b>Web</b>, redirect <code>/api/enterprise/google/callback</code>).'
+          : 'Not available yet — ask IT to add Google in the company setup wizard.')
+        : 'Mail, calendar and documents from your own Google account.');
     $('g-connect').hidden = s.google_ready === false;
     $('g-connect').textContent = s.google ? 'Reconnect' : 'Connect Google'; $('g-disconnect').hidden = !s.google;
     $('c-state').innerHTML = s.clickup ? '<span class="badge ok">Your own token</span> Lisa uses your personal ClickUp token.'
@@ -704,7 +739,8 @@
   });
 
   // ── Roles ──
-  const ROLE_DESC = { viewer: 'Asks questions and reads company knowledge (no personal company Obsidian needed).', staff: 'Everyday assistant: private Files workspace + company Knowledge read/contribute.',
+  const ROLE_DESC = { viewer: 'Asks questions and reads company knowledge (no personal company Obsidian needed).',
+    staff: 'Everyday assistant: private Files, company Knowledge, and own Google / Microsoft / e-mail connections.',
     manager: 'Staff, plus approving company knowledge.', admin: 'Manages people, roles and the company vault connection. No server access.',
     operator: 'IT: setup wizard, AI model, plugins and server settings.' };
   const GROUPS = [
@@ -808,7 +844,8 @@
       $('ka-table').innerHTML = areas.all.length ? '<thead><tr><th>Area</th><th>Access</th><th></th></tr></thead><tbody>' + areas.all.map((a) => `<tr>
         <td class="person"><b>${esc(a.name)}${synced[a.key] ? ` <span class="badge">from ${esc(synced[a.key])}</span>` : ''}</b><span>${esc(a.key)}</span></td>
         <td>${a.grants.map((g) => `<span class="badge ${g.level === 'approve' ? 'role' : ''}">${esc(who(g))} · ${esc(g.level)}</span>`).join('') || '<span class="badge warn">Nobody can read it</span>'}</td>
-        <td style="text-align:right"><button class="btn sm" data-edit-area="${esc(a.key)}">Edit</button></td></tr>`).join('') + '</tbody>'
+        <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-edit-area="${esc(a.key)}">Edit</button>
+        <button class="btn sm danger" data-del-area="${esc(a.key)}" data-del-name="${esc(a.name)}" title="Remove this area from Lisa (vault files stay)">Remove area</button></td></tr>`).join('') + '</tbody>'
         : `<tr><td>${empty('No areas yet', 'Create the first one below — for example "Company handbook", readable by everyone.')}</td></tr>`;
       if (!$('ka-grants').children.length) [{ principal_type: 'role', principal_id: 'staff', level: 'read' },  // keep what was typed
         { principal_type: 'role', principal_id: 'admin', level: 'approve' }].forEach(grantRow);
@@ -816,8 +853,20 @@
       $('k-gaps').innerHTML = gaps.slice(0, 10).map((g) => `<div style="padding:6px 0;border-top:1px solid var(--line)">${esc(g.question)} <span class="hint">· ${esc(new Date(g.at).toLocaleDateString())}</span></div>`).join('') || '<p class="hint">None yet.</p>';
     }
   }
-  $('ka-table').addEventListener('click', (e) => { const b = e.target.closest('[data-edit-area]'); if (!b) return;
-    resetAreaForm(areasCache.find((a) => a.key === b.dataset.editArea)); $('ka-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  $('ka-table').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-area]');
+    if (del) {
+      busy(del, async () => {
+        if (!confirm(`Remove area "${del.dataset.delName}"? Lisa will no longer use it. Notes in the company Git vault are not deleted.`)) return;
+        await api('/api/enterprise/knowledge/areas/delete', { key: del.dataset.delArea });
+        if ($('ka-key').disabled && $('ka-key').value === del.dataset.delArea) resetAreaForm(null);
+        toast('Area removed.'); loadKnowledge();
+      });
+      return;
+    }
+    const b = e.target.closest('[data-edit-area]'); if (!b) return;
+    resetAreaForm(areasCache.find((a) => a.key === b.dataset.editArea)); $('ka-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   $('ka-add-grant').onclick = () => grantRow();
   $('ka-reset').onclick = () => resetAreaForm(null);
   $('ka-name').addEventListener('input', () => { if (!$('ka-key').disabled) $('ka-key').value = $('ka-name').value.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); });
@@ -956,7 +1005,8 @@
   const ACTIONS = { 'login.succeeded': 'Signed in', 'login.failed': 'Sign-in failed', 'user.created': 'Person added', 'user.disabled': 'Person disabled',
     'user.enabled': 'Person enabled', 'user.roles_changed': 'Roles changed', 'user.password_set': 'Password set', 'user.password_link_issued': 'Password link created',
     'setup.completed': 'Organisation created', 'org.setup.applied': 'Setup wizard applied', 'authz.denied': 'Access denied', 'role.updated': 'Role changed',
-    'role.created': 'Role created', 'role.deleted': 'Role deleted', 'knowledge.area_saved': 'Knowledge area saved', 'knowledge.imported': 'Notes imported',
+    'role.created': 'Role created', 'role.deleted': 'Role deleted', 'knowledge.area_saved': 'Knowledge area saved',
+    'knowledge.area_removed': 'Knowledge area removed', 'knowledge.imported': 'Notes imported',
     'user.recovered': 'Access restored from the server', 'mail.account_added': 'E-mail account added', 'mail.account_removed': 'E-mail account removed',
     'mail.account_changed': 'E-mail account changed', 'mail.account_renewed': 'E-mail account renewed', 'mail.draft_created': 'E-mail draft written', 'mail.sent': 'E-mail sent', 'org.assistants_refreshed': 'Assistants refreshed after an update' };
   async function loadAudit() {
