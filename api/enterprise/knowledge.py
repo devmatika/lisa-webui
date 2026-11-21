@@ -102,28 +102,70 @@ def _title(text: str, fallback: str) -> str:
     return fallback
 
 
-def search(db, user: User, query: str, limit: int = 8) -> dict:
-    access = access_for(db, user)
+def _snippet_from_file(path: Path, query: str) -> tuple[str, str]:
+    """Title + snippet from the live mirror file only (never from an external ranker payload)."""
+    text = path.read_text(errors="replace")
+    terms = [t for t in re.findall(r"\w{2,}", (query or "").lower())]
+    low = text.lower()
+    pos = min((low.find(t) for t in terms if t in low), default=0)
+    snippet = text[max(0, pos - 120): pos + MAX_SNIPPET - 120].strip()
+    return _title(text, path.stem), snippet
+
+
+def _term_search(readable: list[str], query: str, limit: int) -> list[dict]:
     terms = [t for t in re.findall(r"\w{2,}", (query or "").lower())]
     hits = []
-    for area, level in access.levels.items():
-        if level < 1:
-            continue
+    for area in readable:
         for rel, path in _docs(area):
             text = path.read_text(errors="replace")
             low = text.lower()
-            # in an Obsidian vault the file name is the note's title: it counts more than the text
             name = path.stem.lower()
             score = sum(low.count(t) + 3 * name.count(t) for t in terms)
-            if score:
-                pos = min((low.find(t) for t in terms if t in low), default=0)
-                snippet = text[max(0, pos - 120): pos + MAX_SNIPPET - 120].strip()
-                hits.append({"path": rel, "area": area, "title": _title(text, Path(rel).stem),
-                             "snippet": snippet, "score": score})
+            if not score:
+                continue
+            title, snippet = _snippet_from_file(path, query)
+            hits.append({"path": rel, "area": area, "title": title, "snippet": snippet, "score": score})
     hits.sort(key=lambda h: -h["score"])
+    return hits[:limit]
+
+
+def _ranked_with_local_snippets(ranked: list[dict], query: str, readable: set[str]) -> list[dict]:
+    """Keep only hits whose area is allowed and whose file exists in the mirror right now."""
+    out = []
+    for hit in ranked:
+        area = hit.get("area") or ""
+        rel = hit.get("path") or ""
+        if area not in readable:
+            continue
+        try:
+            resolved_area, path = _resolve_doc(rel)
+        except DirectoryError:
+            continue
+        if resolved_area != area or not path.is_file():
+            continue
+        title, snippet = _snippet_from_file(path, query)
+        out.append({"path": rel, "area": area, "title": title, "snippet": snippet,
+                    "score": hit.get("score", 0)})
+    return out
+
+
+def search(db, user: User, query: str, limit: int = 8) -> dict:
+    access = access_for(db, user)
+    readable = sorted(a for a, lv in access.levels.items() if lv >= 1)
+    hits: list[dict] = []
+    if readable and (query or "").strip():
+        try:
+            from api.enterprise import knowledge_fts
+            if knowledge_fts.enabled():
+                ranked = knowledge_fts.search_paths(readable, query, limit=max(limit, 8))
+                hits = _ranked_with_local_snippets(ranked, query, set(readable))
+        except Exception:
+            hits = []
+        if not hits:
+            hits = _term_search(readable, query, limit)
     if not hits and query:
         db.add(KnowledgeGap(question=query[:2000], user_id=user.id))
-    return {"results": hits[:limit], "searched_areas": sorted(a for a, lv in access.levels.items() if lv >= 1)}
+    return {"results": hits[:limit], "searched_areas": readable}
 
 
 MAX_TREE = 3000  # notes listed per area; search still covers all of them

@@ -45,9 +45,13 @@ def kb(tmp_path, monkeypatch, request):
     (vault / "farm" / ".history").mkdir()
     (vault / "farm" / ".history" / "old.md").write_text("old milking SECRET-OLD")
     with edb.session() as db:  # these tests build their own areas, without the standard folders
-        from api.enterprise.models import KnowledgeArea
-        for area in db.query(KnowledgeArea).all():
-            db.delete(area)
+        from sqlalchemy import delete
+        from api.enterprise.models import AreaGrant, KnowledgeArea, KnowledgeDraft
+        # Cascade should clear grants/drafts with areas; delete explicitly so leftover
+        # standard-folder grants from first_run_setup cannot survive a partial wipe.
+        db.execute(delete(KnowledgeDraft))
+        db.execute(delete(AreaGrant))
+        db.execute(delete(KnowledgeArea))
     with edb.session() as db:
         from api.enterprise import knowledge
         knowledge.save_area(db, a, "farm", "Farm", [
