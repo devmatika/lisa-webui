@@ -41,6 +41,9 @@ def kb(tmp_path, monkeypatch, request):
     (vault / "farm").mkdir(parents=True)
     (vault / "hr").mkdir(parents=True)
     (vault / "farm" / "milking.md").write_text("# Milking SOP\n\nClean the milking robot at 6am daily.\n")
+    (vault / "farm" / "robots" / "maintenance").mkdir(parents=True)
+    (vault / "farm" / "robots" / "maintenance" / "checklist.md").write_text(
+        "# Robot checklist\n\nInspect the milking robot weekly.\n")
     (vault / "hr" / "salaries.md").write_text("# Salaries\n\nCEO salary SECRET-HR 9000 euro milking bonus.\n")
     (vault / "farm" / ".history").mkdir()
     (vault / "farm" / ".history" / "old.md").write_text("old milking SECRET-OLD")
@@ -190,7 +193,11 @@ def test_browsing_lists_only_the_areas_a_person_may_read(kb):
         anna = knowledge.tree(db, _user(db, ids["anna"]))
         ben = knowledge.tree(db, _user(db, ids["ben"]))
     assert [(a["key"], a["name"], a["level"]) for a in anna["areas"]] == [("farm", "Farm", "contribute")]
-    assert [d["path"] for d in anna["areas"][0]["docs"]] == ["farm/milking.md"]  # never .history or other areas
+    # Nested vault paths stay nested so the Knowledge tab can build a folder tree (not a flat list).
+    assert [d["path"] for d in anna["areas"][0]["docs"]] == [
+        "farm/milking.md",
+        "farm/robots/maintenance/checklist.md",
+    ]  # never .history or other areas
     assert ben["areas"] == [] and "salaries" not in str(anna)
 
 
