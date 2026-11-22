@@ -20,10 +20,10 @@ def test_session_source_labels_are_locale_keys_with_number_placeholder():
     """Issue #7580: source tab labels must come from t() with {0}-interpolated
     counts, not hardcoded English template literals."""
     i18n = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
-    assert "sessions_source_webui: 'WebUI sessions ({0})'" in i18n  # en bundle
-    assert "sessions_source_cli: 'CLI sessions ({0})'" in i18n  # en bundle
-    assert "sessions_source_webui: 'Сеансы WebUI ({0})'" in i18n  # ru bundle
-    assert "sessions_source_cli: 'Сеансы CLI ({0})'" in i18n  # ru bundle
+    assert "sessions_source_webui: 'Chats ({0})'" in i18n  # en bundle
+    assert "sessions_source_cli: 'Terminal ({0})'" in i18n  # en bundle
+    assert "sessions_source_webui: 'Чаты ({0})'" in i18n  # ru bundle
+    assert "sessions_source_cli: 'Терминал ({0})'" in i18n  # ru bundle
     sessions_src = SESSIONS_JS.read_text(encoding="utf-8")
     assert "t('sessions_source_cli', n)" in sessions_src
     assert "t('sessions_source_webui', n)" in sessions_src

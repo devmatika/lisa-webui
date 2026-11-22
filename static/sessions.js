@@ -9993,7 +9993,8 @@ function renderSessionListFromCache(){
     const note=_renderSessionListLoadErrorNote();
     if(note) list.appendChild(note);
   }
-  if(window._showCliSessions || cliSessionCount>0){
+  // Telegram and other messaging chats sit in the first tab; skip the tabs when no terminal chats exist.
+  if(cliSessionCount>0 || cliSessionTabCount>0 || _sessionSourceFilter==='cli'){
     const sourceTabs=document.createElement('div');
     sourceTabs.className='session-source-tabs';
     for(const filter of ['webui','cli']){
