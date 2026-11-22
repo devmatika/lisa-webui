@@ -139,6 +139,33 @@
     }
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
+  // Welcome screen: an organisation profile has no files or terminal (Phase 0), so the default
+  // "What files are in this workspace?" / "run commands" promises would fail. Offer what works.
+  function enterpriseEmptyState() {
+    const de = /^de/i.test(document.documentElement.lang || navigator.language || '');
+    const sub = document.querySelector('#emptyState p[data-i18n="empty_subtitle"], #emptyState p.lisa-sub');
+    if (sub) {
+      sub.removeAttribute('data-i18n');
+      sub.classList.add('lisa-sub');
+      sub.textContent = de ? 'Fragen Sie nach E-Mails, Terminen, Aufgaben oder Firmenwissen.'
+                           : 'Ask about your email, calendar, tasks or company knowledge.';
+    }
+    const picks = de
+      ? ["Was steht heute in meinem Kalender?", 'Welche meiner Aufgaben sind überfällig?', 'Fasse meine ungelesenen E-Mails zusammen.']
+      : ["What's on my calendar today?", 'Which of my tasks are overdue?', 'Summarize my unread emails.'];
+    const icons = ['<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+                   '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+                   '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>'];
+    document.querySelectorAll('#emptyState .suggestion').forEach((btn, i) => {
+      if (!picks[i]) return;
+      btn.dataset.msg = picks[i];  // boot.js reads data-msg on click
+      const ic = btn.querySelector('svg');
+      if (ic && icons[i]) ic.innerHTML = icons[i];
+      const span = btn.querySelector('span');
+      if (span) { span.removeAttribute('data-i18n'); span.textContent = picks[i]; }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { init(); enterpriseEmptyState(); });
+  else { init(); enterpriseEmptyState(); }
 })();
