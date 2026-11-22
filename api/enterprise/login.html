@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Lisa — Sign in</title>
+<title>Sign in · __BRANDING_APP_NAME__</title>
+<link rel="icon" href="__BRANDING_FAVICON__">
 <style>
   /* Clay look, same tokens and self-hosted OFL fonts as the chat (no third-party requests). */
   @font-face { font-family:"Lisa Sans"; src:url("/static/fonts/inter-var-latin.woff2") format("woff2"); font-weight:100 900; font-display:swap; }
@@ -30,6 +31,11 @@
   .mark { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:var(--accent); color:#fff;
           box-shadow:0 6px 16px -6px var(--accent); }
   .mark svg { width:20px; height:20px; }
+  .logo { display:flex; justify-content:center; margin-bottom:28px; }
+  .logo img { height:40px; width:auto; max-width:240px; object-fit:contain; filter:brightness(0); opacity:.88;
+              transition:filter .35s ease, opacity .35s ease; }
+  .logo img:hover { filter:none; opacity:1; }
+  @media (prefers-color-scheme: dark) { .logo img { filter:brightness(0) invert(1); } }
   main { width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:36px 32px 30px;
          box-shadow:var(--shadow); animation:rise .45s cubic-bezier(.2,.8,.2,1) both; }
   @keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
@@ -82,13 +88,14 @@
 </style>
 </head>
 <body>
-<div class="brand" aria-hidden="true">
+<div class="logo"><img id="brand-logo" src="__BRANDING_LOGO__" alt="__BRANDING_COMPANY_NAME__"></div>
+<div class="brand" id="brand-fallback" aria-hidden="true" hidden>
   <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
-  Lisa
+  __BRANDING_APP_NAME__
 </div>
 <main>
   <form id="login" hidden>
-    <h1>Welcome back</h1><p class="sub">Sign in with the account your administrator created for you.</p>
+    <h1>Welcome back</h1><p class="sub">Sign in to __BRANDING_APP_NAME__ with the account your administrator created for you.</p>
     <label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" placeholder="name@company.com" required>
     <label for="l-pw">Password</label>
     <div class="pw"><input id="l-pw" type="password" autocomplete="current-password" required>__EYE__</div>
@@ -131,6 +138,9 @@
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
+  const logo = $('brand-logo'), useMark = () => { logo.parentNode.hidden = true; $('brand-fallback').hidden = false; };
+  if (!logo.getAttribute('src') || logo.getAttribute('src').startsWith('__')) useMark();
+  else if (logo.complete && !logo.naturalWidth) useMark(); else logo.addEventListener('error', useMark);
   // Eye toggle on every password field: the type flips, the button says what it will do next.
   const EYE = '<button type="button" class="eye" aria-label="Show password" aria-pressed="false">'
     + '<svg class="show-ic" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>'
