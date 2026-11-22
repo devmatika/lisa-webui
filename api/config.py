@@ -13316,10 +13316,14 @@ _SETTINGS_DEFAULTS = {
     "show_titlebar_profile": False,  # show profile switcher in app titlebar (opt-in)
     "hide_composer_voice_mode": False,  # hide hands-free voice-mode button in composer footer
     "hide_composer_yolo": False,  # hide YOLO chip in composer footer
-    "hide_composer_profile": False,  # hide profile chip in composer footer
-    "hide_composer_workspace": False,  # hide workspace controls in composer footer/mobile config panel
+    "hide_composer_profile": True,  # hide profile chip in composer footer (Lisa default: off for everyone)
+    "hide_composer_workspace": True,  # hide workspace controls in composer footer/mobile config panel
     "hide_composer_mobile_config": False,  # hide mobile composer config button
-    "hide_composer_model": False,  # hide model chip in composer footer/mobile config panel
+    "hide_composer_model": True,  # hide model chip in composer footer/mobile config panel
+    # Migration marker: True only after the user explicitly re-shows model/profile/workspace
+    # in Chat footer controls. Without it, load_settings force-hides those three for everyone
+    # (stale pre-flip hide_*=False in settings.json must not keep them visible).
+    "composer_core_chips_revealed": False,
     "hide_composer_quota_chip": False,  # hide provider quota chip in composer footer
     "hide_composer_reasoning": False,  # hide reasoning chip in composer footer/mobile config panel
     "hide_composer_toolsets": False,  # hide toolsets chip in composer footer
@@ -13548,6 +13552,12 @@ def load_settings() -> dict:
         # Honor a stored True only when that marker is present.
         if not bool(stored.get("virtualize_transcript_optin")):
             settings["virtualize_transcript"] = False
+        # Force-hide model / profile / workspace composer chips for everyone until
+        # the user explicitly re-shows any of them (composer_core_chips_revealed).
+        if not bool(stored.get("composer_core_chips_revealed")):
+            settings["hide_composer_model"] = True
+            settings["hide_composer_profile"] = True
+            settings["hide_composer_workspace"] = True
     # Fall back to the DEFAULTS, not to None, when nothing is stored.
     #
     # `_read_raw_settings_file()` returns {} for a MISSING settings.json, and {}
@@ -13656,6 +13666,7 @@ _SETTINGS_BOOL_KEYS = {
     "new_chat_on_workspace_switch",
     "virtualize_transcript",
     "virtualize_transcript_optin",
+    "composer_core_chips_revealed",
     "show_tps",
     "fade_text_effect",
     "show_cli_sessions",

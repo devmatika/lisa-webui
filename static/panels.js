@@ -8514,6 +8514,10 @@ function _composerControlVisibilityPayload(){
   const defs=_composerControlDefsForSettings();
   const state=window._composerControlVisibility||{};
   defs.forEach(function(def){payload[def.key]=!!state[def.key];});
+  // Re-showing model/profile/workspace records the post-flip opt-in so load_settings
+  // stops force-hiding those three on the next boot.
+  const core=['hide_composer_model','hide_composer_profile','hide_composer_workspace'];
+  if(core.some(function(k){return state[k]===false;})) payload.composer_core_chips_revealed=true;
   return payload;
 }
 
