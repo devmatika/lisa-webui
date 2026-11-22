@@ -9,6 +9,14 @@
 (function () {
   'use strict';
   window.LISA_ENTERPRISE = true;
+  // Fetched once, right away (this script is deferred, so it runs before DOMContentLoaded): shell
+  // probes for operator-only APIs wait on it instead of drawing 403s for every member.
+  window.LISA_ME_READY = fetch('/api/enterprise/me', { credentials: 'include' })
+    .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  window.lisaAllowed = async (perm) => {
+    const me = await window.LISA_ME_READY;
+    return !!(me && (me.permissions || []).includes(perm));
+  };
   // Each person has exactly one private profile, named by an internal id: no profile switcher.
   const style = document.createElement('style');
   style.textContent = '#profileChipWrap{display:none!important}';
@@ -116,14 +124,8 @@
   }
 
   async function init() {
-    let me;
-    try {
-      const r = await fetch('/api/enterprise/me', { credentials: 'include' });
-      if (!r.ok) return;
-      me = await r.json();
-    } catch (_) {
-      return;
-    }
+    const me = await window.LISA_ME_READY;
+    if (!me) return;
     window.LISA_ME = me;
     if (typeof applyBotName === 'function') applyBotName();  // boot may have named the assistant before this ran
     const perms = new Set(me.permissions || []);

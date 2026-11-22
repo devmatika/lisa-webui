@@ -2049,7 +2049,9 @@ function _formatStatus(st) {
 
 window.addEventListener('DOMContentLoaded', () => {
   // Check customer wizard status after boot
-  setTimeout(() => {
+  setTimeout(async () => {
+    // Lisa Enterprise: the customer setup wizard is operator-only.
+    if (typeof window.lisaAllowed === 'function' && !(await window.lisaAllowed('operator.setup'))) return;
     loadCustomerWizard({ force: false });
   }, 600);
 });

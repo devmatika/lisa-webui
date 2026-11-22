@@ -2386,7 +2386,9 @@ function openHermesDashboard(event){
   window.open(url,'_blank','noopener,noreferrer');
   return false;
 }
-function _initDashboardLinkProbe(){
+async function _initDashboardLinkProbe(){
+  // Lisa Enterprise: the dashboard is operator-only; members would only collect 403s.
+  if(typeof window.lisaAllowed==='function'&&!(await window.lisaAllowed('operator.system'))) return;
   loadDashboardSettings();
   refreshDashboardStatus(true);
   setInterval(refreshDashboardStatus,DASHBOARD_STATUS_TTL_MS);
