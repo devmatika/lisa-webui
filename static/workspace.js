@@ -1198,6 +1198,8 @@ async function _refreshGitBadge(){
   const badge=$('gitBadge');
   if(!badge||!S.session)return;
   const sessionId=S.session.session_id;
+  // Lisa Enterprise: git info is operator-only; members would only get a 403.
+  if(typeof window.lisaAllowed==='function'&&!(await window.lisaAllowed('operator.git'))){badge.style.display='none';return;}
   try{
     const data=await api(`/api/git-info?session_id=${encodeURIComponent(sessionId)}`);
     if(!S.session||S.session.session_id!==sessionId)return;
