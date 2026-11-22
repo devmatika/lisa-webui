@@ -9635,3 +9635,7 @@ button.cw-step-item{width:100%;text-align:left;font:inherit;background:none;bord
 :root[data-skin="clay"] .cw-step-item.active .cw-step-num{background:var(--accent)!important;color:var(--accent-ink)!important;}
 :root[data-skin="clay"] .customer-wizard-badge{background:var(--accent-bg)!important;color:var(--accent-text)!important;border-color:var(--accent-bg-strong)!important;}
 :root[data-skin="clay"] .customer-wizard-sidebar h2,:root[data-skin="clay"] .cw-step-title{font-family:var(--font-conversation);font-weight:500;}
+/* reply headings without the rule line; code block header in the UI font; sidebar separated by colour only */
+:root[data-skin="clay"] .msg-body h1,:root[data-skin="clay"] .msg-body h2,:root[data-skin="clay"] .msg-body h3{border-bottom:0!important;padding-bottom:0!important;}
+:root[data-skin="clay"] .pre-header,:root[data-skin="clay"] .pre-header *{font-family:var(--font-ui)!important;}
+:root[data-skin="clay"] .sidebar{border-right-color:transparent!important;}
