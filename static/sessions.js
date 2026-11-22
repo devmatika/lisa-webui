@@ -2949,7 +2949,10 @@ async function loadSession(sid){
   // Guard against network/server failures to prevent a permanently stuck loading state.
   let data;
   try {
-    data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0`);
+    // A WebUI restart or proxy blip (Cloudflare 52x / 502-504) lasts seconds: retry it quietly
+    // (2.5s, then 5s) instead of showing "Failed to load session" for a session that is fine.
+    data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0`,
+      {retryStatuses:[502,503,504,520,521,522,523,524], retryDelayMs:2500});
   } catch(e) {
     const metadataErrorStatus=e.status;
     const profileMismatch=_sessionProfileMismatchFromError(e);

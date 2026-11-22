@@ -28,9 +28,7 @@
          background:radial-gradient(1200px 520px at 50% -10%, var(--glow), transparent 70%), var(--bg); color:var(--text);
          font:15px/1.5 "Lisa Sans", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing:antialiased; }
   .brand { display:flex; align-items:center; gap:10px; margin-bottom:28px; color:var(--strong); font-weight:600; font-size:17px; letter-spacing:-.01em; }
-  .mark { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:var(--accent); color:#fff;
-          box-shadow:0 6px 16px -6px var(--accent); }
-  .mark svg { width:20px; height:20px; }
+  .mark { width:36px; height:36px; border-radius:10px; box-shadow:0 6px 16px -8px rgba(20,20,19,.45); }
   .logo, .brand { margin-top:auto; }
   .foot { margin-bottom:auto; }
   .logo { display:flex; justify-content:center; margin-bottom:28px; }
@@ -99,7 +97,7 @@
 <body>
 <div class="logo"><img id="brand-logo" src="__BRANDING_LOGO__" alt="__BRANDING_COMPANY_NAME__"></div>
 <div class="brand" id="brand-fallback" aria-hidden="true" hidden>
-  <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
+  <img class="mark" src="/static/lisa-icon-256.png" alt="">
   __BRANDING_APP_NAME__
 </div>
 <main>
