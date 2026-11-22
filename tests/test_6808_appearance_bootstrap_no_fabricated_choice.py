@@ -125,29 +125,35 @@ def test_fresh_browser_writes_nothing():
     assert out["store"] == {}
 
 
-def test_fresh_browser_still_paints_dark():
-    """The fix changes persistence only, never the pre-paint result."""
+def test_fresh_browser_paints_dark_clay():
     out = _run({})
     assert "dark" in out["classes"], (
         "the dark pre-paint fallback must be unchanged for an empty store"
     )
-    assert out["skin"] is None
+    assert out["skin"] == "clay"
 
 
 @pytest.mark.parametrize(
     "initial,expected_theme,expected_skin",
     [
-        ({"hermes-theme": "dark"}, "dark", "default"),
         ({"hermes-skin": "mono"}, "dark", "mono"),
+        ({"hermes-theme": "light", "hermes-skin": "clay"}, "light", "clay"),
+        ({"hermes-theme": "light", "hermes-skin": "default"}, "light", "default"),
         ({"hermes-theme": "light", "hermes-skin": "mono"}, "light", "mono"),
     ],
 )
 def test_any_prior_state_still_normalises_and_persists(initial, expected_theme, expected_skin):
-    """Either key present is enough to make this an explicit choice."""
+    """A stored skin is normalized and persisted with the resolved theme."""
     out = _run(dict(initial))
     assert out["store"]["hermes-theme"] == expected_theme
     assert out["store"]["hermes-skin"] == expected_skin
     assert [k for k, _ in out["writes"]] == ["hermes-theme", "hermes-skin"]
+
+
+def test_theme_only_does_not_fabricate_skin_preference():
+    out = _run({"hermes-theme": "dark"})
+    assert out["store"] == {"hermes-theme": "dark"}
+    assert out["skin"] is None
 
 
 @pytest.mark.parametrize(
@@ -184,5 +190,5 @@ def test_guard_is_on_the_pair_not_per_key():
         script,
     ), "the guard must be true when EITHER appearance key is present"
     assert re.search(r"if\(_hadAppearance\)\{[^}]*setItem\('hermes-theme'", script), (
-        "both appearance writes must sit behind the guard"
+        "appearance writes must sit behind the guard"
     )

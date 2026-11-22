@@ -1559,11 +1559,11 @@
   .system-health-bar{height:5px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--border) 70%,transparent);border:1px solid color-mix(in srgb,var(--border) 75%,transparent);}
   .system-health-bar-fill{height:100%;width:0%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--accent-hover));transition:width .25s ease;}
   .system-health-foot{font-size:11px;color:var(--muted);line-height:1.45;opacity:.82;}
-  .app-titlebar-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--accent);height:18px;max-width:36px;flex:none;overflow:hidden;}
+  .app-titlebar-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--accent);height:var(--titlebar-mark-height,18px);max-width:var(--titlebar-mark-width,36px);flex:none;overflow:hidden;}
   .app-titlebar-icon img,
   .app-titlebar-icon .app-titlebar-icon-img{
-    height:18px !important;max-height:18px !important;
-    width:auto !important;max-width:36px !important;
+    height:var(--titlebar-mark-height,18px) !important;max-height:var(--titlebar-mark-height,18px) !important;
+    width:auto !important;max-width:var(--titlebar-mark-width,36px) !important;
     object-fit:contain;display:block;flex:none;
   }
   .app-titlebar-title{font-size:12px;font-weight:600;color:var(--text);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw;}
@@ -9427,3 +9427,211 @@ button.cw-step-item{width:100%;text-align:left;font:inherit;background:none;bord
 .customer-wizard-actions{position:sticky;bottom:-28px;z-index:1;background:var(--surface,#1e1e24);padding-bottom:28px;margin-bottom:-28px}
 @media (min-width:769px){.customer-wizard-main{padding-right:64px}}
 @media (max-width:768px){.customer-wizard-actions{bottom:-16px;padding-bottom:16px;margin-bottom:-16px}}
+
+/* ── Skin: Clay (Lisa default) ──────────────────────────────────────────────
+   Warm paper, clay accents, and a distinct reading face for Lisa’s answers.
+   The open-source fonts are served locally from static/fonts. */
+@font-face{font-family:"Lisa Sans";src:url("fonts/inter-var-latin.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap;}
+@font-face{font-family:"Lisa Serif";src:url("fonts/source-serif-4-var-latin.woff2") format("woff2");font-weight:200 900;font-style:normal;font-display:swap;}
+@font-face{font-family:"Lisa Serif";src:url("fonts/source-serif-4-var-latin-italic.woff2") format("woff2");font-weight:200 900;font-style:italic;font-display:swap;}
+:root[data-skin="clay"]{
+  color-scheme:light;
+  --bg:#F9F7F2;--sidebar:#F1EEE7;--surface:#FFFEFB;--surface-subtle:#F5F4EE;--surface-subtle-hover:#EDEBE3;
+  --border:#E8E6DC;--border2:#DAD7CC;--border-subtle:#F0EEE6;--border-muted:#E2DFD4;
+  --text:#3D3D3A;--strong:#141413;--muted:#73726C;--em:#3D3D3A;
+  --accent:#A54F38;--accent-hover:#8F402D;--accent-ink:#fff;--accent-bg:rgba(201,100,66,0.09);--accent-bg-strong:rgba(201,100,66,0.16);--accent-text:#A9512F;
+  --blue:#1F64AB;--gold:#C96442;--focus-ring:rgba(201,100,66,0.25);--focus-glow:rgba(201,100,66,0.08);
+  --input-bg:#FFFFFF;--hover-bg:rgba(20,20,19,0.045);--code-bg:#F5F4EE;--code-inline-bg:rgba(20,20,19,0.055);--code-text:#3D3D3A;--pre-text:#3D3D3A;
+  --topbar-bg:var(--bg);--main-bg:var(--bg);
+  --error:#B53333;--success:#4F7A28;--warning:#A9711B;--info:var(--blue);
+  --user-bubble-bg:#F0EEE6;--user-bubble-border:transparent;--user-bubble-text:#141413;--user-bubble-placeholder:#73726C;
+  --user-selection-bg:rgba(201,100,66,0.22);--user-selection-text:#141413;
+  --font-ui:"Lisa Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --font-conversation:"Lisa Serif","Source Serif 4",Georgia,"Times New Roman",serif;
+  --msg-max:800px;
+  --clay-composer-shadow:0 4px 16px rgba(44,32,17,.07);
+}
+:root.dark[data-skin="clay"]{
+  color-scheme:dark;
+  --bg:#252422;--sidebar:#1D1C1A;--surface:#302E2A;--surface-subtle:#2B2A27;--surface-subtle-hover:#353431;
+  --border:#3E3E38;--border2:#4B4A44;--border-subtle:#30302E;--border-muted:#45443E;
+  --text:#E5E3DC;--strong:#FAF9F5;--muted:#A3A19A;--em:#E5E3DC;
+  --accent:#E09476;--accent-hover:#EAA78B;--accent-ink:#251A16;--accent-bg:rgba(217,119,87,0.12);--accent-bg-strong:rgba(217,119,87,0.20);--accent-text:#E8957A;
+  --blue:#6AA6E8;--gold:#D97757;--focus-ring:rgba(217,119,87,0.30);--focus-glow:rgba(217,119,87,0.10);
+  --input-bg:#30302E;--hover-bg:rgba(250,249,245,0.06);--code-bg:#1F1E1D;--code-inline-bg:rgba(250,249,245,0.08);--code-text:#E5E3DC;--pre-text:#E5E3DC;
+  --topbar-bg:var(--bg);--main-bg:var(--bg);
+  --error:#E26D6D;--success:#8DBF5A;--warning:#D9A24A;--info:var(--blue);
+  --user-bubble-bg:#141413;--user-bubble-border:transparent;--user-bubble-text:#F5F4EE;--user-bubble-placeholder:#A3A19A;
+  --user-selection-bg:rgba(217,119,87,0.30);--user-selection-text:#FAF9F5;
+  --clay-composer-shadow:0 4px 16px rgba(0,0,0,.22);
+}
+/* Keep the same reading column for the conversation and the input. */
+:root[data-skin="clay"] :is(.messages-inner,.composer-selection-chips) {
+  max-width:var(--msg-max);
+}
+:root[data-skin="clay"] .composer-box {
+  max-width:calc(var(--msg-max) - 48px);
+  background:var(--surface);
+  border-color:var(--border2);
+  border-radius:18px;
+  box-shadow:var(--clay-composer-shadow);
+}
+:root[data-skin="clay"] .composer-wrap {
+  background:var(--bg);
+  border-top:0;
+}
+:root[data-skin="clay"] .composer-wrap::before {
+  background:linear-gradient(to bottom,transparent,var(--bg));
+}
+:root[data-skin="clay"] .composer-box:focus-within,
+:root[data-skin="clay"] .composer-wrap.drag-over .composer-box {
+  border-color:var(--accent);
+  box-shadow:var(--clay-composer-shadow),0 0 0 2px var(--focus-ring);
+}
+:root[data-skin="clay"] textarea#msg {
+  font-family:var(--font-ui);
+  font-size:16px;
+  line-height:1.5;
+  caret-color:var(--accent);
+}
+:root[data-skin="clay"] .msg-body {
+  font-size:calc(var(--message-body-font-size) + 2px);
+  line-height:1.7;
+}
+:root[data-skin="clay"] .msg-body :is(h1,h2,h3) {
+  font-family:inherit;
+  font-weight:600;
+  color:var(--strong);
+}
+:root[data-skin="clay"] .msg-row[data-role="user"] .msg-body {
+  font-family:var(--font-ui);
+  font-size:calc(var(--message-body-font-size) + 1px);
+  line-height:1.6;
+  border-radius:16px;
+  padding:10px 16px;
+}
+:root[data-skin="clay"] .msg-body a {
+  text-underline-offset:.16em;
+}
+:root[data-skin="clay"] .send-btn {
+  border-radius:10px;
+  box-shadow:none;
+  transition:background-color .15s;
+}
+:root[data-skin="clay"] .send-btn.visible {animation:none;}
+:root[data-skin="clay"] .send-btn:is(:hover,:active) {transform:none;box-shadow:none;}
+:root[data-skin="clay"] .send-btn:not(.stop,.interrupt,.steer) {color:var(--accent-ink);}
+:root[data-skin="clay"] .send-btn:disabled {
+  background:var(--surface-subtle);
+  color:var(--muted);
+  opacity:1;
+}
+
+:root[data-skin="clay"] :is(.sidebar,.app-titlebar,.topbar) {border-color:var(--border);}
+:root[data-skin="clay"] .app-titlebar {justify-content:flex-start;gap:8px;}
+:root[data-skin="clay"] .app-titlebar-inner {justify-content:flex-start;}
+:root[data-skin="clay"] .app-titlebar-title {color:var(--strong);font-size:14px;}
+@media (max-width:900px) {
+  :root[data-skin="clay"] .app-titlebar-inner {flex:1 1 auto;}
+  :root[data-skin="clay"] .app-titlebar-spacer {display:none;}
+}
+@media (max-width:375px) {
+  :root[data-skin="clay"] .app-titlebar {gap:4px;}
+  :root[data-skin="clay"] .app-titlebar-profile-label {max-width:40px;}
+}
+:root[data-skin="clay"] .session-item {border-radius:9px;color:var(--text);}
+:root[data-skin="clay"] .session-item.active {
+  background:var(--surface-subtle-hover);
+  color:var(--strong);
+}
+:root[data-skin="clay"] #btnNewChat {
+  background:var(--accent-bg);
+  color:var(--accent-text);
+}
+:root[data-skin="clay"] #btnNewChat:hover {background:var(--accent-bg-strong);}
+:root[data-skin="clay"] :is(.btn.primary,.update-primary,.clarify-submit) {
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--accent-ink);
+}
+:root[data-skin="clay"] :is(.btn.primary,.update-primary,.clarify-submit):hover {
+  background:var(--accent-hover);
+  border-color:var(--accent-hover);
+}
+
+:root[data-skin="clay"] .empty-state {
+  align-items:flex-start;
+  background:none;
+  gap:10px;
+  padding:24px;
+  width:100%;
+  max-width:var(--msg-max);
+  margin-inline:auto;
+}
+/* The transcript adds no vertical space before a conversation starts. */
+:root[data-skin="clay"] .empty-state + .messages-inner:empty {padding-block:0;}
+:root[data-skin="clay"] .empty-logo {display:none;}
+:root[data-skin="clay"] .empty-state h2 {
+  color:var(--strong);
+  font-family:var(--font-conversation);
+  font-weight:500;
+  font-size:clamp(30px,5vw,44px);
+  line-height:1.15;
+  letter-spacing:-.025em;
+  text-wrap:balance;
+}
+:root[data-skin="clay"] .empty-state p {
+  max-width:44ch;
+  text-align:start;
+  font-size:15px;
+}
+:root[data-skin="clay"] .empty-state:not(.no-suggestions) .suggestion-grid {
+  flex-flow:row wrap;
+  max-width:none;
+  margin-top:8px;
+}
+:root[data-skin="clay"] .suggestion {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  max-width:100%;
+  padding:7px 10px;
+  background:transparent;
+  color:var(--text);
+  border-radius:8px;
+}
+:root[data-skin="clay"] .suggestion svg {flex:none;color:var(--accent-text);}
+:root[data-skin="clay"] .suggestion:hover {
+  background:var(--surface);
+  border-color:var(--border2);
+  transform:none;
+}
+:root[data-skin="clay"] :is(.suggestion,#btnNewChat,.send-btn):focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+@media (min-width:641px) and (min-height:680px) {
+  :root[data-skin="clay"] .empty-state {justify-content:flex-end;}
+  :root[data-skin="clay"] #mainChat:has(.empty-state:not(.no-welcome,[style*="display: none"])) .composer-wrap {
+    margin-bottom:clamp(100px,25vh,240px);
+  }
+}
+@media (max-width:640px) {
+  :root[data-skin="clay"] .suggestion {min-height:44px;}
+}
+/* setup / onboarding window: follow the clay palette instead of the hard-coded blue/navy */
+:root[data-skin="clay"] .onboarding-overlay{background:rgba(20,20,19,.45)!important;}
+:root[data-skin="clay"] .onboarding-card{background:var(--bg)!important;border-color:var(--border)!important;color:var(--text)!important;box-shadow:0 18px 50px rgba(20,20,19,.16)!important;}
+:root[data-skin="clay"] .onboarding-sidebar{background:var(--sidebar)!important;border-right-color:var(--border)!important;}
+:root[data-skin="clay"] .onboarding-sidebar h2{font-family:var(--font-conversation);font-weight:500;letter-spacing:-.01em;color:var(--strong)!important;}
+:root[data-skin="clay"] .onboarding-badge{background:var(--accent-bg)!important;color:var(--accent-text)!important;border-color:var(--accent-bg-strong)!important;}
+:root[data-skin="clay"] .onboarding-step,:root[data-skin="clay"] .onboarding-check,:root[data-skin="clay"] .onboarding-oauth-card,:root[data-skin="clay"] .onboarding-status{background:var(--surface)!important;border-color:var(--border)!important;color:var(--text)!important;}
+:root[data-skin="clay"] .onboarding-step.active,:root[data-skin="clay"] .onboarding-step.done{background:var(--accent-bg)!important;border-color:var(--accent-bg-strong)!important;}
+:root[data-skin="clay"] .onboarding-step.active .onboarding-step-index{background:var(--accent)!important;color:var(--accent-ink)!important;}
+/* customer wizard + onboarding: primary "Continue", active step and badge in clay (inline styles set --blue) */
+:root[data-skin="clay"] #onboardingNextBtn,:root[data-skin="clay"] #customerWizardNextBtn{background:var(--accent)!important;color:var(--accent-ink)!important;border-color:var(--accent)!important;}
+:root[data-skin="clay"] #onboardingNextBtn:hover,:root[data-skin="clay"] #customerWizardNextBtn:hover{background:var(--accent-hover)!important;border-color:var(--accent-hover)!important;}
+:root[data-skin="clay"] .cw-step-item.active{background:var(--accent-bg)!important;}
+:root[data-skin="clay"] .cw-step-item.active .cw-step-num{background:var(--accent)!important;color:var(--accent-ink)!important;}
+:root[data-skin="clay"] .customer-wizard-badge{background:var(--accent-bg)!important;color:var(--accent-text)!important;border-color:var(--accent-bg-strong)!important;}
+:root[data-skin="clay"] .customer-wizard-sidebar h2,:root[data-skin="clay"] .cw-step-title{font-family:var(--font-conversation);font-weight:500;}

@@ -60,6 +60,11 @@ absent for light. System mode tracks the OS preference at runtime.
 | **Geist Contrast** (`geist-contrast`) | Geist-inspired monochrome surfaces with a restrained dark-mode `#FFF175` accent. |
 | **Zeus** | OLED-near-black dark surfaces that keep the default gold accent. Dark-focused; falls back to the default light palette in light mode. |
 
+Lisa starts with **Clay** when no appearance has been saved. Select Clay in
+**Settings → Skin** to apply it to an existing browser. Clay uses locally served
+Inter for controls and Source Serif 4 for assistant prose, with paired light and
+dark palettes.
+
 Each skin defines paired light + dark variants so it reads cleanly on either
 theme. The skin is applied as `data-skin="<name>"` on `<html>` (the default
 skin clears the attribute).

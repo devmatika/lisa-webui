@@ -72,17 +72,16 @@ def test_defaults_are_used_when_file_has_no_appearance_keys(settings_file, custo
     )
 
 
-# ── no behaviour change on stock defaults ─────────────────────────────────
+# ── Lisa defaults ─────────────────────────────────
 
-def test_stock_defaults_are_unchanged_by_the_guard(settings_file):
-    """On the shipped defaults this fix is a no-op — both paths give dark/default."""
+def test_fresh_lisa_settings_use_dark_clay(settings_file):
     assert not settings_file.exists()
     s = config.load_settings()
     assert (s["theme"], s["skin"]) == (
         config._SETTINGS_DEFAULTS["theme"],
         config._SETTINGS_DEFAULTS["skin"],
     )
-    assert (s["theme"], s["skin"]) == ("dark", "default")
+    assert (s["theme"], s["skin"]) == ("dark", "clay")
 
 
 # ── a stored preference still wins, exactly as before ─────────────────────

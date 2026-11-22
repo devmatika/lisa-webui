@@ -3446,6 +3446,7 @@ const _SKINS=[
   {name:'Geist Contrast', value:'geist-contrast', colors:['#000000','#ffffff','#FFF175']},
   {name:'Zeus',     colors:['#FFD700','#FFBF00','#1A1A00']},
   {name:'Verdigris', value:'verdigris', colors:['#C89A5A','#0F1714','#22342C']},
+  {name:'Clay', value:'clay', colors:['#A54F38','#F9F7F2','#252422']},
 ];
 const _VALID_THEMES=new Set((_THEMES||[]).map(t=>t.value));
 const _VALID_SKINS=new Set((_SKINS||[]).map(s=>(s.value||s.name).toLowerCase()));
@@ -4126,14 +4127,8 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     // push the localStorage values back to the server so settings.json stays
     // in sync without ever clobbering the user's chosen theme/skin.
     //
-    // Caveat: the pre-paint inline script in index.html normalises empty
-    // localStorage into 'dark'/'default' BEFORE this code runs, so a truly
-    // empty (new-browser) state is indistinguishable from a user who chose
-    // the defaults.  To avoid blocking server→client sync on first visit we
-    // only let localStorage override the server when it carries an explicit
-    // user-selectable theme value or a NON-DEFAULT skin.  That keeps the
-    // server in charge for empty first-visit state while preserving explicit
-    // light/dark/system choices after a failed autosave.
+    // The pre-paint script paints a fresh browser without persisting a choice.
+    // Any stored skin, including 'default', can therefore take precedence.
     const srvAppearance=_normalizeAppearance(s.theme,s.skin);
     const lsTheme=(localStorage.getItem('hermes-theme')||'').trim().toLowerCase();
     const lsSkin=(localStorage.getItem('hermes-skin')||'').trim().toLowerCase();
@@ -4145,7 +4140,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     // re-apply it once it loads. Without this, the boot sync would clobber the
     // saved choice before the extension runs.
     const lsSkinIsPendingExt=!!lsSkin&&lsSkin!=='default'&&!_VALID_SKINS.has(lsSkin)&&!_LEGACY_THEME_MAP[lsSkin];
-    const lsHasExplicitSkin=lsSkin&&lsSkin!=='default';
+    const lsHasExplicitSkin=!!lsSkin;
     const lsHasExplicitTheme=lsTheme&&['system','light','dark'].includes(lsTheme);
     const theme=lsHasExplicitTheme?lsAppearance.theme:srvAppearance.theme;
     const skin=lsHasExplicitSkin?(lsSkinIsPendingExt?lsSkin:lsAppearance.skin):srvAppearance.skin;

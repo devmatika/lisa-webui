@@ -13289,7 +13289,7 @@ _SETTINGS_DEFAULTS = {
     "voice_silence_ms": 1800,
     "raw_audio_mode": False,
     "theme": "dark",  # light | dark | system
-    "skin": "default",  # accent color skin: default | ares | mono | graphite | slate | poseidon | sisyphus | charizard | sienna | catppuccin | nous
+    "skin": "clay",
     "font_size": "default",  # small | default | large | xlarge
     "session_jump_buttons": False,  # show Start/End transcript jump pills
     "render_user_markdown": False,  # opt-in: render full markdown in user messages (#3870)
@@ -13395,6 +13395,7 @@ _SETTINGS_SKIN_VALUES = {
     "verdigris",
     "neon-soft",
     "neon-paint",
+    "clay",
 }
 _SETTINGS_LEGACY_THEME_MAP = {
     # Legacy full themes now map onto the closest supported theme + accent skin pair.
