@@ -104,6 +104,24 @@
 :root[data-skin="clay"] #memberOnboardingOverlay .onboarding-actions .sm-btn{background:var(--surface)!important;border:1px solid var(--border2)!important;color:var(--text)!important;border-radius:10px!important}
 :root[data-skin="clay"] #memberOnboardingOverlay .member-ob-cta,:root[data-skin="clay"] #memberOnboardingOverlay .onboarding-actions #memberObNext{background:var(--strong)!important;border-color:var(--strong)!important;color:var(--bg)!important;border-radius:10px!important}
 :root[data-skin="clay"] #memberOnboardingOverlay .member-ob-cta:hover,:root[data-skin="clay"] #memberOnboardingOverlay .onboarding-actions #memberObNext:hover{opacity:.9}
+/* Fit any laptop: fixed card height, sidebar and body scroll on their own, buttons always visible. */
+#memberOnboardingOverlay.onboarding-overlay{padding:16px}
+#memberOnboardingOverlay .onboarding-card{display:flex;height:min(640px,calc(100vh - 32px));max-height:none!important;overflow:hidden!important}
+#memberOnboardingOverlay .onboarding-shell{flex:1;min-height:0;width:100%}
+#memberOnboardingOverlay .onboarding-sidebar{overflow-y:auto;min-height:0}
+#memberOnboardingOverlay .onboarding-main{min-height:0;overflow:hidden}
+#memberOnboardingOverlay .onboarding-body{flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+#memberOnboardingOverlay .onboarding-actions{flex:none;margin-top:auto;padding-top:14px;border-top:1px solid var(--border)}
+@media (max-height:760px){
+  #memberOnboardingOverlay .onboarding-sidebar{padding:18px 18px!important}
+  #memberOnboardingOverlay .onboarding-sidebar h2{font-size:21px!important;margin:6px 0 4px!important}
+  #memberOnboardingOverlay .onboarding-sidebar p{font-size:12px;line-height:1.5;margin:0 0 4px}
+  #memberOnboardingOverlay .member-ob-progress{margin:8px 0 2px}
+  #memberOnboardingOverlay .onboarding-steps{gap:4px!important;margin-top:12px!important}
+  #memberOnboardingOverlay .onboarding-step{padding:6px 10px!important;align-items:center}
+  #memberOnboardingOverlay .onboarding-step-desc{display:none}
+  #memberOnboardingOverlay .onboarding-main{padding:20px 22px 16px!important;gap:12px!important}
+}
 /* "Finish setting up" reminder: shown after "Skip for now" until the setup is complete */
 #memberObPill{position:fixed;top:52px;right:18px;z-index:900;display:flex;align-items:center;gap:10px;padding:7px 8px 7px 12px;border-radius:999px;
   background:var(--surface,#fff);border:1px solid var(--border2,#ddd);box-shadow:0 6px 24px -10px rgba(20,20,19,.25);color:var(--text);font-size:13px;
