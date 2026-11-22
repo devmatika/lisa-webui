@@ -762,7 +762,7 @@ def _s_save(handler, body):
                                       credential_id=body.get("credential_id") or None,
                                       folders=list(body.get("folders") or []),
                                       interval_minutes=int(body.get("interval_minutes") or 15),
-                                      write_back=bool(body.get("write_back")))
+                                      write_back=True if "write_back" not in body else bool(body.get("write_back")))
             out = sources.view(src)
     except (DirectoryError, ValueError) as exc:
         return bad(handler, str(exc), 400)

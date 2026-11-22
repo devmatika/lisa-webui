@@ -2,18 +2,19 @@
 
 The organisation connects its vault once (setup wizard or Knowledge page): Lisa reads the
 repository, every top-level folder becomes an area, and the admin decides per folder whether it is
-included and which roles may read it. Lisa then pulls the repository on a schedule (read-only: it
-never pushes) and mirrors the Markdown notes into the areas. Who may read what is always the
-area's grants (``knowledge.py``); nothing in the repository grants anything.
+included and which roles may read it. Lisa pulls on a schedule and mirrors Markdown into the areas.
+With ``write_back``, sync is bidirectional: approved Teach-Lisa notes and Knowledge-only orphans are
+committed back into the vault (for ``file://`` mounts, into the working tree when it is writable).
+Who may read what is always the area's grants (``knowledge.py``); nothing in the repository grants
+anything.
 
 Access to the repository (preferred on Docker servers first):
 - ``file://`` below ``LOCAL_SOURCES`` (bind-mount the host clone under
-  ``/opt/lisa/sources/<name>``). Survives container restarts; no deploy key or token in the
-  container. Ops keep the clone fresh on the host (cron / ``obsidian-vault-sync``).
-- SSH (``git@gitlab.com:org/vault.git``): Lisa generates a deploy key; the admin adds its public
-  half as a read-only deploy key in GitLab / GitHub. Keys live under the knowledge volume; if they
-  are lost after a wipe/restore, reconnect or prefer ``file://``.
-- HTTPS: an access token with read access, sent as an HTTP header (never stored in a URL).
+  ``/opt/lisa/sources/<name>``). Prefer a writable mount when ``write_back`` is on. Ops may still
+  push with host cron / ``obsidian-vault-sync`` when the container cannot reach the Git remote.
+- SSH (``git@gitlab.com:org/vault.git``): Lisa generates a deploy key; give it write access when
+  ``write_back`` is on. Keys live under the knowledge volume.
+- HTTPS: an access token (read, or write when ``write_back`` is on).
 
 Secrets and clones live under ``<vault>/.sources/`` (a dot folder: never searchable).
 """
@@ -295,7 +296,7 @@ def _kept_grants(db, key: str, readers: set[str]) -> list[dict]:
 
 def save_source(db, actor: Actor, *, source_id: str | None, name: str, url: str, branch: str,
                 credential_id: str | None, folders: list[dict], interval_minutes: int = 15,
-                write_back: bool = False) -> KnowledgeSource:
+                write_back: bool = True) -> KnowledgeSource:
     """Create or update a source and its areas.
 
     folders: [{folder ("" = repository root), include, key, name, readers: [role keys]}]. Included
@@ -403,15 +404,81 @@ def _mirror(src: KnowledgeSource, repo: Path | None) -> int:
     return sum(len(v) for v in new.values())
 
 
+def _file_origin_path(url: str) -> Path | None:
+    if not (url or "").startswith("file://"):
+        return None
+    return Path(url[len("file://"):]).resolve()
+
+
+def _writable_dir(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".lisa-write-probe"
+        probe.write_text("")
+        probe.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
+def _is_bare_git(path: Path) -> bool:
+    """Bare repos have HEAD at the root and no ``.git`` directory (unlike a working tree)."""
+    return (path / "HEAD").is_file() and not (path / ".git").is_dir()
+
+
+def _vault_commit_cwd(src: KnowledgeSource, repo: Path) -> Path:
+    """Writable file:// working tree when possible; otherwise the sync clone (SSH/HTTPS/bare)."""
+    origin = _file_origin_path(src.url)
+    if origin is not None and not _is_bare_git(origin) and _writable_dir(origin):
+        return origin
+    return repo
+
+
+def _publish_relpaths(src: KnowledgeSource, repo: Path, relpaths: list[str], *,
+                      message: str, author: str, body: str | None = None) -> bool:
+    """Commit paths already written under ``repo``. For writable ``file://`` origins, mirror into
+    that working tree and commit there (Obsidian checkout). Otherwise commit+push from the clone."""
+    if not relpaths:
+        return False
+    cwd = _vault_commit_cwd(src, repo)
+    into_origin = cwd.resolve() != repo.resolve()
+    if into_origin:
+        for rel in relpaths:
+            src_f = repo / rel
+            if not src_f.is_file():
+                continue
+            dst = cwd / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            data = src_f.read_bytes()
+            if not dst.is_file() or dst.read_bytes() != data:
+                dst.write_bytes(data)
+    for rel in relpaths:
+        _git(["add", "--", rel], credential_id=None, cwd=cwd)
+    if not _git(["status", "--porcelain", "--", *relpaths], credential_id=None, cwd=cwd):
+        return False
+    cmd = ["-c", "user.name=Lisa", "-c", "user.email=lisa@localhost", "commit", "-q",
+           "--author", author, "-m", message]
+    if body:
+        cmd += ["-m", body]
+    _git(cmd, credential_id=None, cwd=cwd)
+    try:
+        _git(["push", "-q", "origin", f"HEAD:refs/heads/{src.branch}"],
+             credential_id=src.credential_id, cwd=cwd)
+    except DirectoryError:
+        if not into_origin:
+            raise  # remote clone must push; file:// working-tree commit is enough without push
+        logger.info("Knowledge write-back committed in %s; remote push deferred", cwd)
+    return True
+
+
 def _push_approved(db, src: KnowledgeSource, repo: Path) -> int:
     """Commit every approved Teach-Lisa note of this source's areas not yet in the vault (one commit
-    per note, authored by the person who wrote it) and push them. Returns the number pushed. A
-    failed push leaves the notes unpushed: the next sync starts from a fresh fetch and tries again."""
+    per note, authored by the person who wrote it). Returns the number published."""
     folder_of = {area: folder for folder, area in (src.folders or {}).items() if area}
     drafts = list(db.scalars(select(KnowledgeDraft).where(
         KnowledgeDraft.status == "approved", KnowledgeDraft.pushed_at.is_(None),
         KnowledgeDraft.area_key.in_(list(folder_of))).order_by(KnowledgeDraft.decided_at)))
-    done = []
+    done = 0
     for d in drafts:
         area, _, rel = (d.published_path or "").partition("/")
         local = _area_dir(area) / rel
@@ -425,20 +492,44 @@ def _push_approved(db, src: KnowledgeSource, repo: Path) -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(local.read_bytes())
         relpath = target.relative_to(repo.resolve()).as_posix()
-        _git(["add", "--", relpath], credential_id=None, cwd=repo)
-        if _git(["status", "--porcelain", "--", relpath], credential_id=None, cwd=repo):
-            author, reviewer = db.get(User, d.author_id), db.get(User, d.reviewer_id) if d.reviewer_id else None
-            who = f"{(author.display_name if author else 'Lisa').strip() or 'Lisa'} <{author.email if author else 'lisa@localhost'}>"
-            _git(["-c", "user.name=Lisa", "-c", "user.email=lisa@localhost", "commit", "-q", "--author", who,
-                  "-m", f"Lisa: {d.title}", "-m",
-                  f"Taught in Lisa and approved by {reviewer.email if reviewer else 'an approver'}."],
-                 credential_id=None, cwd=repo)
-        done.append(d)
-    if done:
-        _git(["push", "-q", "origin", f"HEAD:refs/heads/{src.branch}"], credential_id=src.credential_id, cwd=repo)
-        for d in done:
-            d.pushed_at = utcnow()
-    return len(done)
+        author, reviewer = db.get(User, d.author_id), db.get(User, d.reviewer_id) if d.reviewer_id else None
+        who = f"{(author.display_name if author else 'Lisa').strip() or 'Lisa'} <{author.email if author else 'lisa@localhost'}>"
+        _publish_relpaths(src, repo, [relpath], message=f"Lisa: {d.title}", author=who,
+                          body=f"Taught in Lisa and approved by {reviewer.email if reviewer else 'an approver'}.")
+        d.pushed_at = utcnow()
+        done += 1
+    return done
+
+
+def _push_orphans(src: KnowledgeSource, repo: Path) -> int:
+    """Copy Markdown that exists only in Knowledge (not in the vault clone) back into the vault."""
+    folder_of = {area: folder for folder, area in (src.folders or {}).items() if area}
+    relpaths: list[str] = []
+    root = repo.resolve()
+    for area, folder in folder_of.items():
+        area_dir = _area_dir(area)
+        if not area_dir.is_dir():
+            continue
+        base = (repo / folder) if folder else repo
+        for path in sorted(area_dir.rglob("*.md")):
+            rel = path.relative_to(area_dir)
+            if any(part.startswith(".") or part in _SKIPPED_DIRS for part in rel.parts):
+                continue
+            if path.is_symlink() or not path.is_file():
+                continue
+            target = (base / rel).resolve()
+            if root not in target.parents:
+                continue
+            if target.is_file():
+                continue  # vault already has it; vault wins on content
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(path.read_bytes())
+            relpaths.append(target.relative_to(root).as_posix())
+    if not relpaths:
+        return 0
+    _publish_relpaths(src, repo, relpaths, author="Lisa <lisa@localhost>",
+                      message="Lisa: sync Knowledge notes into the company vault")
+    return len(relpaths)
 
 
 def push_soon(area_key: str) -> None:
@@ -468,12 +559,15 @@ def sync(source_id: str) -> dict:
                 commit = _fetch(src.url, src.branch, src.credential_id, _repo_dir(src.id))
                 if src.write_back:
                     try:
-                        if _push_approved(db, src, _repo_dir(src.id)):
-                            commit = _git(["rev-parse", "HEAD"], credential_id=None, cwd=_repo_dir(src.id))
+                        repo = _repo_dir(src.id)
+                        wrote = _push_approved(db, src, repo) + _push_orphans(src, repo)
+                        if wrote:
+                            cwd = _vault_commit_cwd(src, repo)
+                            commit = _git(["rev-parse", "HEAD"], credential_id=None, cwd=cwd)
                         src.push_error = None
                     except (DirectoryError, OSError, subprocess.SubprocessError) as exc:
                         src.push_error = str(exc)
-                        logger.warning("Writing approved notes to source %s failed: %s", source_id, exc)
+                        logger.warning("Writing Knowledge notes back to source %s failed: %s", source_id, exc)
                 notes = _mirror(src, _repo_dir(src.id))
                 src.last_commit, src.notes, src.last_error = commit, notes, None
             except (DirectoryError, OSError, subprocess.SubprocessError) as exc:

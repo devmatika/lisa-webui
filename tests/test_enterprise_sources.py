@@ -86,12 +86,12 @@ def test_the_vault_becomes_areas_with_their_own_readers_and_stays_in_sync(ent):
                {"folder": "90-Templates", "include": False}]
     with edb.session() as db:
         src = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="Matika vault", url=url,
-                                  branch="main", credential_id=None, folders=folders)
+                                  branch="main", credential_id=None, folders=folders, write_back=False)
         sid = src.id
     assert sources.sync(sid)["notes"] == 3 and sources.sync(sid)["last_error"] is None
     with pytest.raises(directory.DirectoryError, match="already connected"), edb.session() as db:
         sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="again", url=url, branch="main",
-                            credential_id=None, folders=folders)
+                            credential_id=None, folders=folders, write_back=False)
 
     def titles(who, q):
         with edb.session() as db:
@@ -231,10 +231,11 @@ def test_an_approved_note_is_committed_to_the_vault_by_its_author(ent, tmp_path)
     assert subprocess.run(["git", "rev-parse", "main"], cwd=bare, capture_output=True, text=True).stdout == before
 
 
-def test_a_vault_lisa_may_not_write_to_keeps_the_note_and_says_why(ent, tmp_path):
+def test_write_back_commits_into_a_writable_file_vault_working_tree(ent):
+    """file:// Obsidian checkouts: commit in place (push to a non-bare branch often fails)."""
     from api.enterprise import directory, knowledge, sources
     edb, ids, repo = ent
-    with edb.session() as db:  # a checked-out (non-bare) repository refuses pushes to its branch
+    with edb.session() as db:
         sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{repo}",
                                   branch="main", credential_id=None, write_back=True,
                                   folders=[{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff"]}]).id
@@ -246,7 +247,27 @@ def test_a_vault_lisa_may_not_write_to_keeps_the_note_and_says_why(ent, tmp_path
     with edb.session() as db:
         knowledge.decide(db, directory.Actor(ids["boss"]), directory.get_user(db, ids["boss"]), did, True)
     view = sources.sync(sid)
-    assert view["push_error"] and view["last_error"] is None
+    assert view["last_error"] is None
+    assert (repo / "06-Company-Knowledge" / "parking.md").is_file()
+    assert "Behind the barn" in (repo / "06-Company-Knowledge" / "parking.md").read_text()
+
+
+def test_knowledge_only_notes_are_written_back_to_the_vault(ent):
+    """Orphans that landed only in Knowledge (e.g. old import) sync into the mapped vault folder."""
+    from api.enterprise import directory, knowledge, sources
+    edb, ids, repo = ent
     with edb.session() as db:
-        hits = knowledge.search(db, directory.get_user(db, ids["anna"]), "barn")["results"]
-    assert [h["title"] for h in hits] == ["Parking"]
+        sid = sources.save_source(
+            db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{repo}",
+            branch="main", credential_id=None, write_back=True,
+            folders=[{"folder": "03-Projects", "include": True, "readers": ["manager"]}]).id
+    sources.sync(sid)
+    orphan = knowledge.vault_root() / "projects" / "Geniessmi Project--04a9b18f"
+    (orphan / "Knowledge").mkdir(parents=True)
+    (orphan / "Project.md").write_text("# Geniessmi\nOnly in Knowledge before write-back\n")
+    (orphan / "Knowledge" / "overview.md").write_text("# Overview\nProduct notes\n")
+    view = sources.sync(sid)
+    assert view["last_error"] is None and view["push_error"] is None
+    assert (repo / "03-Projects" / "Geniessmi Project--04a9b18f" / "Project.md").is_file()
+    assert "Only in Knowledge" in (repo / "03-Projects" / "Geniessmi Project--04a9b18f" / "Project.md").read_text()
+    assert (repo / "03-Projects" / "Geniessmi Project--04a9b18f" / "Knowledge" / "overview.md").is_file()

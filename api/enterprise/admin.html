@@ -397,6 +397,7 @@
           <div class="fields" style="margin-top:14px"><div class="field"><label for="src-name">Name</label><input id="src-name" value="Company vault"></div>
             <div class="field"><label for="src-interval">Update</label><select id="src-interval">
               <option value="15" selected>Every 15 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Once a day</option></select></div></div>
+          <label class="chip-toggle" style="margin:12px 0 0;display:inline-flex"><input type="checkbox" id="src-writeback" checked> Write Knowledge changes back to the vault (Teach Lisa + notes that only exist in Knowledge)</label>
           <p class="hint" style="margin:14px 0 6px">Tick the folders Lisa may use and who may read each one. Administrators may always approve new knowledge.</p>
           <div class="table-wrap"><table class="folder-table" id="src-folders"></table></div>
           <div class="actions"><button class="btn primary" id="src-save">Save and sync</button><button class="btn" id="src-back">Back</button></div>
@@ -917,6 +918,8 @@
         <button class="btn sm danger" data-src-del="${esc(s.id)}">Disconnect</button></div>
         <div class="src-meta">${s.notes} notes · last update ${esc(ago(s.last_sync_at))}${s.last_commit ? ` · version ${esc(s.last_commit.slice(0, 7))}` : ''} · ${esc(s.interval_minutes >= 1440 ? 'daily' : s.interval_minutes >= 60 ? `every ${s.interval_minutes / 60} h` : `every ${s.interval_minutes} min`)}</div>
         ${s.last_error ? `<div class="callout err" style="margin-top:10px">${icon('info')}<div>${esc(s.last_error)}</div></div>` : ''}
+        ${s.push_error ? `<div class="callout err" style="margin-top:10px">${icon('info')}<div>Write-back: ${esc(s.push_error)}</div></div>` : ''}
+        <div class="src-meta" style="margin-top:6px">${s.write_back ? 'Two-way sync with the vault' : 'Read-only from the vault'}</div>
         <div style="margin-top:8px">${areas}</div></div>`; }).join('') ||
       `<div class="empty"><b>No vault connected</b>Connect the company's Obsidian vault and Lisa learns from it — every folder with its own access.</div>`;
     const busySync = sources.some((s) => !s.last_sync_at);
@@ -939,7 +942,7 @@
   $('src-url').addEventListener('input', () => { const k = urlKind($('src-url').value.trim()); $('src-ssh').hidden = k !== 'ssh' || !srcState.publicKey; $('src-https').hidden = k !== 'https'; });
   $('src-copykey').onclick = () => navigator.clipboard.writeText($('src-pubkey').value).then(() => toast('Key copied.'));
   $('src-add').onclick = () => { srcState = { id: null, credential_id: null, preview: null };
-    $('src-url').value = ''; $('src-branch').value = 'main'; $('src-interval').value = '15'; $('src-token').value = ''; $('src-ssh').hidden = $('src-https').hidden = true; srcStep(1); $('src-url').focus(); };
+    $('src-url').value = ''; $('src-branch').value = 'main'; $('src-interval').value = '15'; $('src-writeback').checked = true; $('src-token').value = ''; $('src-ssh').hidden = $('src-https').hidden = true; srcStep(1); $('src-url').focus(); };
   $('src-cancel').onclick = () => srcStep(0);
   $('src-back').onclick = () => srcStep(1);
   function readersFor(areaKey, fallback) {
@@ -979,7 +982,7 @@
       readers: [...tr.querySelectorAll('[data-reader]:checked')].map((c) => c.value) }));
     await api('/api/enterprise/sources', { id: srcState.id, name: $('src-name').value.trim(), url: $('src-url').value.trim(),
       branch: $('src-branch').value.trim() || 'main', credential_id: srcState.credential_id, folders,
-      interval_minutes: Number($('src-interval').value) });
+      interval_minutes: Number($('src-interval').value), write_back: $('src-writeback').checked });
     toast('Saved. Lisa is reading the vault now…'); srcStep(0); loadSources(); loadKnowledge();
     if (window.parent !== window) window.parent.postMessage({ lisa: 'vault-saved' }, location.origin);
   });
@@ -997,6 +1000,7 @@
     if (b.dataset.srcEdit) { const s = sourcesCache.find((x) => x.id === b.dataset.srcEdit);
       srcState = { id: s.id, credential_id: s.credential_id, publicKey: s.public_key, preview: null };
       $('src-url').value = s.url; $('src-branch').value = s.branch; $('src-name').value = s.name; $('src-interval').value = String(s.interval_minutes);
+      $('src-writeback').checked = s.write_back !== false;
       $('src-token').value = ''; $('src-ssh').hidden = !s.public_key; $('src-pubkey').value = s.public_key || ''; $('src-https').hidden = s.auth !== 'token' && urlKind(s.url) !== 'https';
       srcStep(1); $('src-check').click(); }
   });
