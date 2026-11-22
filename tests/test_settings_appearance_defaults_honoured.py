@@ -89,11 +89,12 @@ def test_fresh_lisa_settings_use_dark_clay(settings_file):
 @pytest.mark.parametrize(
     "stored,expected",
     [
-        ({"theme": "dark"}, ("dark", "default")),
-        ({"theme": "system"}, ("system", "default")),
+        ({"theme": "dark"}, ("dark", "clay")),
+        ({"theme": "system"}, ("system", "clay")),
         ({"theme": "light", "skin": "mono"}, ("light", "mono")),
         ({"skin": "mono"}, ("dark", "mono")),
-        ({"theme": "not-a-theme"}, ("dark", "default")),
+        ({"theme": "not-a-theme"}, ("dark", "clay")),
+        ({"theme": "light", "skin": "default"}, ("light", "clay")),
     ],
 )
 def test_stored_appearance_still_wins(settings_file, custom_defaults, stored, expected):
@@ -117,7 +118,7 @@ def test_stored_appearance_still_wins(settings_file, custom_defaults, stored, ex
         ("solarized", ("dark", "poseidon")),
         ("monokai", ("dark", "sisyphus")),
         ("nord", ("dark", "slate")),
-        ("oled", ("dark", "default")),
+        ("oled", ("dark", "clay")),
     ],
 )
 def test_legacy_theme_migration_is_not_broken_by_the_fallback(

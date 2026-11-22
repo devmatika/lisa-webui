@@ -138,7 +138,7 @@ def test_fresh_browser_paints_dark_clay():
     [
         ({"hermes-skin": "mono"}, "dark", "mono"),
         ({"hermes-theme": "light", "hermes-skin": "clay"}, "light", "clay"),
-        ({"hermes-theme": "light", "hermes-skin": "default"}, "light", "default"),
+        ({"hermes-theme": "light", "hermes-skin": "default"}, "light", "clay"),
         ({"hermes-theme": "light", "hermes-skin": "mono"}, "light", "mono"),
     ],
 )
@@ -151,9 +151,15 @@ def test_any_prior_state_still_normalises_and_persists(initial, expected_theme, 
 
 
 def test_theme_only_does_not_fabricate_skin_preference():
+    """Theme-only state must not write hermes-skin (server still owns the choice).
+
+    Pre-paint may show Clay (the factory skin) without persisting it — same
+    distinction as a fully empty store, which paints dark+clay but writes nothing.
+    """
     out = _run({"hermes-theme": "dark"})
     assert out["store"] == {"hermes-theme": "dark"}
-    assert out["skin"] is None
+    assert out["skin"] == "clay"
+    assert "hermes-skin" not in [k for k, _ in out["writes"]]
 
 
 @pytest.mark.parametrize(
@@ -163,7 +169,7 @@ def test_theme_only_does_not_fabricate_skin_preference():
         ("slate", "dark", "slate"),
         ("monokai", "dark", "sisyphus"),
         ("nord", "dark", "slate"),
-        ("oled", "dark", "default"),
+        ("oled", "dark", "clay"),
     ],
 )
 def test_legacy_theme_migration_survives(legacy, theme, skin):

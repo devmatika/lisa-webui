@@ -13403,7 +13403,7 @@ _SETTINGS_LEGACY_THEME_MAP = {
     "solarized": ("dark", "poseidon"),
     "monokai": ("dark", "sisyphus"),
     "nord": ("dark", "slate"),
-    "oled": ("dark", "default"),
+    "oled": ("dark", "clay"),
 }
 
 
@@ -13416,11 +13416,11 @@ def _normalize_appearance(theme, skin) -> tuple[str, str]:
         solarized → ("dark", "poseidon")
         monokai   → ("dark", "sisyphus")
         nord      → ("dark", "slate")
-        oled      → ("dark", "default")
+        oled      → ("dark", "clay")
 
-    Unknown / custom theme names fall back to ("dark", "default").  This is a
-    behavior change vs. the pre-PR-#627 state, where the `theme` field was
-    open-ended ("no enum gate -- allows custom themes").  Users who set a
+    Unknown / custom theme names fall back to ("dark", "clay").  The previous
+    factory skin ``default`` is migrated to ``clay`` so existing installs pick
+    up Clay without each user re-choosing Appearance.  Users who set a
     custom CSS theme via `data-theme` will need to re-apply via skin or
     custom CSS — see CHANGELOG entry for details.
 
@@ -13429,19 +13429,24 @@ def _normalize_appearance(theme, skin) -> tuple[str, str]:
     """
     raw_theme = theme.strip().lower() if isinstance(theme, str) else ""
     raw_skin = skin.strip().lower() if isinstance(skin, str) else ""
+    # Previous product default skin → Clay (new factory appearance).
+    if raw_skin == "default":
+        raw_skin = "clay"
     legacy = _SETTINGS_LEGACY_THEME_MAP.get(raw_theme)
     if legacy:
         next_theme, legacy_skin = legacy
     elif raw_theme in _SETTINGS_THEME_VALUES:
-        next_theme, legacy_skin = raw_theme, "default"
+        next_theme, legacy_skin = raw_theme, "clay"
     else:
         # Unknown themes used to exist; default to dark so upgrades stay visually stable.
-        next_theme, legacy_skin = "dark", "default"
+        next_theme, legacy_skin = "dark", "clay"
     next_skin = (
         raw_skin
         if raw_skin in _SETTINGS_SKIN_VALUES
         else legacy_skin
     )
+    if next_skin == "default":
+        next_skin = "clay"
     return next_theme, next_skin
 
 

@@ -3455,7 +3455,7 @@ const _LEGACY_THEME_MAP={
   solarized:{theme:'dark',skin:'poseidon'},
   monokai:{theme:'dark',skin:'sisyphus'},
   nord:{theme:'dark',skin:'slate'},
-  oled:{theme:'dark',skin:'default'},
+  oled:{theme:'dark',skin:'clay'},
 };
 let _systemThemeMq=null;
 let _onSystemThemeChange=null;
@@ -3463,10 +3463,13 @@ let _resolvedThemeBaseDark=false;
 
 function _normalizeAppearance(theme,skin){
   const rawTheme=typeof theme==='string'?theme.trim().toLowerCase():'';
-  const rawSkin=typeof skin==='string'?skin.trim().toLowerCase():'';
+  let rawSkin=typeof skin==='string'?skin.trim().toLowerCase():'';
+  // Previous product default skin → Clay (new factory appearance for everyone).
+  if(rawSkin==='default') rawSkin='clay';
   const legacy=_LEGACY_THEME_MAP[rawTheme];
   const nextTheme=legacy?legacy.theme:(_VALID_THEMES.has(rawTheme)?rawTheme:'dark');
-  const nextSkin=_VALID_SKINS.has(rawSkin)?rawSkin:(legacy?legacy.skin:'default');
+  let nextSkin=_VALID_SKINS.has(rawSkin)?rawSkin:(legacy?legacy.skin:'clay');
+  if(nextSkin==='default') nextSkin='clay';
   return {theme:nextTheme,skin:nextSkin};
 }
 
