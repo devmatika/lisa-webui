@@ -30,10 +30,17 @@ SURFACES = ("cli", "telegram", "api_server")
 # assistant once, so an upgrade needs no "Apply" in the setup wizard. 2 = mail tools;
 # 3 = Staff/Manager/Admin default Google + Outlook plugins after grant release;
 # 4 = companion approval plugins + copy approvals/persona from the organisation template.
-PROFILE_LAYOUT = 4
+# 5 = seed SOUL/MEMORY/skills from the company profile (LISA_COMPANY_PROFILE, default matika).
+PROFILE_LAYOUT = 5
 FRONT_DESK = "front-desk"
 PLUGIN_SOURCE = Path("/opt/lisa/plugins")  # mounted read-only by the Lisa stack
 REQUIRED_PLUGINS = ("org-authz",)
+# Shared company know-how (ClickUp playbooks, meetings, …). Mailbox-specific skills stay off.
+COMPANY_SKILL_DIRS = (
+    "clickup-task-management", "meeting-memory", "note-taking", "productivity", "research",
+    "lead-enrichment", "media", "web", "devops", "software-development", "autonomous-ai-agents",
+    "creative", "social-media", "apple",
+)
 # Write-gate companions installed whenever the matching integration is granted.
 APPROVAL_COMPANIONS = {
     "integration.google": ("business-action-approval",),
@@ -68,7 +75,7 @@ INTEGRATIONS = {
 }
 MEDIA_POLICY = {"profile_isolation": True, "strict": True, "trust_recent_files": False}
 COPIED_CONFIG_KEYS = ("model", "providers", "custom_providers", "fallback_providers", "auxiliary",
-                      "timezone", "approvals")
+                      "timezone", "approvals", "stt", "tts", "voice", "provider_routing", "memory")
 
 
 def companion_plugins(integrations: list[str]) -> list[str]:
@@ -155,7 +162,18 @@ def _google_plugin_settings(email: str, permissions) -> dict:
 
 def render_config(default_cfg: dict, toolsets: list[str], profile_name: str | None = None,
                   integrations: list[str] = (), email: str = "", permissions=()) -> dict:
-    cfg = {k: default_cfg[k] for k in COPIED_CONFIG_KEYS if k in default_cfg}
+    # Prefer the company profile for STT/TTS/voice/memory when the default home is still a stub.
+    template_cfg = default_cfg
+    try:
+        company = company_template_home()
+        company_cfg_path = company / "config.yaml"
+        if company_cfg_path.is_file() and company != root_home():
+            loaded = yaml.safe_load(company_cfg_path.read_text()) or {}
+            if isinstance(loaded, dict) and loaded.get("stt"):
+                template_cfg = {**default_cfg, **{k: loaded[k] for k in COPIED_CONFIG_KEYS if k in loaded}}
+    except Exception:
+        logger.warning("Could not load company template config; using default profile", exc_info=True)
+    cfg = {k: template_cfg[k] for k in COPIED_CONFIG_KEYS if k in template_cfg}
     if profile_name:
         # WebUI chat runs on the gateway under this profile's own route and key, never in-process.
         cfg["webui_gateway_base_url"] = f"{gateway_url()}/p/{profile_name}"
@@ -206,21 +224,81 @@ def _install_plugins(home: Path, integrations: list[str] = ()) -> None:
         shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "tests", "test_*"))
 
 
+def company_template_home(root: Path | None = None) -> Path:
+    """Profile that holds the organisation's taught SOUL/MEMORY/skills (shared Matika knowledge).
+
+    ``LISA_COMPANY_PROFILE`` names a Hermes profile under ``profiles/``; when unset we prefer
+    ``matika`` if present, otherwise the default (root) home that the setup wizard edits.
+    """
+    import os
+    base = root or root_home()
+    name = (os.environ.get("LISA_COMPANY_PROFILE") or "").strip() or "matika"
+    candidate = base / "profiles" / name
+    if (candidate / "SOUL.md").is_file() or (candidate / "memories").is_dir():
+        return candidate
+    return base
+
+
 def _seed_persona_from_default(home: Path, root: Path) -> None:
-    """Copy company SOUL/MEMORY from the default template; seed USER.md only on first provision."""
-    soul_src = root / "SOUL.md"
+    """Copy company SOUL/MEMORY from the org template; seed USER.md only on first provision."""
+    template = company_template_home(root)
+    soul_src = template / "SOUL.md"
+    if not soul_src.is_file():
+        soul_src = root / "SOUL.md"
     if soul_src.is_file():
         (home / "SOUL.md").write_text(soul_src.read_text(encoding="utf-8"), encoding="utf-8")
-    mem_src = root / "memories"
+    mem_src = template / "memories" if (template / "memories").is_dir() else root / "memories"
     mem_dst = home / "memories"
     mem_dst.mkdir(parents=True, exist_ok=True)
     memory_src = mem_src / "MEMORY.md"
+    if not memory_src.is_file() and (mem_src / "USER.md").is_file() and template != root:
+        # Older Matika installs kept company facts in USER.md only.
+        memory_src = mem_src / "USER.md"
     if memory_src.is_file():
-        (mem_dst / "MEMORY.md").write_text(memory_src.read_text(encoding="utf-8"), encoding="utf-8")
+        text = memory_src.read_text(encoding="utf-8")
+        if memory_src.name == "USER.md":
+            text = "# Company memory (seeded from shared profile)\n\n" + text
+        (mem_dst / "MEMORY.md").write_text(text, encoding="utf-8")
     user_dst = mem_dst / "USER.md"
     user_src = mem_src / "USER.md"
     if not user_dst.is_file() and user_src.is_file():
         user_dst.write_text(user_src.read_text(encoding="utf-8"), encoding="utf-8")
+    _seed_company_skills(home, template)
+
+
+def _seed_company_skills(home: Path, template: Path) -> None:
+    """Link shared company skills into the user profile (no mailbox/email skills)."""
+    import os
+    src_root = template / "skills"
+    if not src_root.is_dir():
+        return
+    dst_root = home / "skills"
+    dst_root.mkdir(parents=True, exist_ok=True)
+    desc = src_root / "DESCRIPTION.md"
+    if desc.is_file():
+        (dst_root / "DESCRIPTION.md").write_text(desc.read_text(encoding="utf-8"), encoding="utf-8")
+    for name in COMPANY_SKILL_DIRS:
+        src = src_root / name
+        if not src.is_dir():
+            continue
+        dst = dst_root / name
+        if dst.is_symlink() or dst.is_file():
+            dst.unlink()
+        elif dst.is_dir():
+            import shutil
+            shutil.rmtree(dst)
+        os.symlink(os.path.relpath(src, dst_root), dst)
+    # Shared Pipecat STT bridge used by Telegram voice notes.
+    bridge_src = template / "bin" / "hermes-stt-bridge.sh"
+    if not bridge_src.is_file():
+        bridge_src = root_home() / "profiles" / "matika" / "bin" / "hermes-stt-bridge.sh"
+    if bridge_src.is_file():
+        bin_dir = home / "bin"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        bridge_dst = bin_dir / "hermes-stt-bridge.sh"
+        if bridge_dst.is_symlink() or bridge_dst.is_file():
+            bridge_dst.unlink()
+        os.symlink(os.path.relpath(bridge_src, bin_dir), bridge_dst)
 
 
 def _write_allowlist(home: Path, toolsets: list[str], integrations: list[str] = ()) -> None:
@@ -275,7 +353,15 @@ def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str
     # Credentials the user connected themselves survive re-provisioning only while still granted.
     own_env = _read_env(home / ".env")
     kept_user_env = {k for i in integrations for k in INTEGRATIONS[i]["user_env"]}
-    env.update({k: v for k, v in own_env.items() if k in kept_user_env})
+    # Shared company STT + any bot token already on this profile (cron delivery) must survive refresh.
+    kept_shared = {"PIPECAT_INTERNAL_TOKEN", "TELEGRAM_BOT_TOKEN", "HIMALAYA_CONFIG",
+                   "HIMALAYA_DEFAULT_ACCOUNT"} | {k for k in own_env if k.startswith("MATIKA_MAIL_")}
+    env.update({k: v for k, v in own_env.items() if k in kept_user_env or k in kept_shared})
+    company_env = _read_env(company_template_home(root) / ".env")
+    if company_env.get("PIPECAT_INTERNAL_TOKEN") and not env.get("PIPECAT_INTERNAL_TOKEN"):
+        env["PIPECAT_INTERNAL_TOKEN"] = company_env["PIPECAT_INTERNAL_TOKEN"]
+    elif root_env.get("PIPECAT_INTERNAL_TOKEN") and not env.get("PIPECAT_INTERNAL_TOKEN"):
+        env["PIPECAT_INTERNAL_TOKEN"] = root_env["PIPECAT_INTERNAL_TOKEN"]
     kept_files = {f for i in integrations for f in INTEGRATIONS[i]["user_files"]}
     for spec in INTEGRATIONS.values():
         for f in spec["user_files"]:
