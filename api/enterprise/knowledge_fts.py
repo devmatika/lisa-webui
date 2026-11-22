@@ -6,6 +6,7 @@ any indexed note is newer than the stamp stored in the DB. Callers must still fi
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import sqlite3
 import time
@@ -48,16 +49,16 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 
 
 def _vault_fingerprint(docs: list[tuple[str, str, Path]]) -> str:
-    """Cheap change detector: count + newest mtime + path list hash length."""
-    if not docs:
-        return "0:0:0"
-    newest = 0.0
-    for _rel, _area, path in docs:
+    """Change detector over every (path, mtime, size): a note moved between same-length areas with
+    `mv` keeps its mtime, so count + newest mtime + path lengths missed it."""
+    h = hashlib.sha1()
+    for rel, _area, path in sorted(docs):
         try:
-            newest = max(newest, path.stat().st_mtime)
+            st = path.stat()
         except OSError:
             continue
-    return f"{len(docs)}:{int(newest)}:{sum(len(r) for r, _, _ in docs)}"
+        h.update(f"{rel}\0{st.st_mtime_ns}\0{st.st_size}\n".encode())
+    return h.hexdigest()
 
 
 def _all_docs(list_docs) -> list[tuple[str, str, Path]]:
@@ -117,13 +118,16 @@ def rebuild_if_needed(list_docs) -> None:
 
 
 def _fts_query(raw: str) -> str | None:
-    """Turn a user query into a safe FTS5 MATCH expression (AND of quoted tokens)."""
+    """Turn a user query into a safe FTS5 MATCH expression (OR of quoted tokens, ranked by bm25).
+
+    AND made every word required, so a full question ("what did we agree on hosting") matched nothing.
+    """
     import re
     terms = [t for t in re.findall(r"\w{2,}", (raw or "").lower())]
     if not terms:
         return None
     # Quote each token so FTS operators in user input cannot break the query.
-    return " ".join('"' + t.replace('"', "") + '"' for t in terms)
+    return " OR ".join('"' + t.replace('"', "") + '"' for t in dict.fromkeys(terms))
 
 
 def search_paths(readable_areas: list[str], query: str, limit: int = 8) -> list[dict]:
