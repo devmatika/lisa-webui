@@ -5,13 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lisa — Sign in</title>
 <style>
-  :root { --bg:#f4f6f8; --card:#fff; --text:#1d2430; --muted:#5b6575; --line:#d7dce3; --accent:#006eb3; --err:#b42318; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#12161c; --card:#1b2129; --text:#e6e9ee; --muted:#9aa4b2; --line:#2c3440; --accent:#3aa0e6; --err:#f97066; } }
+  @font-face { font-family:"Lisa Sans"; src:url("/static/fonts/inter-var-latin.woff2") format("woff2"); font-weight:100 900; font-display:swap; }
+  @font-face { font-family:"Lisa Serif"; src:url("/static/fonts/source-serif-4-var-latin.woff2") format("woff2"); font-weight:200 900; font-display:swap; }
+  :root { --bg:#FAF9F5; --card:#FFFFFF; --text:#3D3D3A; --muted:#73726C; --line:#E8E6DC; --accent:#C96442; --err:#B53333; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#262624; --card:#30302E; --text:#E5E3DC; --muted:#A3A19A; --line:#3E3E38; --accent:#D97757; --err:#E26D6D; } }
   * { box-sizing: border-box; }
   body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--text);
-         font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding:16px; }
-  main { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:28px; }
-  h1 { font-size:20px; margin:0 0 4px; } p.sub { color:var(--muted); margin:0 0 20px; }
+         font:15px/1.5 "Lisa Sans", system-ui, -apple-system, "Segoe UI", sans-serif; padding:16px; }
+  main { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:18px; padding:32px; box-shadow:0 4px 20px rgba(20,20,19,.05); }
+  h1 { font-family:"Lisa Serif", Georgia, serif; font-weight:500; font-size:26px; margin:0 0 6px; } p.sub { color:var(--muted); margin:0 0 20px; }
   label { display:block; font-size:13px; color:var(--muted); margin:14px 0 4px; }
   input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); font:inherit; }
   input:focus { outline:2px solid var(--accent); outline-offset:1px; }

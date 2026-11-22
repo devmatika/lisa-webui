@@ -5,22 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lisa Organization</title>
 <style>
-  /* Tokens: trust blue on slate, AA contrast in both themes. System fonts on purpose: no third-party
-     font requests from a company install. */
+  /* Tokens: the Clay palette of the chat (warm neutrals, clay accent). Fonts are self-hosted OFL files
+     under /static/fonts: no third-party font requests from a company install. */
+  @font-face { font-family:"Lisa Sans"; src:url("/static/fonts/inter-var-latin.woff2") format("woff2"); font-weight:100 900; font-display:swap; }
+  @font-face { font-family:"Lisa Serif"; src:url("/static/fonts/source-serif-4-var-latin.woff2") format("woff2"); font-weight:200 900; font-display:swap; }
   :root {
-    --bg:#f1f5f9; --surface:#ffffff; --surface-2:#f8fafc; --text:#0f172a; --muted:#475569; --line:#e2e8f0;
-    --line-strong:#cbd5e1; --primary:#2563eb; --primary-hover:#1d4ed8; --on-primary:#ffffff;
-    --primary-soft:#eff6ff; --primary-soft-text:#1e40af; --ok:#047857; --ok-soft:#ecfdf5; --warn:#b45309;
-    --warn-soft:#fffbeb; --err:#b91c1c; --err-soft:#fef2f2; --ring:#2563eb; --shadow:0 1px 2px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.08);
+    --bg:#FAF9F5; --surface:#FFFFFF; --surface-2:#F5F4EE; --text:#3D3D3A; --muted:#73726C; --line:#E8E6DC;
+    --line-strong:#DAD7CC; --primary:#30302E; --primary-hover:#141413; --on-primary:#ffffff; --accent:#C96442;
+    --primary-soft:#F5E9E2; --primary-soft-text:#A9512F; --ok:#4F7A28; --ok-soft:#EEF3E6; --warn:#A9711B;
+    --warn-soft:#FBF3E4; --err:#B53333; --err-soft:#FBEDEC; --ring:#C96442; --shadow:0 1px 2px rgba(20,20,19,.04);
+    --font-ui:"Lisa Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --font-serif:"Lisa Serif",Georgia,serif;
   }
   @media (prefers-color-scheme: dark) { :root {
-    --bg:#0b1120; --surface:#111827; --surface-2:#0f172a; --text:#e5e7eb; --muted:#9ca3af; --line:#1f2937;
-    --line-strong:#374151; --primary:#3b82f6; --primary-hover:#60a5fa; --on-primary:#ffffff;
-    --primary-soft:#172554; --primary-soft-text:#bfdbfe; --ok:#34d399; --ok-soft:#052e1f; --warn:#fbbf24;
-    --warn-soft:#2b1d05; --err:#f87171; --err-soft:#2a0f0f; --ring:#60a5fa; --shadow:none; } }
+    --bg:#262624; --surface:#30302E; --surface-2:#2B2A27; --text:#E5E3DC; --muted:#A3A19A; --line:#3E3E38;
+    --line-strong:#4B4A44; --primary:#E5E3DC; --primary-hover:#FAF9F5; --on-primary:#1F1E1D; --accent:#D97757;
+    --primary-soft:#3A2C25; --primary-soft-text:#E8957A; --ok:#8DBF5A; --ok-soft:#26301D; --warn:#D9A24A;
+    --warn-soft:#33291A; --err:#E26D6D; --err-soft:#3A2222; --ring:#D97757; --shadow:none; } }
   * { box-sizing:border-box; }
   html, body { margin:0; }
-  body { background:var(--bg); color:var(--text); font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  body { background:var(--bg); color:var(--text); font:15px/1.55 var(--font-ui); -webkit-font-smoothing:antialiased; }
   a { color:var(--primary); }
   :focus-visible { outline:2px solid var(--ring); outline-offset:2px; border-radius:6px; }
   [hidden] { display:none !important; }
@@ -30,7 +33,7 @@
   /* Shell */
   .top { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:10px 20px; background:var(--surface); border-bottom:1px solid var(--line); }
   .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:16px; white-space:nowrap; }
-  .brand-mark { width:30px; height:30px; border-radius:8px; background:var(--primary); color:var(--on-primary); display:grid; place-items:center; }
+  .brand-mark { width:30px; height:30px; border-radius:8px; background:var(--accent); color:#fff; display:grid; place-items:center; }
   .top .spacer { flex:1; }
   .who { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; min-width:0; }
   .who b { color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
@@ -42,11 +45,11 @@
   .side button[aria-selected="true"] { background:var(--primary-soft); color:var(--primary-soft-text); font-weight:600; }
   main { min-width:0; }
   .page-head { margin:0 0 18px; }
-  .page-head h1 { font-size:22px; line-height:1.3; margin:0 0 4px; }
+  .page-head h1 { font-family:var(--font-serif); font-weight:500; font-size:28px; line-height:1.25; letter-spacing:-.01em; margin:0 0 6px; }
   .page-head p { margin:0; color:var(--muted); max-width:70ch; }
 
   /* Cards, forms */
-  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow); }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow); }
   .card > h2 { font-size:16px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
   .card > .sub { color:var(--muted); margin:0 0 16px; font-size:14px; max-width:75ch; }
   .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px 14px; align-items:end; }
