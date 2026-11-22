@@ -85,6 +85,26 @@ def test_moved_note_dropped_even_if_stale_rank_would_match(fts_kb, monkeypatch):
     assert out["results"] == []  # term fallback also finds nothing
 
 
+def test_fts_answers_a_full_question_not_only_keywords(fts_kb):
+    from api.enterprise import knowledge_fts
+    _, _, _ = fts_kb
+    # all words were required before, so a natural question found nothing in FTS (fell back silently)
+    hits = knowledge_fts.search_paths(["farm"], "when do we clean the milking robot?")
+    assert [h["path"] for h in hits] == ["farm/milking.md"]
+    assert knowledge_fts.search_paths(["farm"], "salary") == []  # OR still stays inside readable areas
+
+
+def test_index_notices_note_moved_between_same_length_areas(fts_kb):
+    import shutil
+    from api.enterprise import knowledge_fts
+    _, _, vault = fts_kb
+    (vault / "flat").mkdir()  # "farm" and "flat": same length; mv keeps the mtime
+    assert [h["path"] for h in knowledge_fts.search_paths(["farm"], "milking")] == ["farm/milking.md"]
+    shutil.move(str(vault / "farm" / "milking.md"), str(vault / "flat" / "milking.md"))
+    assert [h["path"] for h in knowledge_fts.search_paths(["flat"], "milking")] == ["flat/milking.md"]
+    assert knowledge_fts.search_paths(["farm"], "milking") == []
+
+
 def test_fts_disabled_falls_back_to_term_search(fts_kb, monkeypatch):
     from api.enterprise import knowledge
     monkeypatch.setenv("LISA_KNOWLEDGE_FTS", "0")
