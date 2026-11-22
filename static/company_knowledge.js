@@ -154,25 +154,12 @@
       <div class="ck-list">${st.loading ? '<div class="ck-none">Loading…</div>' : st.results ? `<div class="ck-results-head">Search results <button type="button" class="ck-clear" data-ck-clear>Clear</button></div>` + resultsList() : st.areas ? areaList() : ''}</div>`;
   }
 
-  function seedFirstLevelFolders(areaKey) {
-    const area = (st.areas || []).find((a) => a.key === areaKey);
-    const top = area ? Object.keys(docsToTree(area.docs).folders || {}) : [];
-    if (!top.length || top.length > 40) return;
-    for (const name of top) {
-      const id = areaKey + '/' + name;
-      if (!(id in st.folders)) st.folders[id] = true;
-    }
-  }
-
   async function load() {
     st.loading = !st.areas;
     render();
     try {
       st.areas = (await get('/api/enterprise/knowledge/tree')).areas || [];
-      if (st.areas.length === 1) {
-        st.open[st.areas[0].key] = true;
-        seedFirstLevelFolders(st.areas[0].key);
-      }
+      if (st.areas.length === 1) st.open[st.areas[0].key] = true;
     } catch (e) {
       st.areas = [];
       if (typeof showToast === 'function') showToast(e.message);
@@ -198,12 +185,7 @@
     e.preventDefault();
     if (t.dataset.ckOpen) return openDoc(t.dataset.ckOpen);
     if (t.dataset.ckArea) {
-      const key = t.dataset.ckArea;
-      const opening = !st.open[key];
-      st.open[key] = opening;
-      // First open: expand one folder level so project/subfolder trees are visible without
-      // hunting collapsed rows (deeper levels stay closed until clicked).
-      if (opening) seedFirstLevelFolders(key);
+      st.open[t.dataset.ckArea] = !st.open[t.dataset.ckArea];
       return render();
     }
     if (t.dataset.ckFolder) {

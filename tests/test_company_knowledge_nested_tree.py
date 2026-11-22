@@ -12,7 +12,8 @@ def test_company_knowledge_js_builds_nested_folder_tree():
     assert "function docsToTree(" in JS
     assert "data-ck-folder=" in JS
     assert "function renderNode(" in JS
-    assert "seedFirstLevelFolders" in JS
+    # Folders stay collapsed until clicked — no auto-expand of nested levels.
+    assert "seedFirstLevelFolders" not in JS
     # Old flat list rendered path crumbs under each note; nested UI must not fall back to that.
     assert "ck-doc-folder" not in JS.split("function areaList")[1].split("function resultsList")[0]
 
