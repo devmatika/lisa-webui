@@ -29,7 +29,7 @@ _DEFAULTS: dict[str, str] = {
     "appName": "Matika AI Assistant",
     "companyName": "Matika",
     "logo": "static/matika-logo.png",
-    "favicon": "static/favicon-matika.png",
+    "favicon": "static/lisa-favicon.png",
     "primaryColor": "#006eb3",
     "primaryColorDark": "#00908d",
     "supportEmail": "",

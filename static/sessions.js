@@ -2949,7 +2949,10 @@ async function loadSession(sid){
   // Guard against network/server failures to prevent a permanently stuck loading state.
   let data;
   try {
-    data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0`);
+    // A WebUI restart or proxy blip (Cloudflare 52x / 502-504) lasts seconds: retry it quietly
+    // (2.5s, then 5s) instead of showing "Failed to load session" for a session that is fine.
+    data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0`,
+      {retryStatuses:[502,503,504,520,521,522,523,524], retryDelayMs:2500});
   } catch(e) {
     const metadataErrorStatus=e.status;
     const profileMismatch=_sessionProfileMismatchFromError(e);
@@ -9990,7 +9993,8 @@ function renderSessionListFromCache(){
     const note=_renderSessionListLoadErrorNote();
     if(note) list.appendChild(note);
   }
-  if(window._showCliSessions || cliSessionCount>0){
+  // Telegram and other messaging chats sit in the first tab; skip the tabs when no terminal chats exist.
+  if(cliSessionCount>0 || cliSessionTabCount>0 || _sessionSourceFilter==='cli'){
     const sourceTabs=document.createElement('div');
     sourceTabs.className='session-source-tabs';
     for(const filter of ['webui','cli']){

@@ -3,41 +3,119 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lisa — Sign in</title>
+<meta name="color-scheme" content="light dark">
+<title>Sign in · __BRANDING_APP_NAME__</title>
+<link rel="icon" href="__BRANDING_FAVICON__">
 <style>
-  :root { --bg:#f4f6f8; --card:#fff; --text:#1d2430; --muted:#5b6575; --line:#d7dce3; --accent:#006eb3; --err:#b42318; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#12161c; --card:#1b2129; --text:#e6e9ee; --muted:#9aa4b2; --line:#2c3440; --accent:#3aa0e6; --err:#f97066; } }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--text);
-         font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding:16px; }
-  main { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:28px; }
-  h1 { font-size:20px; margin:0 0 4px; } p.sub { color:var(--muted); margin:0 0 20px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 4px; }
-  input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text); font:inherit; }
-  input:focus { outline:2px solid var(--accent); outline-offset:1px; }
-  button { width:100%; margin-top:20px; padding:11px; border:0; border-radius:8px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
-  button:disabled { opacity:.6; cursor:default; }
-  .err { color:var(--err); font-size:14px; min-height:20px; margin-top:12px; }
-  a.alt { display:block; text-align:center; margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:8px; color:var(--text); text-decoration:none; }
-  a.small { display:block; margin-top:12px; font-size:13px; color:var(--muted); }
-  .note { color:var(--muted); font-size:14px; margin-top:12px; }
+  /* Clay look, same tokens and self-hosted OFL fonts as the chat (no third-party requests). */
+  @font-face { font-family:"Lisa Sans"; src:url("/static/fonts/inter-var-latin.woff2") format("woff2"); font-weight:100 900; font-display:swap; }
+  @font-face { font-family:"Lisa Serif"; src:url("/static/fonts/source-serif-4-var-latin.woff2") format("woff2"); font-weight:200 900; font-display:swap; }
+  :root {
+    --bg:#FAF9F5; --card:#FFFFFF; --text:#3D3D3A; --strong:#141413; --muted:#73726C; --line:#E8E6DC; --line-strong:#DAD7CC;
+    --field:#FFFFFF; --accent:#C96442; --btn:#30302E; --btn-hover:#141413; --on-btn:#FFFFFF;
+    --ring:rgba(201,100,66,.22); --err:#B53333; --err-soft:#FBEDEC; --glow:rgba(201,100,66,.10);
+    --shadow:0 1px 2px rgba(20,20,19,.04),0 12px 40px -12px rgba(20,20,19,.12);
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#262624; --card:#30302E; --text:#E5E3DC; --strong:#FAF9F5; --muted:#A3A19A; --line:#3E3E38; --line-strong:#4B4A44;
+    --field:#262624; --accent:#D97757; --btn:#E5E3DC; --btn-hover:#FAF9F5; --on-btn:#1F1E1D;
+    --ring:rgba(217,119,87,.30); --err:#E26D6D; --err-soft:#3A2222; --glow:rgba(217,119,87,.08);
+    --shadow:0 1px 2px rgba(0,0,0,.2),0 16px 48px -16px rgba(0,0,0,.5);
+  } }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px;
+         background:radial-gradient(1200px 520px at 50% -10%, var(--glow), transparent 70%), var(--bg); color:var(--text);
+         font:15px/1.5 "Lisa Sans", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing:antialiased; }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:28px; color:var(--strong); font-weight:600; font-size:17px; letter-spacing:-.01em; }
+  .mark { width:36px; height:36px; border-radius:10px; box-shadow:0 6px 16px -8px rgba(20,20,19,.45); }
+  .logo, .brand { margin-top:auto; }
+  .foot { margin-bottom:auto; }
+  .logo { display:flex; justify-content:center; margin-bottom:28px; }
+  .logo img { height:40px; width:auto; max-width:240px; object-fit:contain; filter:brightness(0); opacity:.88;
+              transition:filter .35s ease, opacity .35s ease; }
+  .logo img:hover { filter:none; opacity:1; }
+  @media (prefers-color-scheme: dark) { .logo img { filter:brightness(0) invert(1); } }
+  main { width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:36px 32px 30px;
+         box-shadow:var(--shadow); animation:rise .45s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  h1 { font-family:"Lisa Serif", Georgia, serif; font-weight:500; font-size:30px; line-height:1.15; letter-spacing:-.015em; color:var(--strong); margin:0 0 8px; }
+  p.sub { color:var(--muted); margin:0 0 24px; font-size:14.5px; }
+  label { display:block; font-size:13px; font-weight:500; color:var(--text); margin:16px 0 6px; }
+  input { width:100%; height:46px; padding:0 14px; border:1px solid var(--line-strong); border-radius:12px; background:var(--field);
+          color:var(--strong); font:inherit; font-size:15px; transition:border-color .15s, box-shadow .15s; }
+  input::placeholder { color:var(--muted); }
+  input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+    -webkit-text-fill-color:var(--strong); caret-color:var(--strong);
+    -webkit-box-shadow:0 0 0 1000px var(--field) inset; transition:background-color 9999s ease-out 0s; }
+  input:-webkit-autofill:focus { -webkit-box-shadow:0 0 0 1000px var(--field) inset, 0 0 0 4px var(--ring); }
+  input:hover { border-color:var(--muted); }
+  input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 4px var(--ring); }
+  .pw { position:relative; }
+  .pw input { padding-right:48px; }
+  .eye { position:absolute; top:50%; right:6px; transform:translateY(-50%); width:36px; height:36px; display:grid; place-items:center;
+         border:0; border-radius:9px; background:transparent; color:var(--muted); cursor:pointer; transition:background .15s, color .15s; }
+  .eye:hover { background:color-mix(in srgb, var(--muted) 12%, transparent); color:var(--strong); }
+  .eye:focus-visible { outline:none; box-shadow:0 0 0 3px var(--ring); }
+  .eye svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .eye .hide-ic, .eye[aria-pressed="true"] .show-ic { display:none; }
+  .eye[aria-pressed="true"] .hide-ic { display:block; }
+  .primary { width:100%; height:46px; margin-top:24px; border:0; border-radius:12px; background:var(--btn); color:var(--on-btn);
+             font:inherit; font-size:15px; font-weight:600; cursor:pointer; transition:background .15s, transform .08s, opacity .15s; }
+  .primary:hover { background:var(--btn-hover); }
+  .primary:active { transform:scale(.99); }
+  .primary:focus-visible { outline:none; box-shadow:0 0 0 4px var(--ring); }
+  .primary:disabled { opacity:.55; cursor:default; }
+  .divider { display:flex; align-items:center; gap:12px; margin:20px 0 4px; color:var(--muted); font-size:12px; }
+  .divider::before, .divider::after { content:""; flex:1; height:1px; background:var(--line); }
+  a.alt { display:flex; align-items:center; justify-content:center; height:46px; margin-top:12px; border:1px solid var(--line-strong);
+          border-radius:12px; color:var(--strong); text-decoration:none; font-weight:500; transition:background .15s; }
+  a.alt:hover { background:color-mix(in srgb, var(--muted) 8%, transparent); }
+  a.small { display:inline-block; margin-top:16px; font-size:13.5px; color:var(--muted); text-decoration:none; }
+  a.small:hover { color:var(--strong); text-decoration:underline; text-underline-offset:3px; }
+  .err { font-size:14px; margin-top:16px; border-radius:10px; }
+  .err:not(:empty) { padding:10px 12px; color:var(--err); background:var(--err-soft); }
+  .note { color:var(--muted); font-size:14.5px; margin:0 0 4px; }
+  .foot { margin-top:24px; font-size:12.5px; color:var(--muted); text-align:center; max-width:400px; line-height:1.6; }
+  .foot .made { margin-top:10px; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 14px; }
+  .foot a { color:var(--muted); text-decoration:none; }
+  .foot a:hover { color:var(--strong); text-decoration:underline; text-underline-offset:3px; }
+  .foot .made b { color:var(--text); font-weight:600; }
+  .caps { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12.5px; color:var(--muted); }
+  .caps svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; }
+  .primary .spin { display:inline-block; width:15px; height:15px; margin-right:8px; vertical-align:-2px; border:2px solid currentColor;
+                   border-right-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
   [hidden] { display:none !important; }
+  @media (max-height:820px) { body { padding:16px; } .logo, .brand { margin-bottom:18px; } .logo img { height:34px; }
+    main { padding:28px 30px 24px; } h1 { font-size:27px; } p.sub { margin-bottom:16px; } label { margin-top:12px; }
+    .primary { margin-top:18px; } .foot { margin-top:16px; } }
+  @media (max-width:440px) { main { padding:28px 22px 24px; border-radius:18px; } h1 { font-size:27px; } }
+  @media (prefers-reduced-motion: reduce) { main { animation:none; } * { transition:none !important; } }
 </style>
 </head>
 <body>
+<div class="logo"><img id="brand-logo" src="__BRANDING_LOGO__" alt="__BRANDING_COMPANY_NAME__"></div>
+<div class="brand" id="brand-fallback" aria-hidden="true" hidden>
+  <img class="mark" src="/static/lisa-icon-256.png" alt="">
+  __BRANDING_APP_NAME__
+</div>
 <main>
   <form id="login" hidden>
-    <h1>Sign in to Lisa</h1><p class="sub">Use the account your administrator created for you.</p>
-    <label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" required>
-    <label for="l-pw">Password</label><input id="l-pw" type="password" autocomplete="current-password" required>
-    <button type="submit">Sign in</button>
-    <a id="sso" class="alt" href="/api/auth/oidc/start" hidden>Sign in with your company account</a>
+    <h1>Welcome back</h1><p class="sub">Sign in to __BRANDING_APP_NAME__ with the account your administrator created for you.</p>
+    <label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" placeholder="name@company.com" required>
+    <label for="l-pw">Password</label>
+    <div class="pw"><input id="l-pw" type="password" autocomplete="current-password" required>__EYE__</div>
+    <div class="caps" id="caps" hidden><svg viewBox="0 0 24 24"><path d="M12 4l7 8h-4v5H9v-5H5z"/></svg>Caps Lock is on</div>
+    <button class="primary" type="submit" data-busy="Signing in…">Sign in</button>
+    <div id="sso-wrap" hidden><div class="divider">or</div>
+      <a id="sso" class="alt" href="/api/auth/oidc/start">Sign in with your company account</a></div>
     <a id="forgot-link" class="small" href="#" hidden>Forgot password?</a>
   </form>
   <form id="forgot" hidden>
     <h1>Reset your password</h1><p class="sub">We send a one-time link to your e-mail address.</p>
-    <label for="f-email">E-mail</label><input id="f-email" type="email" autocomplete="username" required>
-    <button type="submit">Send link</button>
+    <label for="f-email">E-mail</label><input id="f-email" type="email" autocomplete="username" placeholder="name@company.com" required>
+    <button class="primary" type="submit">Send link</button>
     <a class="small" href="/login">Back to sign in</a>
   </form>
   <form id="setup" hidden>
@@ -45,29 +123,69 @@
     <label for="s-org">Organisation name</label><input id="s-org" required>
     <label for="s-name">Your name</label><input id="s-name" autocomplete="name" required>
     <label for="s-email">E-mail</label><input id="s-email" type="email" autocomplete="username" required>
-    <label for="s-pw">Password (at least 10 characters)</label><input id="s-pw" type="password" minlength="10" autocomplete="new-password" required>
-    <button type="submit">Create organisation</button>
+    <label for="s-pw">Password (at least 10 characters)</label>
+    <div class="pw"><input id="s-pw" type="password" minlength="10" autocomplete="new-password" required>__EYE__</div>
+    <button class="primary" type="submit">Create organisation</button>
   </form>
   <form id="password" hidden>
     <h1>Choose your password</h1><p class="sub">This link works once.</p>
-    <label for="p-pw">New password (at least 10 characters)</label><input id="p-pw" type="password" minlength="10" autocomplete="new-password" required>
-    <button type="submit">Save and sign in</button>
+    <label for="p-pw">New password (at least 10 characters)</label>
+    <div class="pw"><input id="p-pw" type="password" minlength="10" autocomplete="new-password" required>__EYE__</div>
+    <button class="primary" type="submit">Save and sign in</button>
   </form>
   <div class="err" id="err" role="alert"></div>
 </main>
+<footer class="foot">
+  <div>Private and secure: your chats and connected accounts stay in your company's own Lisa.</div>
+  <div class="made"><span>Lisa — a product of <b>Matika</b></span>
+    <a href="https://matika.at/" target="_blank" rel="noopener">matika.at</a>
+    <a href="https://matika.at/de/privacy" target="_blank" rel="noopener">Privacy</a>
+    <a href="https://matika.at/de/impressum" target="_blank" rel="noopener">Imprint</a></div>
+</footer>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  const show = (id) => { $(id).hidden = false; $(id).querySelector('input').focus(); };
+  const logo = $('brand-logo'), useMark = () => { logo.parentNode.hidden = true; $('brand-fallback').hidden = false; };
+  if (!logo.getAttribute('src') || logo.getAttribute('src').startsWith('__')) useMark();
+  else if (logo.complete && !logo.naturalWidth) useMark(); else logo.addEventListener('error', useMark);
+  // Eye toggle on every password field: the type flips, the button says what it will do next.
+  const EYE = '<button type="button" class="eye" aria-label="Show password" aria-pressed="false">'
+    + '<svg class="show-ic" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>'
+    + '<svg class="hide-ic" viewBox="0 0 24 24"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.4 9.4 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg></button>';
+  document.querySelectorAll('.pw').forEach((w) => {
+    w.innerHTML = w.innerHTML.replace('__EYE__', EYE);
+    const input = w.querySelector('input'), eye = w.querySelector('.eye');
+    eye.addEventListener('click', () => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      eye.setAttribute('aria-pressed', String(show));
+      eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      input.focus({ preventScroll: true });
+    });
+  });
+  const show = (id) => { $(id).hidden = false;
+    let first = $(id).querySelector('input');
+    if (id === 'login') { try { const last = localStorage.getItem('lisa-last-email');
+      if (last) { $('l-email').value = last; first = $('l-pw'); } } catch (_) {} }
+    first.focus(); };
+  const capsHint = (e) => { if (e.getModifierState) $('caps').hidden = !e.getModifierState('CapsLock'); };
+  $('l-pw').addEventListener('keydown', capsHint); $('l-pw').addEventListener('keyup', capsHint);
+  $('l-pw').addEventListener('blur', () => { $('caps').hidden = true; });
+  document.querySelectorAll('input').forEach((i) => i.addEventListener('input', () => {
+    if ($('err').textContent && !new URLSearchParams(location.search).get('sso')) $('err').textContent = ''; }));
   async function post(url, body, form) {
-    const btn = form.querySelector('button'); btn.disabled = true; $('err').textContent = '';
+    // the submit button, not the eye toggle that also sits in the form
+    const btn = form.querySelector('button[type="submit"]'), label = btn.textContent;
+    btn.disabled = true; btn.innerHTML = '<span class="spin" aria-hidden="true"></span>' + (btn.dataset.busy || 'One moment…');
+    $('err').textContent = '';
     try {
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                    credentials: 'same-origin', body: JSON.stringify(body) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
+      try { if (body.email) localStorage.setItem('lisa-last-email', body.email); } catch (_) {}  // e-mail only, never the password
       location.replace('/');
-    } catch (e) { $('err').textContent = e.message; btn.disabled = false; }
+    } catch (e) { $('err').textContent = e.message; btn.disabled = false; btn.textContent = label; }
   }
   $('login').addEventListener('submit', (e) => { e.preventDefault();
     post('/api/enterprise/login', { email: $('l-email').value, password: $('l-pw').value }, e.target); });
@@ -89,7 +207,7 @@
   if (location.pathname === '/set-password') return show('password');
   fetch('/api/enterprise/setup/status', { credentials: 'same-origin' })
     .then((r) => r.json()).then((s) => { show(s.needs_setup ? 'setup' : 'login');
-      $('sso').hidden = !(s.sso && !s.needs_setup); $('forgot-link').hidden = !(s.password_reset && !s.needs_setup); })
+      $('sso-wrap').hidden = !(s.sso && !s.needs_setup); $('forgot-link').hidden = !(s.password_reset && !s.needs_setup); })
     .catch(() => { $('err').textContent = 'Lisa is not reachable. Try again shortly.'; });
 })();
 </script>

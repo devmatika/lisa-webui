@@ -918,7 +918,8 @@ def handle(handler, parsed, method: str) -> bool:
     if method == "GET" and parsed.path == "/api/auth/oidc/callback":
         return _oidc_callback(handler, {})
     if method == "GET" and parsed.path in ("/login", "/set-password"):
-        return _html(handler, _PAGE.read_text())
+        from api.branding import apply_branding_to_html  # each customer's logo, name and favicon
+        return _html(handler, apply_branding_to_html(_PAGE.read_text()))
     if method == "GET" and parsed.path == "/lisa":
         import json as _json
         from api.auth import csrf_token_for_session, parse_cookie

@@ -2386,7 +2386,9 @@ function openHermesDashboard(event){
   window.open(url,'_blank','noopener,noreferrer');
   return false;
 }
-function _initDashboardLinkProbe(){
+async function _initDashboardLinkProbe(){
+  // Lisa Enterprise: the dashboard is operator-only; members would only collect 403s.
+  if(typeof window.lisaAllowed==='function'&&!(await window.lisaAllowed('operator.system'))) return;
   loadDashboardSettings();
   refreshDashboardStatus(true);
   setInterval(refreshDashboardStatus,DASHBOARD_STATUS_TTL_MS);
@@ -21123,6 +21125,12 @@ function _parseProcessWakeupBody(text){
 // Server-stamped _wakeup_meta (authoritative when present) merged over the
 // client parse; the output section only ever comes from the parse because the
 // meta deliberately carries header fields only.
+const _AGENT_INTERNAL_NOTICE_RE=/^\s*\[(ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED)|INTERNAL NOTIFICATION|SYSTEM NOTICE|STILL IN PROGRESS) [—-]/;
+function _isAgentInternalNotice(content){
+  const text=typeof content==='string'?content:(Array.isArray(content)?content.map(p=>p&&p.text||'').join(''):'');
+  return _AGENT_INTERNAL_NOTICE_RE.test(text);
+}
+
 function _processWakeupInfo(m, text){
   const parsed=_parseProcessWakeupBody(text);
   const meta=(m&&m._wakeup_meta&&typeof m._wakeup_meta==='object')?m._wakeup_meta:null;
@@ -21724,7 +21732,9 @@ function renderMessages(options){
         }
       }
     }
-    const isProcessWakeup=m&&m._source==='process_wakeup';
+    // Hermes injects its own notices (subagent results, system notes) as role=user turns; the
+    // gateway path stores them without _source, so recognise the fixed prefixes too.
+    const isProcessWakeup=m&&(m._source==='process_wakeup'||(m.role==='user'&&_isAgentInternalNotice(m.content)));
     const isUser=m.role==='user';
     // #7882 (gate round-7 CORE): a hidden delegation_wakeup row between two
     // answers deletes the user-turn boundary from the visible projection —
@@ -21840,6 +21850,12 @@ function renderMessages(options){
         const exitStr=wakeupInfo.exitCode==null?'':String(wakeupInfo.exitCode);
         if(wakeupInfo.type==='completion'&&/^-?\d+$/.test(exitStr)&&exitStr!=='0') noticeClass+=' process-wakeup-fail';
         noticeInnerHtml=_processWakeupCardHtml(wakeupInfo, processText, {timeHtml, filesHtml, footHtml:`<div class="msg-foot"><span class="msg-actions">${copyBtn}</span></div>`});
+      }else if(_isAgentInternalNotice(processText)){
+        // collapsed by default: a subagent report is for Lisa, the user only needs the headline
+        const head=processText.slice(0,90);
+        const title=/^\[ASYNC DELEGATION/.test(head)?(/FAILED/.test(head)?'Background task failed':'Background task finished'):'Lisa internal note';
+        noticeInnerHtml=`<details class="process-wakeup-card"><summary class="process-wakeup-label">${li('terminal',13)}<span>${esc(title)}</span></summary>`
+          +`<div class="msg-body process-wakeup-body"><pre class="process-wakeup-text">${esc(processText)}</pre></div></details>${processFootHtml}`;
       }else{
         const processTextHtml=processText?`<pre class="process-wakeup-text">${esc(processText)}</pre>`:'';
         noticeInnerHtml=`<div class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></div>${filesHtml}<div class="msg-body process-wakeup-body">${processTextHtml}</div>${processFootHtml}`;
