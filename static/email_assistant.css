@@ -85,3 +85,14 @@
 .ea-prio{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
 .ea-prio.is-high{border-color:#e05a4f;color:#e05a4f;font-weight:600}
 .ea-wait{margin:4px 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+/* Connect + suggestions: a filled main button, what the connection test verified, the suggestion box */
+.ea-body .sm-btn.ea-primary,.ea-foot .sm-btn.ea-primary{background:var(--text);color:var(--bg);border-color:var(--text);padding:8px 16px}
+.ea-body .sm-btn.ea-primary:hover,.ea-foot .sm-btn.ea-primary:hover{opacity:.88}
+.ea-body .sm-btn:disabled{opacity:.6;cursor:progress}
+.ea-card--ok{border-color:rgba(46,160,90,.45)}
+.ea-checks{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.ea-checks b{color:var(--text);font-weight:600}
+.ea-suggest{flex-direction:row;align-items:center;justify-content:space-between;gap:14px;border-color:var(--accent)}
+.ea-suggest>div{display:flex;flex-direction:column;gap:3px}
+.ea-suggest .sm-btn{white-space:nowrap}
+@media (max-width:640px){.ea-suggest{flex-direction:column;align-items:stretch}}

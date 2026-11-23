@@ -110,21 +110,30 @@
   function mailboxCard() {
     const m = EA.data.mailbox || {};
     if (m.connected && !EA.reconnect) {
-      return `<div class="ea-card"><div class="ea-card-head"><strong>Mailbox connected</strong>
+      const f = EA.checks;  // only right after "Connect and test": what was actually verified
+      const checks = f ? `<ul class="ea-checks">
+          <li>✓ Signed in to ${esc(f.host || 'the mail server')}</li>
+          <li>✓ Drafts folder found: <b>${esc(f.drafts || '?')}</b> — drafts go here, nothing is ever sent</li>
+          <li>${f.sent ? `✓ Sent folder found: <b>${esc(f.sent)}</b> — Lisa learns your style from it` : '• No Sent folder found — Lisa learns your style only from your edits'}</li>
+        </ul>` : '';
+      return `<div class="ea-card ea-card--ok"><div class="ea-card-head"><strong>✓ Mailbox connected</strong>
         <span class="ea-muted">${esc(m.address || '')}${m.via === 'admin' ? ' · set up by your admin' : ''}</span>
-        <button class="ea-link" data-ea-reconnect>Change</button></div></div>`;
+        <button class="ea-link" data-ea-reconnect>Change</button></div>${checks}</div>`;
     }
     return `<div class="ea-card"><div class="ea-card-head"><strong>Connect your mailbox</strong></div>
       <div class="ea-provider"><span class="ea-chip is-active">IMAP (any mail server)</span>
         <span class="ea-chip" title="Coming soon">Gmail — soon</span><span class="ea-chip" title="Coming soon">Outlook — soon</span></div>
       <div class="ea-grid2">
-        <label>Email address<input id="ea_c_user" type="email" autocomplete="username" value="${esc(EA.draft.address || '')}" placeholder="name@company.com"></label>
-        <label>Password<input id="ea_c_pass" type="password" autocomplete="current-password" placeholder="mailbox password"></label>
-        <label>IMAP server<input id="ea_c_host" placeholder="mail.example.com" autocapitalize="off" spellcheck="false"></label>
-        <label>Port<input id="ea_c_port" inputmode="numeric" value="993"></label>
+        <label>Email address<input id="ea_c_user" type="email" name="ea-mailbox-address" autocomplete="off" value="${esc(EA.draft.address || '')}" placeholder="name@company.com"></label>
+        <label>Mailbox password<input id="ea_c_pass" type="password" name="ea-mailbox-password" autocomplete="new-password" placeholder="the password of this mailbox"></label>
       </div>
-      <p class="ea-muted">Lisa only reads mail and saves drafts — she never sends. The password is stored on your server only,
-        never shown again. The connection is tested before anything is saved.</p>
+      <details class="ea-more"><summary>Server settings <span class="ea-muted">— found automatically, change only if it fails</span></summary>
+        <div class="ea-grid2">
+          <label>IMAP server<input id="ea_c_host" placeholder="automatic" autocapitalize="off" spellcheck="false"></label>
+          <label>Port<input id="ea_c_port" inputmode="numeric" value="993"></label>
+        </div></details>
+      <p class="ea-muted">Lisa only reads mail, saves drafts and adds a category label — she never sends or deletes.
+        The password is stored on your server only, never shown again. The connection is tested before anything is saved.</p>
       <div class="ea-actions-row"><button class="sm-btn ea-primary" data-ea-connect>Connect and test</button>
         ${m.connected ? '<button class="sm-btn" data-ea-reconnect-cancel>Cancel</button>' : ''}</div></div>`;
   }
@@ -132,9 +141,10 @@
 
   function ownerForm(full) {
     const d = EA.draft;
+    const fromMailbox = !full && (EA.data.mailbox || {}).connected;  // wizard: the address is the connected mailbox
     return `
       <div class="ea-grid2">
-        <label>Mailbox address<input id="ea_address" type="email" value="${esc(d.address)}" placeholder="name@company.com"></label>
+        ${fromMailbox ? '' : `<label>Mailbox address<input id="ea_address" type="email" value="${esc(d.address)}" placeholder="name@company.com"></label>`}
         <label>Name on the drafts<input id="ea_name" value="${esc(d.name)}" placeholder="Alexander Müller"></label>
       </div>
       <label>About you / the company (one line)<input id="ea_owner" value="${esc(d.owner)}" placeholder="Runs MATIKA, a digital agency in Vienna"></label>
@@ -188,7 +198,12 @@
       </details>`;
     }).join('');
     const missing = Object.keys(EA.data.presets).filter((k) => !cats[k]);
-    return `
+    const suggest = (EA.data.mailbox || {}).connected ? `<div class="ea-card ea-suggest">
+        <div><strong>✨ Categories made for your mailbox</strong>
+          <span class="ea-muted">${EA.suggestedFrom ? `Lisa looked at the senders and subjects of your last ${esc(EA.suggestedFrom)} emails and suggested the categories below. Change anything you like.`
+            : 'Lisa looks at the senders and subjects of your recent emails (not the content) and suggests categories that fit them.'}</span></div>
+        <button class="sm-btn" data-ea-suggest>${EA.suggestedFrom ? 'Suggest again' : 'Suggest categories'}</button></div>` : '';
+    return `${suggest}
       <div class="ea-guide">
         <b>How it works</b>
         <ol><li>A new email arrives → Lisa puts it into <b>one</b> category, using “Which emails belong here?”.</li>
@@ -306,6 +321,8 @@
     head.innerHTML = tabs.map(([k, t]) => `<button class="ea-tab ${EA.tab === k ? 'is-active' : ''}" data-ea-tab="${k}" role="tab" aria-selected="${EA.tab === k}">${t}${k === 'learned' && Object.keys(EA.data.proposals || {}).length ? ' •' : ''}</button>`).join('');
     body.innerHTML = { status: statusView, owner: () => mailboxCard() + ownerForm(true) + `
         <label class="ea-switch"><input type="checkbox" id="ea_drafts" ${EA.draft.drafts ? 'checked' : ''}> Write drafts (off = summary only)</label>
+        <label class="ea-switch"><input type="checkbox" id="ea_labels" ${EA.draft.labels === false ? '' : 'checked'}> Label each email with its category
+          <small>(shows as a tag in your mail app; the email stays in the Inbox)</small></label>
         <label>Chat messages (Telegram)<select id="ea_notify">
           <option value="actionable" ${EA.draft.notify !== 'all' && EA.draft.notify !== 'off' ? 'selected' : ''}>Only when I need to act (recommended)</option>
           <option value="all" ${EA.draft.notify === 'all' ? 'selected' : ''}>Every processed email</option>
@@ -329,8 +346,9 @@
   }
 
   function collectCurrent() {
-    if (el('ea_address')) collectOwner();
+    if (el('ea_address') || el('ea_name')) collectOwner();
     if (el('ea_drafts')) EA.draft.drafts = el('ea_drafts').checked;
+    if (el('ea_labels')) EA.draft.labels = el('ea_labels').checked;
     if (el('ea_notify')) EA.draft.notify = el('ea_notify').value;
     if (el('ea_daily_at')) EA.draft.daily_at = el('ea_daily_at').value;
     if (el('ea_review')) EA.draft.review_every_days = Number(el('ea_review').value);
@@ -367,17 +385,25 @@
         EA.draft = { ...keep, address: payload.user };
         EA.reconnect = false;
         render(true);
-        const f = res.connected_folders || {};
-        notice(`Connected. Drafts folder: ${f.drafts || '?'}${f.sent ? ` · Sent: ${f.sent}` : ''}`, false);
+        EA.checks = { ...(res.connected_folders || {}), host: res.connected_host };
+        render(true);
+        notice('Connected and tested.', false);
       } catch (err) {
         t.disabled = false; t.textContent = 'Connect and test';
         notice((err && err.message) || 'Could not connect.', true);
       }
       return;
     }
+    if (ds.eaSuggest !== undefined) return suggestCategories(t);
     if (ds.eaNext !== undefined) {
+      if (EA.step === 0 && !(EA.data.mailbox || {}).connected) return notice('Connect your mailbox first (button above).', true);
       if (EA.step === 0 && !EA.draft.address) return notice('Enter the mailbox address.', true);
-      if (EA.step < WIZ.length - 1) { EA.step += 1; return render(); }
+      if (EA.step < WIZ.length - 1) {
+        EA.step += 1;
+        render();
+        if (EA.step === 1 && !EA.suggestedFrom && !EA.suggestTried) { EA.suggestTried = true; suggestCategories(el('eaBody').querySelector('[data-ea-suggest]')); }
+        return;
+      }
       if (await post('/api/email-assistant/config', { config: EA.draft })) { EA.tab = 'status'; render(true); }
       return;
     }
@@ -419,6 +445,26 @@
     if (ds.eaLearnedSave) {
       const notes = document.querySelector(`[data-ea-learned="${CSS.escape(ds.eaLearnedSave)}"]`).value;
       if (await post('/api/email-assistant/learned', { category: ds.eaLearnedSave, notes })) render(true);
+    }
+  }
+
+  // Replace the categories with ones made for this mailbox (wizard: automatic on step 2; later: on request).
+  async function suggestCategories(btn) {
+    if (EA.data.configured && !confirm('Replace your categories with new suggestions? Nothing changes until you press Save.')) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Lisa is looking at your inbox…'; }
+    try {
+      const res = await api('/api/email-assistant/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'suggest' }), timeoutMs: 120000 });
+      const old = EA.draft.categories || {};
+      EA.draft.categories = res.categories;
+      Object.keys(old).forEach((k) => { if (!res.categories[k]) EA.draft.rules = (EA.draft.rules || []).filter((r) => r.category !== k); });
+      EA.suggestedFrom = res.based_on;
+      EA.openCats = new Set();
+      render(true);
+      notice(`${Object.keys(res.categories).length} categories suggested.`, false);
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Suggest categories'; }
+      notice((err && err.message) || 'No suggestions right now.', true);
     }
   }
 

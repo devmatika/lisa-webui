@@ -149,7 +149,7 @@ FAKE_HIMALAYA = """#!/usr/bin/env python3
 import json, os, sys
 if os.environ.get("EMAIL_ASSISTANT_IMAP_PASSWORD") != "right":
     print("Error: IMAP authentication failed: invalid credentials", file=sys.stderr); sys.exit(1)
-if "mailbox" in sys.argv:
+if sys.argv[-3:-1] == ["mailbox", "list"]:  # not the account name "mailbox" in -a
     print(json.dumps({"mailboxes": [{"name": "INBOX"}, {"name": "INBOX.Drafts"}, {"name": "INBOX.Sent Messages"},
                                     {"name": "INBOX.Papierkorb"}]}))
 else:
@@ -222,3 +222,80 @@ def test_pause_is_saved_and_only_true_pauses(home):
     assert json.loads((d / "config.json").read_text())["paused"] is True
     ea.save_email_assistant_config(good_config(paused="yes"))
     assert json.loads((d / "config.json").read_text())["paused"] is False
+
+
+def _mx_answer():
+    """A DNS answer for matika.at MX: two records, the second host name compressed (pointer into the first)."""
+    q = b"\x06matika\x02at\x00"
+    head = bytes.fromhex("1234818000010002") + b"\x00\x00\x00\x00"
+    question = q + b"\x00\x0f\x00\x01"
+    rr1_name = b"\x03mx1\x0dagenturserver\x02de\x00"
+    rr1 = b"\xc0\x0c\x00\x0f\x00\x01\x00\x00\x01\x2c" + (2 + len(rr1_name)).to_bytes(2, "big") + b"\x00\x14" + rr1_name
+    base = 12 + len(question) + 12 + 2 + 4  # offset of "agenturserver" inside answer 1
+    rr2_name = b"\x03mx2\xc0" + bytes([base])
+    rr2 = b"\xc0\x0c\x00\x0f\x00\x01\x00\x00\x01\x2c" + (2 + len(rr2_name)).to_bytes(2, "big") + b"\x00\x0a" + rr2_name
+    return head + question + rr1 + rr2
+
+
+MX_ANSWER = _mx_answer()
+
+
+def test_mx_answer_is_parsed_best_first():
+    assert ea.parse_mx(MX_ANSWER) == ["mx2.agenturserver.de", "mx1.agenturserver.de"]  # preference 10 before 20
+    assert ea.parse_mx(MX_ANSWER, qid=0x9999) == []  # an answer to someone else's query is ignored
+    assert ea.parse_mx(b"\x00\x01") == []
+
+
+def test_server_is_found_from_the_mail_provider(monkeypatch):
+    monkeypatch.setattr(ea, "_mx_hosts", lambda d: ["mx1.agenturserver.de"])
+    monkeypatch.setattr(ea, "_imap_ok", lambda h: h == "mail.agenturserver.de")
+    assert ea.discover_imap("alex@matika.at") == "mail.agenturserver.de"
+    monkeypatch.setattr(ea, "_mx_hosts", lambda d: ["alt1.aspmx.l.google.com"])
+    monkeypatch.setattr(ea, "_imap_ok", lambda h: h == "imap.gmail.com")
+    assert ea.discover_imap("x@firma.at") == "imap.gmail.com"
+    monkeypatch.setattr(ea, "_imap_ok", lambda h: False)
+    assert ea.discover_imap("x@firma.at") == ""
+
+
+def test_connect_without_server_uses_the_found_one(mailhome, monkeypatch):
+    monkeypatch.setattr(ea, "discover_imap", lambda u: "mail.agenturserver.de")
+    st = ea.connect_imap({"user": "alex@matika.at", "password": "right"})
+    assert st["connected_host"] == "mail.agenturserver.de"
+    assert "imaps://mail.agenturserver.de:993" in (mailhome[0] / ea.MAILBOX_TOML).read_text()
+    monkeypatch.setattr(ea, "discover_imap", lambda u: "")
+    with pytest.raises(ValueError, match="Server settings"):
+        ea.connect_imap({"user": "a@b.at", "password": "right"})
+
+
+def test_suggestions_are_cleaned_before_use():
+    cats = ea.clean_suggestions({"categories": {
+        "Job Applications": {"description": "People applying for a job", "tone": "kind", "address": "Sie"},
+        "../evil": {"description": "x"}, "invoices": {"description": "Bills", "draft": False, "address": "Herr"},
+        "spam": "not a card"}})
+    assert cats["job-applications"] == {"description": "People applying for a job", "tone": "kind", "address": "Sie"}
+    assert cats["invoices"] == {"description": "Bills", "draft": False}
+    assert "evil" in cats and "spam" not in cats and "other" in cats
+    ea.validate_config(good_config(categories=cats, rules=[]))  # always saveable
+    assert list(ea.clean_suggestions("garbage")) == ["other"]
+
+
+def test_suggest_reads_only_senders_and_subjects(mailhome, monkeypatch):
+    home, _ = mailhome
+    ea.connect_imap({"host": "mail.example.com", "user": "a@b.at", "password": "right"})
+    (home / ".env").write_text("EMAIL_ASSISTANT_IMAP_PASSWORD=right\nOPENROUTER_API_KEY=k\n")
+    envs = [{"from": [{"name": None, "email": f"c{i}@kunde.at"}], "subject": f"Angebot {i}"} for i in range(6)]
+    (home / "bin/himalaya").write_text(FAKE_HIMALAYA.replace('{"envelopes": []}', repr({"envelopes": envs})))
+    seen = {}
+
+    def fake_llm(h, system, user):
+        seen["user"] = user
+        return {"categories": {"customer": {"description": "Existing customers", "tone": "friendly"}}}
+    monkeypatch.setattr(ea, "_openrouter", fake_llm)
+    out = ea.connect_imap({"action": "suggest"})
+    assert out["based_on"] == 6 and set(out["categories"]) == {"customer", "other"}
+    assert "c0@kunde.at | Angebot 0" in seen["user"]
+
+
+def test_labels_default_on_and_can_be_switched_off(home):
+    assert ea.validate_config(good_config())["labels"] is True
+    assert ea.validate_config({**good_config(), "labels": False})["labels"] is False

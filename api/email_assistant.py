@@ -11,8 +11,12 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
+import socket
+import ssl
 import subprocess
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -162,14 +166,27 @@ def _mailbox_toml(host: str, port: int, user: str, name: str, folders: dict[str,
     ])
 
 
-def _himalaya(home: Path, toml: Path, password: str, args: list[str]) -> str:
+def _profile_env(home: Path) -> dict[str, str]:
+    """The profile .env as a dict: an admin-made mailbox reads its password through a password.command from it."""
+    out = {}
+    try:
+        for line in (home / ".env").read_text(encoding="utf-8").splitlines():
+            key, sep, value = line.partition("=")
+            if sep and re.match(r"^[A-Z_][A-Z0-9_]*$", key.strip()):
+                out[key.strip()] = value.strip().strip("'\"")
+    except OSError:
+        pass
+    return out
+
+
+def _himalaya(home: Path, toml: Path, password: str | None, args: list[str], account: str | None = ACCOUNT) -> str:
     binary = home / "bin" / "himalaya"
     if not binary.is_file():
         raise ValueError("The mail tool (himalaya) is not installed in this profile yet — ask your admin.")
-    env = {**os.environ, PASS_ENV: password}
+    env = {**os.environ, **_profile_env(home), **({PASS_ENV: password} if password is not None else {})}
     try:
-        r = subprocess.run([str(binary), "-c", str(toml), "-a", ACCOUNT, *args], capture_output=True, text=True,
-                           timeout=45, env=env, check=False)
+        r = subprocess.run([str(binary), "-c", str(toml), *(["-a", account] if account else []), *args],
+                           capture_output=True, text=True, timeout=45, env=env, check=False)
     except subprocess.TimeoutExpired:
         raise ValueError("The mail server did not answer within 45 s. Check server name and port.")
     if r.returncode != 0:
@@ -190,20 +207,114 @@ def pick_folders(names: list[str]) -> dict[str, str]:
     return out
 
 
+# Where a provider's mail is not at imap.<domain>: the IMAP host for an MX base domain.
+KNOWN_IMAP = {"google.com": "imap.gmail.com", "googlemail.com": "imap.gmail.com",
+              "outlook.com": "outlook.office365.com", "icloud.com": "imap.mail.me.com"}
+
+
+def _mx_hosts(domain: str, timeout: float = 3.0) -> list[str]:
+    """MX hosts of a domain, best first, with one plain UDP query to the system resolver (no extra library)."""
+    try:
+        ns = next(ln.split()[1] for ln in Path("/etc/resolv.conf").read_text().splitlines()
+                  if ln.startswith("nameserver") and len(ln.split()) > 1)
+    except (OSError, StopIteration):
+        return []
+    qid = random.randint(0, 0xFFFF)
+    query = qid.to_bytes(2, "big") + b"\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00" + b"".join(
+        bytes([len(p)]) + p.encode("ascii") for p in domain.split(".")) + b"\x00\x00\x0f\x00\x01"
+    try:
+        with socket.socket(socket.AF_INET6 if ":" in ns else socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(timeout)
+            sock.sendto(query, (ns, 53))
+            data = sock.recv(4096)
+    except OSError:
+        return []
+    return parse_mx(data, qid)
+
+
+def parse_mx(data: bytes, qid: int | None = None) -> list[str]:
+    def name(pos: int) -> tuple[str, int]:
+        labels, end, jumps = [], None, 0
+        while data[pos]:
+            if data[pos] >= 0xC0:  # compression pointer
+                end = pos + 2 if end is None else end
+                pos = int.from_bytes(data[pos:pos + 2], "big") & 0x3FFF
+                jumps += 1
+                if jumps > 20:
+                    raise ValueError("loop")
+                continue
+            labels.append(data[pos + 1:pos + 1 + data[pos]].decode("ascii", "replace"))
+            pos += 1 + data[pos]
+        return ".".join(labels), (pos + 1 if end is None else end)
+
+    try:
+        if qid is not None and int.from_bytes(data[:2], "big") != qid:
+            return []
+        qd, an = int.from_bytes(data[4:6], "big"), int.from_bytes(data[6:8], "big")
+        pos = 12
+        for _ in range(qd):
+            pos = name(pos)[1] + 4
+        found = []
+        for _ in range(an):
+            pos = name(pos)[1]
+            rtype, rdlen = int.from_bytes(data[pos:pos + 2], "big"), int.from_bytes(data[pos + 8:pos + 10], "big")
+            pos += 10
+            if rtype == 15:
+                found.append((int.from_bytes(data[pos:pos + 2], "big"), name(pos + 2)[0].lower()))
+            pos += rdlen
+        return [h for _, h in sorted(found)]
+    except (IndexError, ValueError):
+        return []
+
+
+def _imap_ok(host: str, port: int = 993, timeout: float = 4.0) -> bool:
+    """An IMAPS server answers here with a certificate valid for this name (rules out a shared host's wrong cert)."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as raw:
+            with ssl.create_default_context().wrap_socket(raw, server_hostname=host) as tls:
+                tls.settimeout(timeout)
+                return tls.recv(64).startswith(b"* OK")
+    except (OSError, ssl.SSLError):
+        return False
+
+
+def discover_imap(user: str) -> str:
+    """The IMAP server for an address: imap./mail.<domain>, else the mail host of its MX provider."""
+    domain = user.rsplit("@", 1)[-1].lower()
+    candidates = [f"imap.{domain}", f"mail.{domain}"]
+    for mx in _mx_hosts(domain)[:2]:
+        # shortcut: last two labels as the provider domain — wrong for co.uk-style suffixes; add a suffix list if seen.
+        base = ".".join(mx.rstrip(".").split(".")[-2:])
+        candidates += [KNOWN_IMAP.get(base, ""), f"imap.{base}", f"mail.{base}"]
+    seen = set()
+    for host in candidates:
+        if host and host not in seen and HOST_RE.match(host):
+            seen.add(host)
+            if _imap_ok(host):
+                return host
+    return ""
+
+
 def connect_imap(data: Any) -> dict[str, Any]:
     """Test an IMAP login read-only, find the Drafts/Sent folders, then save. Nothing is stored if the test fails;
     the password goes only into the profile .env and is never returned. No SMTP: this feature never sends."""
     if not isinstance(data, dict):
         raise ValueError("mailbox data missing")
-    host = _text(data.get("host"), "server", 253)
+    # Mailbox actions share this endpoint (routes.py lists it): {"action": "suggest"} proposes categories.
+    if data.get("action") == "suggest":
+        return suggest_categories()
+    user = _text(data.get("user"), "email", 200)
+    if not EMAIL_RE.match(user):
+        raise ValueError("email: the full mailbox address")
+    host = _text(data.get("host"), "server", 253) or discover_imap(user)
+    if not host:
+        raise ValueError("Could not find the mail server for this address. Open “Server settings” and enter it "
+                         "(your provider calls it IMAP server, e.g. mail.example.com).")
     if not HOST_RE.match(host):
         raise ValueError("server: a host name like mail.example.com")
     port = 993 if data.get("port") in (None, "") else int(data["port"])
     if not 1 <= port <= 65535:
         raise ValueError("port: 1–65535")
-    user = _text(data.get("user"), "email", 200)
-    if not EMAIL_RE.match(user):
-        raise ValueError("email: the full mailbox address")
     password = str(data.get("password") or "")
     if not password or len(password) > 300 or any(c in password for c in "\r\n\0"):
         raise ValueError("password missing")
@@ -240,7 +351,80 @@ def connect_imap(data: Any) -> dict[str, Any]:
     _write_json(path, cfg)
     out = get_email_assistant()
     out["connected_folders"] = folders
+    out["connected_host"] = host
     return out
+
+
+SUGGEST_SYSTEM = """You set up an email assistant that sorts a person's incoming email into categories and writes
+reply drafts in a tone per category. From the senders and subjects of their recent inbox, propose 4 to 7 categories
+that fit THIS mailbox. Return JSON only: {"categories": {"<name>": {"description": "...", "tone": "...",
+"address": "Sie|du|", "draft": true|false}}}. Rules: name = 1-2 lowercase English words joined by - (e.g. customer,
+job-applications); description = which emails belong here, in plain words a classifier can apply (one sentence, no
+names of people); tone = a few words; address = "du" or "Sie" only if clearly so, else ""; draft = false for mail that
+never needs a written reply (invoices, notifications, newsletters). Always include "other" for anything else.
+Ignore newsletters and automatic notifications unless they are a large part of the mail."""
+
+
+def _openrouter(home: Path, system: str, user: str) -> dict[str, Any]:
+    key = _profile_env(home).get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+    if not key:
+        raise ValueError("No AI key in this profile yet — ask your admin.")
+    body = {"model": "deepseek/deepseek-v4-flash-0731", "temperature": 0.2, "max_tokens": 1500,
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            # same routing as the cron job: providers that neither store nor train on prompts, none in China
+            "provider": {"data_collection": "deny", "require_parameters": True,
+                         "ignore": ["baidu", "alibaba", "siliconflow", "streamlake", "deepseek"]}}
+    req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=json.dumps(body).encode(),
+                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            text = json.loads(r.read().decode())["choices"][0]["message"]["content"] or ""
+        return json.loads(re.sub(r"^```(?:json)?|```$", "", text.strip()).strip())
+    except (OSError, ValueError, KeyError, IndexError) as exc:
+        raise ValueError(f"Lisa could not make suggestions right now ({str(exc)[:80]}). Try again in a minute.")
+
+
+def clean_suggestions(raw: Any) -> dict[str, dict[str, Any]]:
+    """Model output -> categories that pass validate_config (bad names and fields are dropped, never trusted)."""
+    cats = raw.get("categories") if isinstance(raw, dict) else None
+    out: dict[str, dict[str, Any]] = {}
+    for name, card in (cats.items() if isinstance(cats, dict) else []):
+        name = re.sub(r"[^a-z0-9_-]+", "-", str(name).strip().lower()).strip("-")[:31]
+        if not CATEGORY_RE.match(name) or not isinstance(card, dict) or len(out) >= MAX_CATEGORIES - 1:
+            continue
+        c = {f: str(card[f]).strip()[:300] for f in ("description", "tone") if isinstance(card.get(f), str) and card[f].strip()}
+        if card.get("address") in ("Sie", "du"):
+            c["address"] = card["address"]
+        if card.get("draft") is False:
+            c["draft"] = False
+        out[name] = c
+    out.setdefault("other", dict(PRESETS["other"]))
+    return out
+
+
+def suggest_categories() -> dict[str, Any]:
+    """Look at the senders and subjects of the last 60 inbox mails (no bodies) and propose categories for them."""
+    home = get_active_hermes_home()
+    cfg = _read_json(_dir() / "config.json", {})
+    cfg = cfg if isinstance(cfg, dict) else {}
+    toml = home / str(cfg.get("himalaya_config") or "himalaya/config.toml")
+    if not toml.is_file():
+        raise ValueError("Connect your mailbox first.")
+    listing = json.loads(_himalaya(home, toml, None, ["envelope", "list", "-m", "inbox", "-s", "60", "--json"],
+                                   account=cfg.get("account") or None) or "[]")
+    envs = listing.get("envelopes", []) if isinstance(listing, dict) else listing
+    lines = []
+    for e in envs if isinstance(envs, list) else []:
+        sender = e.get("from") if isinstance(e, dict) else None  # himalaya: [{"name": ..., "email": ...}]
+        sender = sender[0] if isinstance(sender, list) and sender else sender
+        sender = sender.get("email") or sender.get("name") if isinstance(sender, dict) else sender
+        lines.append(f"- {str(sender or '')[:80]} | {str(e.get('subject') or '')[:120]}")
+    if len(lines) < 5:
+        raise ValueError("Your inbox has too few emails for suggestions yet — the ready-made categories are a good start.")
+    who = f"Mailbox owner: {cfg.get('name') or ''} <{cfg.get('address') or ''}>. {cfg.get('owner') or ''}".strip()
+    cats = clean_suggestions(_openrouter(home, SUGGEST_SYSTEM, f"{who}\n\nRecent inbox (sender | subject):\n" + "\n".join(lines)))
+    return {"categories": cats, "based_on": len(lines)}
 
 
 def _text(value: Any, field: str, limit: int) -> str:
@@ -343,6 +527,7 @@ def validate_config(data: Any) -> dict[str, Any]:
         "mail_url": _url(data.get("mail_url")),
         "only_from": only_from,
         "drafts": data.get("drafts") is True,
+        "labels": data.get("labels") is not False,  # category label on each sorted inbox mail (default on)
         "paused": data.get("paused") is True,  # kill switch: the cron job does not even read the mailbox
         "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",
         "max_per_run": max_per_run,
