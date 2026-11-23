@@ -132,7 +132,7 @@
           <label>IMAP server<input id="ea_c_host" placeholder="automatic" autocapitalize="off" spellcheck="false"></label>
           <label>Port<input id="ea_c_port" inputmode="numeric" value="993"></label>
         </div></details>
-      <p class="ea-muted">Lisa only reads mail, saves drafts and adds a category label — she never sends or deletes.
+      <p class="ea-muted">Lisa reads mail, saves drafts, labels each email and moves newsletters to a “Lisa / Automated” folder — she never sends or deletes.
         The password is stored on your server only, never shown again. The connection is tested before anything is saved.</p>
       <div class="ea-actions-row"><button class="sm-btn ea-primary" data-ea-connect>Connect and test</button>
         ${m.connected ? '<button class="sm-btn" data-ea-reconnect-cancel>Cancel</button>' : ''}</div></div>`;
@@ -322,7 +322,10 @@
     body.innerHTML = { status: statusView, owner: () => mailboxCard() + ownerForm(true) + `
         <label class="ea-switch"><input type="checkbox" id="ea_drafts" ${EA.draft.drafts ? 'checked' : ''}> Write drafts (off = summary only)</label>
         <label class="ea-switch"><input type="checkbox" id="ea_labels" ${EA.draft.labels === false ? '' : 'checked'}> Label each email with its category
-          <small>(shows as a tag in your mail app; the email stays in the Inbox)</small></label>
+          <small>(a tag in Thunderbird; most webmails don't show tags)</small></label>
+        <label>Newsletters &amp; notifications <small>— real emails and meeting invites always stay in the Inbox</small>
+          <select id="ea_folders"><option value="automated" ${EA.draft.folders !== 'off' ? 'selected' : ''}>Move to the folder “Lisa / Automated” (recommended)</option>
+            <option value="off" ${EA.draft.folders === 'off' ? 'selected' : ''}>Leave them in the Inbox</option></select></label>
         <label>Chat messages (Telegram)<select id="ea_notify">
           <option value="actionable" ${EA.draft.notify !== 'all' && EA.draft.notify !== 'off' ? 'selected' : ''}>Only when I need to act (recommended)</option>
           <option value="all" ${EA.draft.notify === 'all' ? 'selected' : ''}>Every processed email</option>
@@ -349,6 +352,7 @@
     if (el('ea_address') || el('ea_name')) collectOwner();
     if (el('ea_drafts')) EA.draft.drafts = el('ea_drafts').checked;
     if (el('ea_labels')) EA.draft.labels = el('ea_labels').checked;
+    if (el('ea_folders')) EA.draft.folders = el('ea_folders').value;
     if (el('ea_notify')) EA.draft.notify = el('ea_notify').value;
     if (el('ea_daily_at')) EA.draft.daily_at = el('ea_daily_at').value;
     if (el('ea_review')) EA.draft.review_every_days = Number(el('ea_review').value);

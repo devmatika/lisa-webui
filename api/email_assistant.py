@@ -528,6 +528,7 @@ def validate_config(data: Any) -> dict[str, Any]:
         "only_from": only_from,
         "drafts": data.get("drafts") is True,
         "labels": data.get("labels") is not False,  # category label on each sorted inbox mail (default on)
+        "folders": "off" if data.get("folders") == "off" else "automated",  # newsletters -> Lisa/Automated (default)
         "paused": data.get("paused") is True,  # kill switch: the cron job does not even read the mailbox
         "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",
         "max_per_run": max_per_run,

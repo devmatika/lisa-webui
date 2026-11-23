@@ -299,3 +299,9 @@ def test_suggest_reads_only_senders_and_subjects(mailhome, monkeypatch):
 def test_labels_default_on_and_can_be_switched_off(home):
     assert ea.validate_config(good_config())["labels"] is True
     assert ea.validate_config({**good_config(), "labels": False})["labels"] is False
+
+
+def test_newsletter_folder_default_on_and_can_be_switched_off(home):
+    assert ea.validate_config(good_config())["folders"] == "automated"
+    assert ea.validate_config({**good_config(), "folders": "off"})["folders"] == "off"
+    assert ea.validate_config({**good_config(), "folders": "INBOX; DROP"})["folders"] == "automated"
