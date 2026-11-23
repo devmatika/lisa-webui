@@ -48,6 +48,11 @@ PRESETS: dict[str, dict[str, Any]] = {
     "internal": {"description": "Team and colleagues", "tone": "short and casual", "address": "du"},
     "admin": {"description": "Invoices, contracts, authorities", "tone": "formal and exact", "address": "Sie",
               "draft": False},
+    "receipts": {"description": "Payment receipts, subscription renewals, invoices already paid by card or direct debit",
+                 "draft": False, "folder": True, "folder_name": "Belege"},
+    "accounts": {"description": "Verification and login codes, password resets, security notices", "draft": False},
+    "web-leads": {"description": "Lead notifications from our own website forms: a new potential customer, high priority",
+                  "draft": False},
     "other": {"description": "Anything else", "tone": "polite and short"},
 }
 
