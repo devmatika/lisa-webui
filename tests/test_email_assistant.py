@@ -362,3 +362,12 @@ def test_env_file_goes_back_to_the_profile_owner_after_connect(mailhome, monkeyp
     monkeypatch.setattr(ea, "_own", lambda path, mode=0o644: owned.append((path.name, mode)))
     ea.connect_imap({"host": "mail.example.com", "user": "a@b.at", "password": "right"})
     assert (".env", 0o600) in owned  # seen live: root-owned .env broke the cron job's password lookup
+
+
+def test_auto_reply_is_server_only_and_survives_a_browser_save(home):
+    d = home / "workspace/email-assistant"
+    d.mkdir(parents=True)
+    (d / "config.json").write_text(json.dumps({**good_config(), "auto_reply": {"enabled": True, "text": {"en": "x"}}}))
+    st = ea.save_email_assistant_config({**good_config(), "auto_reply": {"enabled": True, "text": {"en": "EVIL"}}})
+    assert "auto_reply" not in st["config"]  # not shown to the browser
+    assert json.loads((d / "config.json").read_text())["auto_reply"]["text"]["en"] == "x"  # browser cannot change it

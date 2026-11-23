@@ -2956,7 +2956,11 @@ async function loadSession(sid){
   } catch(e) {
     const metadataErrorStatus=e.status;
     const profileMismatch=_sessionProfileMismatchFromError(e);
-    if(profileMismatch && profileMismatch.profile && !opts.skipProfileResolve){
+    // Lisa Enterprise: one profile per person, so another profile's chat is another person's (e.g. a remembered chat
+    // after signing in as someone else on the same browser). Forget it like a missing one instead of switching.
+    if(profileMismatch && window.LISA_ENTERPRISE){
+      e.status=404;
+    } else if(profileMismatch && profileMismatch.profile && !opts.skipProfileResolve){
       if (!_isCurrentLoad()) {
         _rearmActiveSessionStream();
         return;

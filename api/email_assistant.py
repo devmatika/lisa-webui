@@ -28,7 +28,8 @@ EMAIL_RE = re.compile(r"^[^@\s<>\"]+@[^@\s<>\"]+\.[^@\s<>\"]+$")
 TEXT_FIELDS = ("description", "tone", "address", "greeting", "farewell", "do", "dont", "language")
 LOCKED_KEYS = ("himalaya", "himalaya_config", "account", "model", "watch_seconds", "watch_period", "watch_every",
                "telegram_chats", "timezone", "open_days", "learn_every", "skip_from",
-               "webui_url", "review_image", "review_ignore", "review_weekday", "provider_routing")  # set on the server (admin or Connect mailbox), never by the browser
+               "webui_url", "review_image", "review_ignore", "review_weekday", "provider_routing",
+               "auto_reply")  # auto_reply SENDS mail: set on the server after the owner approved the text, never by the browser  # set on the server (admin or Connect mailbox), never by the browser
 MAX_CATEGORIES, MAX_RULES = 15, 50
 HOST_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 PASS_ENV = "EMAIL_ASSISTANT_IMAP_PASSWORD"  # profile .env; the cron job's himalaya reads it via password.command
@@ -433,6 +434,8 @@ def _openrouter(home: Path, system: str, user: str) -> dict[str, Any]:
     if not key:
         raise ValueError("No AI key in this profile yet — ask your admin.")
     body = {"model": "deepseek/deepseek-v4-flash-0731", "temperature": 0.2, "max_tokens": 1500,
+            # no reasoning: the model otherwise can spend the whole budget thinking and return no text (seen live)
+            "reasoning": {"enabled": False},
             "response_format": {"type": "json_object"},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             # same routing as the cron job: providers that neither store nor train on prompts, none in China
