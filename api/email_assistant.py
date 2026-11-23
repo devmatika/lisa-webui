@@ -438,11 +438,36 @@ def _text(value: Any, field: str, limit: int) -> str:
     return text
 
 
+def _int_range(value: Any, default: int, lo: int, hi: int, field: str) -> int:
+    number = default if value in (None, "") else int(value)
+    if not lo <= number <= hi:
+        raise ValueError(f"{field}: {lo}–{hi}")
+    return number
+
+
+def _invoice_folder(value: Any) -> str:
+    """An existing folder of the user (full IMAP name, e.g. INBOX.Zahlung offen); the cron job never creates it."""
+    name = _text(value, "invoice folder", 100)
+    if any(c in name for c in '"\\\r\n*%'):
+        raise ValueError("invoice folder: the folder name as your mail app shows it, without quotes")
+    return name
+
+
 def _url(value: Any) -> str:
     url = _text(value, "mail_url", 300)
     if url and not re.match(r"^https://[^\s<>\"']+$", url):
         raise ValueError("mail_url must start with https://")
     return url
+
+
+FOLDER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$")  # same rule as email_drafts.py (ASCII: no IMAP UTF-7)
+
+
+def _folder_name(value: Any, field: str) -> str:
+    name = _text(value, field, 40)
+    if name and not FOLDER_NAME_RE.match(name):
+        raise ValueError(f"{field}: letters, digits, space, - or _ (no umlauts), e.g. Bewerbungen")
+    return name
 
 
 def validate_config(data: Any) -> dict[str, Any]:
@@ -473,6 +498,8 @@ def validate_config(data: Any) -> dict[str, Any]:
             clean["draft"] = False
         if card.get("folder") is True:  # the cron job moves these mails to the folder Lisa/<Name>
             clean["folder"] = True
+        if card.get("folder_name") not in (None, ""):
+            clean["folder_name"] = _folder_name(card["folder_name"], f"{name}: folder name")
         cats[name] = clean
     rules = []
     for r in data.get("rules") or []:
@@ -531,6 +558,9 @@ def validate_config(data: Any) -> dict[str, Any]:
         "drafts": data.get("drafts") is True,
         "labels": data.get("labels") is not False,  # category label on each sorted inbox mail (default on)
         "folders": "off" if data.get("folders") == "off" else "automated",  # newsletters -> Lisa/Automated (default)
+        "auto_folder_name": _folder_name(data.get("auto_folder_name"), "newsletter folder") or "Automated",
+        "auto_archive_days": _int_range(data.get("auto_archive_days"), 30, 0, 365, "archive newsletters after (days)"),
+        "invoice_folder": _invoice_folder(data.get("invoice_folder")),
         "paused": data.get("paused") is True,  # kill switch: the cron job does not even read the mailbox
         "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",
         "max_per_run": max_per_run,

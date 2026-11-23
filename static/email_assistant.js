@@ -85,6 +85,8 @@
       FIELDS.forEach(([f]) => { const i = card.querySelector(`[data-f="${f}"]`); if (i && i.value.trim()) c[f] = i.value.trim(); });
       if (!card.querySelector('[data-f="draft"]').checked) c.draft = false;
       if (card.querySelector('[data-f="folder"]').checked) c.folder = true;
+      const fn = card.querySelector('[data-f="folder_name"]').value.trim();
+      if (fn) c.folder_name = fn;
       EA.draft.categories[name] = c;
       if (card.open) EA.openCats.add(name); else EA.openCats.delete(name);
     });
@@ -190,7 +192,8 @@
           <label class="ea-switch"><input type="checkbox" data-f="draft" ${c.draft === false ? '' : 'checked'}>
             Write reply drafts for these emails <small>(off = Lisa only sorts and lists them)</small></label>
           <label class="ea-switch"><input type="checkbox" data-f="folder" ${c.folder ? 'checked' : ''}>
-            Move these emails to the folder “Lisa / ${esc(name.charAt(0).toUpperCase() + name.slice(1))}” <small>(visible in every mail app and webmail; off = they stay in the Inbox)</small></label>
+            Move these emails to a folder under “Lisa” <small>(visible in every mail app and webmail; off = they stay in the Inbox)</small></label>
+          <label>Folder name <small>— Lisa / …, letters without umlauts</small><input data-f="folder_name" value="${esc(c.folder_name || '')}" placeholder="${esc(name.charAt(0).toUpperCase() + name.slice(1))}" style="max-width:260px"></label>
           <div class="ea-grid2">${FIELDS.slice(0, BASIC).map((fd) => fieldInput(fd, c)).join('')}</div>
           <details class="ea-more" ${more ? 'open' : ''}><summary>More options</summary>
             <div class="ea-grid2">${FIELDS.slice(BASIC).map((fd) => fieldInput(fd, c)).join('')}</div></details>
@@ -327,8 +330,13 @@
         <label class="ea-switch"><input type="checkbox" id="ea_labels" ${EA.draft.labels === false ? '' : 'checked'}> Label each email with its category
           <small>(a tag in Thunderbird; most webmails don't show tags)</small></label>
         <label>Newsletters &amp; notifications <small>— real emails and meeting invites always stay in the Inbox</small>
-          <select id="ea_folders"><option value="automated" ${EA.draft.folders !== 'off' ? 'selected' : ''}>Move to the folder “Lisa / Automated” (recommended)</option>
+          <select id="ea_folders"><option value="automated" ${EA.draft.folders !== 'off' ? 'selected' : ''}>Move to the folder “Lisa / ${esc(EA.draft.auto_folder_name || 'Automated')}” (recommended)</option>
             <option value="off" ${EA.draft.folders === 'off' ? 'selected' : ''}>Leave them in the Inbox</option></select></label>
+        <div class="ea-grid2">
+          <label>Newsletter folder name<input id="ea_auto_folder_name" value="${esc(EA.draft.auto_folder_name || '')}" placeholder="Automated"></label>
+          <label>Move newsletters on to the Archive after <small>days, 0 = never</small><input id="ea_auto_archive_days" inputmode="numeric" value="${esc(EA.draft.auto_archive_days ?? 30)}"></label>
+          <label>Folder for invoices still to pay <small>— your own folder, e.g. INBOX.Zahlung offen; empty = off</small><input id="ea_invoice_folder" value="${esc(EA.draft.invoice_folder || '')}" placeholder="empty = invoices stay in the Inbox"></label>
+        </div>
         <label>Chat messages (Telegram)<select id="ea_notify">
           <option value="actionable" ${EA.draft.notify !== 'all' && EA.draft.notify !== 'off' ? 'selected' : ''}>Only when I need to act (recommended)</option>
           <option value="all" ${EA.draft.notify === 'all' ? 'selected' : ''}>Every processed email</option>
@@ -356,6 +364,9 @@
     if (el('ea_drafts')) EA.draft.drafts = el('ea_drafts').checked;
     if (el('ea_labels')) EA.draft.labels = el('ea_labels').checked;
     if (el('ea_folders')) EA.draft.folders = el('ea_folders').value;
+    if (el('ea_auto_folder_name')) EA.draft.auto_folder_name = el('ea_auto_folder_name').value.trim();
+    if (el('ea_auto_archive_days')) EA.draft.auto_archive_days = el('ea_auto_archive_days').value.trim();
+    if (el('ea_invoice_folder')) EA.draft.invoice_folder = el('ea_invoice_folder').value.trim();
     if (el('ea_notify')) EA.draft.notify = el('ea_notify').value;
     if (el('ea_daily_at')) EA.draft.daily_at = el('ea_daily_at').value;
     if (el('ea_review')) EA.draft.review_every_days = Number(el('ea_review').value);

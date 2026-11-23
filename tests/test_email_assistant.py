@@ -311,3 +311,16 @@ def test_category_folder_switch_is_saved_only_when_true(home):
     cats = {"customer": {"tone": "x", "folder": True}, "admin": {"tone": "y", "folder": "yes"}}
     out = ea.validate_config(good_config(categories=cats, rules=[]))["categories"]
     assert out["customer"]["folder"] is True and "folder" not in out["admin"]
+
+
+def test_folder_settings_survive_a_save_and_are_validated(home):
+    cats = {"applicant": {"tone": "x", "folder": True, "folder_name": "Bewerbungen"}}
+    out = ea.validate_config(good_config(categories=cats, rules=[], auto_folder_name="Newsletter",
+                                         auto_archive_days="30", invoice_folder="INBOX.Zahlung offen"))
+    assert out["categories"]["applicant"]["folder_name"] == "Bewerbungen" and out["auto_folder_name"] == "Newsletter"
+    assert out["auto_archive_days"] == 30 and out["invoice_folder"] == "INBOX.Zahlung offen"
+    assert ea.validate_config(good_config())["auto_folder_name"] == "Automated"
+    for bad in ({"auto_folder_name": "Büro"}, {"auto_archive_days": 999}, {"invoice_folder": 'INBOX" DELETE'},
+                {"categories": {"a": {"folder_name": "../x"}}}):
+        with pytest.raises(ValueError):
+            ea.validate_config(good_config(rules=[], **bad))
