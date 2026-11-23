@@ -141,7 +141,7 @@
 
   function ownerForm(full) {
     const d = EA.draft;
-    const fromMailbox = !full && (EA.data.mailbox || {}).connected;  // wizard: the address is the connected mailbox
+    const fromMailbox = !full;  // wizard: the address is the one connected above (Continue needs a connected mailbox)
     return `
       <div class="ea-grid2">
         ${fromMailbox ? '' : `<label>Mailbox address<input id="ea_address" type="email" value="${esc(d.address)}" placeholder="name@company.com"></label>`}
