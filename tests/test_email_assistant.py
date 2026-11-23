@@ -147,7 +147,7 @@ def test_cron_status_is_read_from_jobs_json(home):
 
 FAKE_HIMALAYA = """#!/usr/bin/env python3
 import json, os, sys
-if os.environ.get("EMAIL_ASSISTANT_IMAP_PASSWORD") != "right":
+if "right" not in [v for k, v in os.environ.items() if k.startswith("EMAIL_ASSISTANT_IMAP_PASSWORD")]:
     print("Error: IMAP authentication failed: invalid credentials", file=sys.stderr); sys.exit(1)
 if sys.argv[-3:-1] == ["mailbox", "list"]:  # not the account name "mailbox" in -a
     print(json.dumps({"mailboxes": [{"name": "INBOX"}, {"name": "INBOX.Drafts"}, {"name": "INBOX.Sent Messages"},
@@ -324,3 +324,34 @@ def test_folder_settings_survive_a_save_and_are_validated(home):
                 {"categories": {"a": {"folder_name": "../x"}}}):
         with pytest.raises(ValueError):
             ea.validate_config(good_config(rules=[], **bad))
+
+
+def test_a_second_mailbox_lives_beside_the_main_one(mailhome):
+    home, env_writes = mailhome
+    ea.connect_imap({"host": "mail.agenturserver.de", "user": "alex@matika.at", "password": "right"})
+    st = ea.connect_imap({"host": "mail.agenturserver.de", "user": "jobs@matika.at", "password": "right", "box": "new"})
+    assert st["box"] == "jobs" and [b["address"] for b in st["boxes"]] == ["alex@matika.at", "jobs@matika.at"]
+    cfg = json.loads((home / "workspace/email-assistant/boxes/jobs/config.json").read_text())
+    assert cfg["himalaya_config"] == "himalaya/email-assistant-jobs.toml" and cfg["address"] == "jobs@matika.at"
+    assert cfg["drafts"] is False and cfg["notify"] == "off"  # a new extra mailbox starts quiet
+    assert 'printenv EMAIL_ASSISTANT_IMAP_PASSWORD_JOBS' in (home / "himalaya/email-assistant-jobs.toml").read_text()
+    assert env_writes == {ea.PASS_ENV: "right", ea.PASS_ENV + "_JOBS": "right"}
+    main = json.loads((home / "workspace/email-assistant/config.json").read_text())
+    assert main["address"] == "alex@matika.at" and main["himalaya_config"] == ea.MAILBOX_TOML  # untouched
+    # connecting the same address again reuses the box
+    assert ea.connect_imap({"host": "mail.agenturserver.de", "user": "jobs@matika.at", "password": "right",
+                            "box": "new"})["box"] == "jobs"
+
+
+def test_mailbox_actions_work_on_the_chosen_mailbox_only(mailhome):
+    home, _ = mailhome
+    ea.connect_imap({"host": "mail.example.com", "user": "jobs@matika.at", "password": "right", "box": "new"})
+    st = ea.connect_imap({"action": "save", "box": "jobs", "config": good_config(address="jobs@matika.at", rules=[])})
+    assert st["box"] == "jobs" and st["configured"] and st["config"]["address"] == "jobs@matika.at"
+    assert not (home / "workspace/email-assistant/config.json").exists()  # the main mailbox was not written
+    assert ea.connect_imap({"action": "get", "box": "jobs"})["config"]["address"] == "jobs@matika.at"
+    ea.connect_imap({"action": "learned", "box": "jobs", "category": "customer", "notes": "- short"})
+    assert "short" in (home / "workspace/email-assistant/boxes/jobs/learned.md").read_text()
+    for bad in ({"action": "get", "box": "nope"}, {"action": "get", "box": "../x"}, {"action": "rm", "box": "jobs"}):
+        with pytest.raises(ValueError):
+            ea.connect_imap(bad)

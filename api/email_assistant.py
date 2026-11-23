@@ -57,8 +57,39 @@ PRESETS: dict[str, dict[str, Any]] = {
 }
 
 
-def _dir() -> Path:
-    return get_active_hermes_home() / "workspace" / "email-assistant"
+BOX_RE = re.compile(r"^[a-z][a-z0-9-]{0,30}$")  # an extra mailbox: workspace/email-assistant/boxes/<id>/ (cron job)
+
+
+def _box(value: Any) -> str | None:
+    """None = the person's main mailbox; else the id of one of their extra mailboxes (e.g. "jobs")."""
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or not BOX_RE.match(value):
+        raise ValueError("mailbox: unknown")
+    return value
+
+
+def _dir(box: str | None = None) -> Path:
+    base = get_active_hermes_home() / "workspace" / "email-assistant"
+    return base / "boxes" / box if box else base
+
+
+def _box_files(box: str | None) -> tuple[str, str]:
+    """(himalaya config relative to the profile, .env variable holding the password) of a mailbox."""
+    if not box:
+        return MAILBOX_TOML, PASS_ENV
+    return f"himalaya/email-assistant-{box}.toml", f"{PASS_ENV}_{box.upper().replace('-', '_')}"
+
+
+def list_boxes() -> list[dict[str, Any]]:
+    main = _read_json(_dir() / "config.json", {})
+    out = [{"id": None, "address": (main or {}).get("address", "") if isinstance(main, dict) else ""}]
+    root = _dir() / "boxes"
+    for cfg_path in sorted(root.glob("*/config.json")) if root.is_dir() else []:
+        if BOX_RE.match(cfg_path.parent.name):
+            cfg = _read_json(cfg_path, {})
+            out.append({"id": cfg_path.parent.name, "address": cfg.get("address", "") if isinstance(cfg, dict) else ""})
+    return out
 
 
 def _read_json(path: Path, default: Any) -> Any:
@@ -124,8 +155,8 @@ def _cron_job(home: Path) -> dict[str, Any] | None:
             "last_run_at": job.get("last_run_at"), "last_status": job.get("last_status")}
 
 
-def get_email_assistant() -> dict[str, Any]:
-    d = _dir()
+def get_email_assistant(box: str | None = None) -> dict[str, Any]:
+    d = _dir(box)
     cfg = _read_json(d / "config.json", None)
     public_cfg = {k: v for k, v in (cfg or {}).items() if k not in LOCKED_KEYS}
     return {
@@ -137,6 +168,8 @@ def get_email_assistant() -> dict[str, Any]:
         "proposals": _read_json(d / "proposals.json", {}),
         "cron": _cron_job(get_active_hermes_home()),
         "mailbox": _mailbox_status(cfg if isinstance(cfg, dict) else {}),
+        "box": box,
+        "boxes": list_boxes(),
     }
 
 
@@ -153,9 +186,9 @@ def _toml_str(value: str) -> str:
     return json.dumps(value)  # a JSON string is a valid TOML basic string (validated input has no control chars)
 
 
-def _mailbox_toml(host: str, port: int, user: str, name: str, folders: dict[str, str]) -> str:
+def _mailbox_toml(host: str, port: int, user: str, name: str, folders: dict[str, str], pass_env: str = PASS_ENV) -> str:
     return "\n".join([
-        f"# Written by the WebUI Email setup. The password is {PASS_ENV} in the profile .env, never in this file.",
+        f"# Written by the WebUI Email setup. The password is {pass_env} in the profile .env, never in this file.",
         f"[accounts.{ACCOUNT}]",
         "default = true",
         f"email = {_toml_str(user)}",
@@ -166,7 +199,7 @@ def _mailbox_toml(host: str, port: int, user: str, name: str, folders: dict[str,
         f"mailbox.alias.trash = {_toml_str(folders.get('trash', 'Trash'))}",
         f"imap.server = {_toml_str(f'imaps://{host}:{port}')}",
         f"imap.sasl.plain.username = {_toml_str(user)}",
-        f'imap.sasl.plain.password.command = "printenv {PASS_ENV}"',
+        f'imap.sasl.plain.password.command = "printenv {pass_env}"',
         "",
     ])
 
@@ -184,11 +217,12 @@ def _profile_env(home: Path) -> dict[str, str]:
     return out
 
 
-def _himalaya(home: Path, toml: Path, password: str | None, args: list[str], account: str | None = ACCOUNT) -> str:
+def _himalaya(home: Path, toml: Path, password: str | None, args: list[str], account: str | None = ACCOUNT,
+              pass_env: str = PASS_ENV) -> str:
     binary = home / "bin" / "himalaya"
     if not binary.is_file():
         raise ValueError("The mail tool (himalaya) is not installed in this profile yet — ask your admin.")
-    env = {**os.environ, **_profile_env(home), **({PASS_ENV: password} if password is not None else {})}
+    env = {**os.environ, **_profile_env(home), **({pass_env: password} if password is not None else {})}
     try:
         r = subprocess.run([str(binary), "-c", str(toml), *(["-a", account] if account else []), *args],
                            capture_output=True, text=True, timeout=45, env=env, check=False)
@@ -305,12 +339,31 @@ def connect_imap(data: Any) -> dict[str, Any]:
     the password goes only into the profile .env and is never returned. No SMTP: this feature never sends."""
     if not isinstance(data, dict):
         raise ValueError("mailbox data missing")
-    # Mailbox actions share this endpoint (routes.py lists it): {"action": "suggest"} proposes categories.
-    if data.get("action") == "suggest":
-        return suggest_categories()
+    # Mailbox actions share this endpoint (routes.py lists it and sits outside the hot-deployed files): {"action":
+    # "suggest"} proposes categories; get/save/proposal/learned with "box" work on one of the person's extra mailboxes.
+    action = data.get("action")
+    if action is not None:
+        box = _box(data.get("box"))
+        if box and not (_dir(box) / "config.json").is_file():
+            raise ValueError("mailbox: unknown")
+        if action == "suggest":
+            return suggest_categories(box)
+        if action == "get":
+            return get_email_assistant(box)
+        if action == "save":
+            return save_email_assistant_config(data.get("config"), box)
+        if action == "proposal":
+            return resolve_proposal(data.get("category"), data.get("decision"), data.get("notes"), box)
+        if action == "learned":
+            return save_learned_notes(data.get("category"), data.get("notes"), box)
+        raise ValueError("unknown mailbox action")
     user = _text(data.get("user"), "email", 200)
     if not EMAIL_RE.match(user):
         raise ValueError("email: the full mailbox address")
+    # "box": "new" adds another mailbox of this person (id from the address, e.g. jobs@ -> "jobs")
+    box = _new_box_id(user) if data.get("box") == "new" else _box(data.get("box"))
+    if box and data.get("box") != "new" and not (_dir(box) / "config.json").is_file():
+        raise ValueError("mailbox: unknown")
     host = _text(data.get("host"), "server", 253) or discover_imap(user)
     if not host:
         raise ValueError("Could not find the mail server for this address. Open “Server settings” and enter it "
@@ -326,35 +379,39 @@ def connect_imap(data: Any) -> dict[str, Any]:
     name = _text(data.get("name"), "name", 100)
 
     home = get_active_hermes_home()
-    toml = home / MAILBOX_TOML
+    toml_rel, pass_env = _box_files(box)
+    toml = home / toml_rel
     toml.parent.mkdir(parents=True, exist_ok=True)
     trial = toml.with_name(toml.name + ".test")
     try:  # test with a trial file: a failed attempt never replaces a working mailbox config
-        _atomic_write_text(trial, _mailbox_toml(host, port, user, name, {}))
-        listing = json.loads(_himalaya(home, trial, password, ["mailbox", "list", "--json"]) or "{}")
+        _atomic_write_text(trial, _mailbox_toml(host, port, user, name, {}, pass_env))
+        listing = json.loads(_himalaya(home, trial, password, ["mailbox", "list", "--json"], pass_env=pass_env) or "{}")
         folders = pick_folders([m.get("name") or m.get("id") or "" for m in listing.get("mailboxes", [])])
         if "drafts" not in folders:
             raise ValueError("Connected, but no Drafts folder was found in this mailbox.")
-        _atomic_write_text(trial, _mailbox_toml(host, port, user, name, folders))
-        _himalaya(home, trial, password, ["envelope", "list", "-m", "inbox", "-s", "1", "--json"])  # read-only probe
+        _atomic_write_text(trial, _mailbox_toml(host, port, user, name, folders, pass_env))
+        _himalaya(home, trial, password, ["envelope", "list", "-m", "inbox", "-s", "1", "--json"],
+                  pass_env=pass_env)  # read-only probe
     except Exception:
         trial.unlink(missing_ok=True)
         raise
     trial.replace(toml)
     _own(toml)
     from api.providers import _write_env_file  # shared, locked .env writer
-    _write_env_file(home / ".env", {PASS_ENV: password})
+    _write_env_file(home / ".env", {pass_env: password})
 
-    path = _dir() / "config.json"
+    path = _dir(box) / "config.json"
     cfg = _read_json(path, {})
     cfg = cfg if isinstance(cfg, dict) else {}
-    cfg.update({"account": ACCOUNT, "himalaya_config": MAILBOX_TOML, "address": user})
+    if box and not cfg:  # a new extra mailbox starts quiet: summary only, no chat message per mail
+        cfg.update({"drafts": False, "notify": "off"})
+    cfg.update({"account": ACCOUNT, "himalaya_config": toml_rel, "address": user})
     if name:
         cfg["name"] = name
     if not cfg.get("categories"):  # connected before the wizard finished: keep it a valid draft config
         cfg.setdefault("drafts", False)
     _write_json(path, cfg)
-    out = get_email_assistant()
+    out = get_email_assistant(box)
     out["connected_folders"] = folders
     out["connected_host"] = host
     return out
@@ -408,16 +465,32 @@ def clean_suggestions(raw: Any) -> dict[str, dict[str, Any]]:
     return out
 
 
-def suggest_categories() -> dict[str, Any]:
+def _new_box_id(user: str) -> str:
+    """jobs@matika.at -> "jobs"; the same address again -> its existing id; a clash -> "jobs-matika"."""
+    for b in list_boxes():
+        if b["id"] and b["address"].lower() == user.lower():
+            return b["id"]
+    local, _, domain = user.lower().partition("@")
+    base = re.sub(r"[^a-z0-9]+", "-", local).strip("-")
+    base = base if base[:1].isalpha() else "box-" + base
+    taken = {b["id"] for b in list_boxes()}
+    for cand in (base, f"{base}-{domain.split('.')[0]}"):
+        cand = cand[:31].strip("-")
+        if BOX_RE.match(cand) and cand not in taken:
+            return cand
+    raise ValueError("mailbox: could not name it; remove an old one first")
+
+
+def suggest_categories(box: str | None = None) -> dict[str, Any]:
     """Look at the senders and subjects of the last 60 inbox mails (no bodies) and propose categories for them."""
     home = get_active_hermes_home()
-    cfg = _read_json(_dir() / "config.json", {})
+    cfg = _read_json(_dir(box) / "config.json", {})
     cfg = cfg if isinstance(cfg, dict) else {}
     toml = home / str(cfg.get("himalaya_config") or "himalaya/config.toml")
     if not toml.is_file():
         raise ValueError("Connect your mailbox first.")
     listing = json.loads(_himalaya(home, toml, None, ["envelope", "list", "-m", "inbox", "-s", "60", "--json"],
-                                   account=cfg.get("account") or None) or "[]")
+                                   account=cfg.get("account") or None, pass_env=_box_files(box)[1]) or "[]")
     envs = listing.get("envelopes", []) if isinstance(listing, dict) else listing
     lines = []
     for e in envs if isinstance(envs, list) else []:
@@ -576,20 +649,20 @@ def validate_config(data: Any) -> dict[str, Any]:
     }
 
 
-def save_email_assistant_config(data: Any) -> dict[str, Any]:
+def save_email_assistant_config(data: Any, box: str | None = None) -> dict[str, Any]:
     clean = validate_config(data)
-    path = _dir() / "config.json"
+    path = _dir(box) / "config.json"
     old = _read_json(path, {})
     for key in LOCKED_KEYS:  # keep the server-side settings the browser may not change
         if isinstance(old, dict) and key in old:
             clean[key] = old[key]
     _write_json(path, clean)
-    return get_email_assistant()
+    return get_email_assistant(box)
 
 
-def resolve_proposal(category: Any, action: Any, notes: Any = None) -> dict[str, Any]:
+def resolve_proposal(category: Any, action: Any, notes: Any = None, box: str | None = None) -> dict[str, Any]:
     """approve: proposal (optionally edited) -> active notes in learned.md; reject: drop it."""
-    d = _dir()
+    d = _dir(box)
     props = _read_json(d / "proposals.json", {})
     category = str(category or "")
     if category not in props:
@@ -603,15 +676,15 @@ def resolve_proposal(category: Any, action: Any, notes: Any = None) -> dict[str,
         write_learned(d / "learned.md", learned)
     del props[category]
     _write_json(d / "proposals.json", props)
-    return get_email_assistant()
+    return get_email_assistant(box)
 
 
-def save_learned_notes(category: Any, notes: Any) -> dict[str, Any]:
+def save_learned_notes(category: Any, notes: Any, box: str | None = None) -> dict[str, Any]:
     """Edit or clear the active notes of one category (empty text = forget them)."""
     category = str(category or "")
     if not CATEGORY_RE.match(category):
         raise ValueError("invalid category")
-    d = _dir()
+    d = _dir(box)
     learned = read_learned(d / "learned.md")
     text = _text(notes, "notes", 1200)
     if text:
@@ -619,4 +692,4 @@ def save_learned_notes(category: Any, notes: Any) -> dict[str, Any]:
     else:
         learned.pop(category, None)
     write_learned(d / "learned.md", learned)
-    return get_email_assistant()
+    return get_email_assistant(box)

@@ -8,7 +8,8 @@
 (() => {
   if (window.EmailAssistant) return;
 
-  const EA = { data: null, draft: null, tab: 'status', step: 0 };
+  // box: null = the person's main mailbox; else the id of an extra mailbox (e.g. "jobs"). adding: "+ Add mailbox" wizard.
+  const EA = { data: null, draft: null, tab: 'status', step: 0, box: null, adding: false };
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const el = (id) => document.getElementById(id);
   const slug = (v) => String(v || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
@@ -37,8 +38,24 @@
     : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().filter((k) => v[k] !== '' && v[k] != null).map((k) => [k, canon(v[k])]))
       : typeof v === 'number' ? String(v) : v);
   const snap = () => JSON.stringify(canon(EA.draft));
+  // Extra mailboxes go through the mailbox-actions endpoint; the main one keeps its own routes.
+  const BOX_ACTION = { '/api/email-assistant/config': 'save', '/api/email-assistant/proposal': 'proposal',
+                       '/api/email-assistant/learned': 'learned' };
+  function call(path, payload, opts = {}) {
+    if (EA.box && BOX_ACTION[path]) {
+      const { action, ...rest } = payload || {};
+      payload = { ...rest, action: BOX_ACTION[path], box: EA.box, ...(action ? { decision: action } : {}) };
+      path = '/api/email-assistant/connect';
+    }
+    return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), ...opts });
+  }
+
   async function load() {
-    EA.data = await api('/api/email-assistant');
+    EA.data = EA.box ? await call('/api/email-assistant/connect', { action: 'get', box: EA.box })
+      : await api('/api/email-assistant');
+    if (EA.adding) {  // a blank wizard for the new mailbox; the list of mailboxes stays
+      EA.data = { ...EA.data, configured: false, config: {}, mailbox: { connected: false }, status: null, proposals: {}, learned: {}, cron: null };
+    }
     EA.draft = JSON.parse(JSON.stringify(EA.data.config || {}));
     EA.saved = snap();
     if (!EA.data.configured) {
@@ -50,7 +67,7 @@
 
   async function post(path, payload) {
     try {
-      EA.data = await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      EA.data = await call(path, payload);
       EA.draft = JSON.parse(JSON.stringify(EA.data.config || {}));
       EA.saved = snap();
       notice('Saved.', false);
@@ -310,7 +327,19 @@
         <span><b>Write drafts</b><br>Reply drafts go to your Drafts folder. You review and send.</span></label>`],
   ];
 
+  function renderBoxes() {
+    const boxes = (EA.data && EA.data.boxes) || [];
+    const row = el('eaBoxes');
+    if (!row) return;
+    if (!boxes.length || !boxes[0].address) { row.hidden = true; return; }  // main mailbox not set up yet
+    row.hidden = false;
+    row.innerHTML = boxes.map((b) => `<button class="ea-chip ${!EA.adding && (b.id || null) === EA.box ? 'is-active' : ''}" data-ea-box="${esc(b.id || '')}"
+        aria-pressed="${!EA.adding && (b.id || null) === EA.box}">${esc(b.address || b.id)}</button>`).join('')
+      + `<button class="ea-chip ${EA.adding ? 'is-active' : ''}" data-ea-box-add>+ Add mailbox</button>`;
+  }
+
   function render(keepNotice) {
+    renderBoxes();
     if (!keepNotice && el('eaNotice')) el('eaNotice').hidden = true;
     const body = el('eaBody');
     const head = el('eaTabs');
@@ -385,6 +414,15 @@
     if (ds.eaClose !== undefined) return close();
     collectCurrent();
     if (ds.eaTab) { EA.tab = ds.eaTab; return render(); }
+    if (ds.eaBox !== undefined || ds.eaBoxAdd !== undefined) {  // switch mailbox (unsaved edits ask first)
+      if (EA.data.configured && snap() !== EA.saved && !confirm('You have unsaved changes. Switch without saving?')) return;
+      EA.adding = ds.eaBoxAdd !== undefined;
+      EA.box = EA.adding ? null : (ds.eaBox || null);
+      EA.tab = 'status'; EA.suggestedFrom = null; EA.suggestTried = false; EA.checks = null; EA.reconnect = false;
+      el('eaBody').innerHTML = '<p class="ea-muted">Loading…</p>';
+      try { await load(); render(); } catch (err) { notice((err && err.message) || 'Could not load this mailbox.', true); }
+      return;
+    }
     if (ds.eaPause !== undefined) {
       if (ds.eaPause === '1' && !confirm('Pause the email assistant? Lisa stops reading this mailbox until you resume.')) return;
       if (await post('/api/email-assistant/config', { config: { ...(EA.data.config || {}), paused: ds.eaPause === '1' } })) render();
@@ -394,12 +432,15 @@
     if (ds.eaReconnectCancel !== undefined) { EA.reconnect = false; return render(); }
     if (ds.eaConnect !== undefined) {
       const payload = { user: el('ea_c_user').value.trim(), password: el('ea_c_pass').value,
-        host: el('ea_c_host').value.trim(), port: el('ea_c_port').value.trim(), name: (el('ea_name') && el('ea_name').value.trim()) || EA.draft.name || '' };
+        host: el('ea_c_host').value.trim(), port: el('ea_c_port').value.trim(), name: (el('ea_name') && el('ea_name').value.trim()) || EA.draft.name || '',
+        ...(EA.adding ? { box: 'new' } : EA.box ? { box: EA.box } : {}) };
       t.disabled = true; t.textContent = 'Testing…';
       try {
         const res = await api('/api/email-assistant/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeoutMs: 90000 });
         const keep = EA.draft;
         EA.data = res;
+        EA.box = res.box || null;
+        EA.adding = false;
         EA.draft = { ...keep, address: payload.user };
         EA.reconnect = false;
         render(true);
@@ -472,7 +513,7 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Lisa is looking at your inbox…'; }
     try {
       const res = await api('/api/email-assistant/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'suggest' }), timeoutMs: 120000 });
+        body: JSON.stringify({ action: 'suggest', ...(EA.box ? { box: EA.box } : {}) }), timeoutMs: 120000 });
       const old = EA.draft.categories || {};
       EA.draft.categories = res.categories;
       Object.keys(old).forEach((k) => { if (!res.categories[k]) EA.draft.rules = (EA.draft.rules || []).filter((r) => r.category !== k); });
@@ -497,6 +538,7 @@
     o.setAttribute('aria-labelledby', 'eaTitle');
     o.innerHTML = `<div class="ea-dialog">
         <div class="ea-head"><h2 id="eaTitle">Email drafts</h2><button class="ea-link" data-ea-close aria-label="Close">✕</button></div>
+        <div class="ea-boxes" id="eaBoxes" role="group" aria-label="Mailboxes" hidden></div>
         <nav class="ea-tabs" id="eaTabs" role="tablist"></nav>
         <div class="ea-notice" id="eaNotice" role="status" aria-live="polite" hidden></div>
         <div class="ea-body" id="eaBody"></div>
