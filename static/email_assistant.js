@@ -84,6 +84,7 @@
       const c = {};
       FIELDS.forEach(([f]) => { const i = card.querySelector(`[data-f="${f}"]`); if (i && i.value.trim()) c[f] = i.value.trim(); });
       if (!card.querySelector('[data-f="draft"]').checked) c.draft = false;
+      if (card.querySelector('[data-f="folder"]').checked) c.folder = true;
       EA.draft.categories[name] = c;
       if (card.open) EA.openCats.add(name); else EA.openCats.delete(name);
     });
@@ -183,11 +184,13 @@
         <summary class="ea-cat-sum">
           <strong>${esc(name)}</strong>
           <span class="ea-muted ea-cat-desc">${esc(c.description || 'no description yet — open to set it up')}</span>
-          <span class="ea-pill ${c.draft === false ? '' : 'is-on'}">${c.draft === false ? 'no drafts' : 'drafts on'}</span>
+          ${c.folder ? '<span class="ea-pill">📁 folder</span>' : ''}<span class="ea-pill ${c.draft === false ? '' : 'is-on'}">${c.draft === false ? 'no drafts' : 'drafts on'}</span>
         </summary>
         <div class="ea-cat-body">
           <label class="ea-switch"><input type="checkbox" data-f="draft" ${c.draft === false ? '' : 'checked'}>
             Write reply drafts for these emails <small>(off = Lisa only sorts and lists them)</small></label>
+          <label class="ea-switch"><input type="checkbox" data-f="folder" ${c.folder ? 'checked' : ''}>
+            Move these emails to the folder “Lisa / ${esc(name.charAt(0).toUpperCase() + name.slice(1))}” <small>(visible in every mail app and webmail; off = they stay in the Inbox)</small></label>
           <div class="ea-grid2">${FIELDS.slice(0, BASIC).map((fd) => fieldInput(fd, c)).join('')}</div>
           <details class="ea-more" ${more ? 'open' : ''}><summary>More options</summary>
             <div class="ea-grid2">${FIELDS.slice(BASIC).map((fd) => fieldInput(fd, c)).join('')}</div></details>

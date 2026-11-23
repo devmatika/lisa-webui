@@ -471,6 +471,8 @@ def validate_config(data: Any) -> dict[str, Any]:
             clean["max_words"] = words
         if card.get("draft") is False:
             clean["draft"] = False
+        if card.get("folder") is True:  # the cron job moves these mails to the folder Lisa/<Name>
+            clean["folder"] = True
         cats[name] = clean
     rules = []
     for r in data.get("rules") or []:

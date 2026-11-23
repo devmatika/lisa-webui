@@ -305,3 +305,9 @@ def test_newsletter_folder_default_on_and_can_be_switched_off(home):
     assert ea.validate_config(good_config())["folders"] == "automated"
     assert ea.validate_config({**good_config(), "folders": "off"})["folders"] == "off"
     assert ea.validate_config({**good_config(), "folders": "INBOX; DROP"})["folders"] == "automated"
+
+
+def test_category_folder_switch_is_saved_only_when_true(home):
+    cats = {"customer": {"tone": "x", "folder": True}, "admin": {"tone": "y", "folder": "yes"}}
+    out = ea.validate_config(good_config(categories=cats, rules=[]))["categories"]
+    assert out["customer"]["folder"] is True and "folder" not in out["admin"]
