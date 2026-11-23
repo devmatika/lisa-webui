@@ -399,6 +399,7 @@ def connect_imap(data: Any) -> dict[str, Any]:
     _own(toml)
     from api.providers import _write_env_file  # shared, locked .env writer
     _write_env_file(home / ".env", {pass_env: password})
+    _own(home / ".env", 0o600)  # the WebUI runs as root: give .env back to the profile owner, or the cron job can't read it
 
     path = _dir(box) / "config.json"
     cfg = _read_json(path, {})

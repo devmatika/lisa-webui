@@ -355,3 +355,10 @@ def test_mailbox_actions_work_on_the_chosen_mailbox_only(mailhome):
     for bad in ({"action": "get", "box": "nope"}, {"action": "get", "box": "../x"}, {"action": "rm", "box": "jobs"}):
         with pytest.raises(ValueError):
             ea.connect_imap(bad)
+
+
+def test_env_file_goes_back_to_the_profile_owner_after_connect(mailhome, monkeypatch):
+    owned = []
+    monkeypatch.setattr(ea, "_own", lambda path, mode=0o644: owned.append((path.name, mode)))
+    ea.connect_imap({"host": "mail.example.com", "user": "a@b.at", "password": "right"})
+    assert (".env", 0o600) in owned  # seen live: root-owned .env broke the cron job's password lookup
