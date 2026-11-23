@@ -19,7 +19,9 @@ EXACT = {
     "/api/default-model": "operator.settings",
     "/api/admin/reload": "operator.system",
     "/api/auth/logout": ANY_USER,
-    "/api/settings": "operator.settings",
+    # Bound to the user's own profile: appearance / composer footer / personal prefs.
+    # Operator-only surfaces (providers, MCP, gateway) stay on their own routes.
+    "/api/settings": "chat.use",
     "/api/health/detailed": "operator.system",
     "/api/health": ANY_USER,
     "/api/profiles": ANY_USER,

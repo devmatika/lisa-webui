@@ -79,10 +79,29 @@ class HttpRunnerClient:
     def cancel_run(self, run_id: str) -> dict[str, Any]:
         return self._post(f"/v1/runs/{urllib.parse.quote(str(run_id), safe='')}/cancel", {})
 
-    def respond_approval(self, run_id: str, approval_id: str, choice: str) -> dict[str, Any]:
+    def respond_approval(
+        self,
+        run_id: str,
+        approval_id: str,
+        choice: str,
+        *,
+        request_id: str | None = None,
+        execution_generation: int | None = None,
+    ) -> dict[str, Any]:
+        # Session-authority gateways require an exact body; legacy runs accept
+        # choice (+ optional approval_id). Never mix the two shapes.
+        rid = str(request_id or "").strip()
+        if rid and isinstance(execution_generation, int):
+            body: dict[str, Any] = {
+                "request_id": rid,
+                "execution_generation": execution_generation,
+                "choice": choice,
+            }
+        else:
+            body = {"choice": choice, "approval_id": approval_id}
         return self._post(
             f"/v1/runs/{urllib.parse.quote(str(run_id), safe='')}/approval",
-            {"choice": choice, "approval_id": approval_id},
+            body,
         )
 
     def respond_clarify(self, run_id: str, clarify_id: str, response: str) -> dict[str, Any]:

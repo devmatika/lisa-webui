@@ -31,7 +31,8 @@ SURFACES = ("cli", "telegram", "api_server")
 # 3 = Staff/Manager/Admin default Google + Outlook plugins after grant release;
 # 4 = companion approval plugins + copy approvals/persona from the organisation template.
 # 5 = seed SOUL/MEMORY/skills from the company profile (LISA_COMPANY_PROFILE, default matika).
-PROFILE_LAYOUT = 5
+# 6 = Google Calendar/Docs/Sheets create capabilities with integration.google (Drive upload still drive_write).
+PROFILE_LAYOUT = 6
 FRONT_DESK = "front-desk"
 PLUGIN_SOURCE = Path("/opt/lisa/plugins")  # mounted read-only by the Lisa stack
 REQUIRED_PLUGINS = ("org-authz",)
@@ -51,14 +52,28 @@ APPROVAL_COMPANIONS = {
 ALL_APPROVAL_PLUGINS = frozenset({"business-action-approval", "clickup-approval"})
 # Role toolsets that are provided by Lisa plugins rather than Hermes core.
 PLUGIN_TOOLSETS = {"knowledge": "lisa_knowledge"}
+# Runtime paths inside the Hermes gateway container. Shared Google client libs are the
+# company profile's .gws-venv, bind-mounted at /opt/lisa/gws-venv on the gateway.
 GOOGLE_SCRIPT = "/opt/hermes/skills/productivity/google-workspace/scripts/google_api.py"
+GOOGLE_PYTHON = "/opt/lisa/gws-venv/bin/python"
+# Company .env keys every assistant should inherit for shared skills (YouTube transcripts, research).
+SHARED_SKILL_ENV = (
+    "SUPADATA_API_KEY",  # YouTube / video transcripts
+    "SCRAPECREATORS_API_KEY",
+    "REDDIT_CLIENT_ID",
+    "REDDIT_CLIENT_SECRET",
+    "BRAVE_API_KEY",
+    "EXA_API_KEY",
+    "TAVILY_API_KEY",
+    "FIRECRAWL_API_KEY",
+)
 # Integration permission -> plugin, its toolset, the secrets it may receive, per-user settings.
 # A user only ever gets an integration's credentials when one of their roles grants it.
 INTEGRATIONS = {
     "integration.google": {"plugin": "google-workspace-tools", "toolset": "google_workspace_tools",
                            "env": (), "user_files": ("google_token.json",), "user_env": (),
-                           # shared Google libraries baked into the Lisa Hermes image; the token is the user's
-                           "settings": lambda email: {"python_path": "/opt/lisa/gws-venv/bin/python",
+                           # shared Google libraries on the company profile; the token is the user's
+                           "settings": lambda email: {"python_path": GOOGLE_PYTHON,
                                                       "script_path": GOOGLE_SCRIPT, "account_label": email}},
     # the company account (setup wizard) finds each user's own tasks by e-mail; a personal token wins
     "integration.clickup": {"plugin": "clickup-personal", "toolset": "clickup_personal",
@@ -150,11 +165,20 @@ def _surface_toolsets(toolsets: list[str], integrations: list[str]) -> list[str]
 
 
 def _google_plugin_settings(email: str, permissions) -> dict:
-    """Google plugin settings for this user: write/upload only when the role grants drive_write."""
+    """Google plugin settings for this user.
+
+    ``integration.google`` covers Calendar/Docs/Sheets/Drive browse plus approval-gated
+    creates. Drive *upload* stays behind ``integration.google.drive_write``.
+    """
     base = INTEGRATIONS["integration.google"]["settings"](email) or {}
     settings = dict(base)
     caps = dict(settings.get("capabilities") or {})
     caps["drive_read"] = True
+    caps["calendar_read"] = True
+    caps["calendar_create"] = True
+    caps["docs_read"] = True
+    caps["docs_create"] = True
+    caps["sheets_create"] = True
     caps["drive_upload"] = "integration.google.drive_write" in set(permissions or ())
     settings["capabilities"] = caps
     return settings
@@ -362,6 +386,12 @@ def _build(name: str, toolsets: list[str], *, owner: str, integrations: list[str
         env["PIPECAT_INTERNAL_TOKEN"] = company_env["PIPECAT_INTERNAL_TOKEN"]
     elif root_env.get("PIPECAT_INTERNAL_TOKEN") and not env.get("PIPECAT_INTERNAL_TOKEN"):
         env["PIPECAT_INTERNAL_TOKEN"] = root_env["PIPECAT_INTERNAL_TOKEN"]
+    # Shared skill credentials (YouTube/Reddit/search) from the company profile.
+    for key in SHARED_SKILL_ENV:
+        if company_env.get(key) and not env.get(key):
+            env[key] = company_env[key]
+        elif root_env.get(key) and not env.get(key):
+            env[key] = root_env[key]
     kept_files = {f for i in integrations for f in INTEGRATIONS[i]["user_files"]}
     for spec in INTEGRATIONS.values():
         for f in spec["user_files"]:

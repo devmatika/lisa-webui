@@ -420,6 +420,8 @@ def _settle_gateway_run_approval(
 
     run_id = str(approval_data.get("run_id") or "").strip()
     identity_v1 = bool(approval_data.get("_gateway_agent_identity_v1"))
+    request_id = str(approval_data.get("request_id") or "").strip() or None
+    generation = approval_data.get("execution_generation")
     with gateway_yolo_handoff(session_id):
         if _gateway_session_yolo_enabled(session_id):
             try:
@@ -428,6 +430,8 @@ def _settle_gateway_run_approval(
                     api_key,
                     run_id,
                     approval_data["approval_id"] if identity_v1 else "",
+                    request_id=request_id,
+                    execution_generation=generation if isinstance(generation, int) else None,
                 )
                 return True, None, 0
             except Exception:
@@ -447,6 +451,9 @@ def _auto_approve_gateway_run(
     api_key: str,
     run_id: str,
     approval_id: str,
+    *,
+    request_id: str | None = None,
+    execution_generation: int | None = None,
 ) -> None:
     """Resolve one Runs API prompt using only the shipped approval contract.
 
@@ -463,6 +470,8 @@ def _auto_approve_gateway_run(
         run_id,
         approval_id,
         "once",
+        request_id=request_id,
+        execution_generation=execution_generation,
     )
 
 
@@ -605,10 +614,14 @@ def _gateway_runs_approval_event(payload: dict) -> dict | None:
     pattern_key = str(payload.get("pattern_key") or "").strip()
     args = payload.get("args") if isinstance(payload.get("args"), (list, dict)) else []
     run_id = str(payload.get("run_id") or "").strip()
+    # Authority prompts use prompt_id; legacy runs use approval_id/id. request_id
+    # is the value POST /v1/runs/{id}/approval must echo under session authority.
+    request_id = str(payload.get("request_id") or payload.get("prompt_id") or "").strip()
     raw_approval_id = str(payload.get("approval_id") or payload.get("id") or "").strip()
-    approval_id = raw_approval_id
+    approval_id = raw_approval_id or request_id
     if not approval_id:
         approval_id = uuid.uuid4().hex
+    generation = payload.get("execution_generation")
     risk = str(payload.get("risk_level") or "high").strip()
     choices = payload.get("choices") if isinstance(payload.get("choices"), list) else []
     allow_permanent = payload.get("allow_permanent")
@@ -616,7 +629,7 @@ def _gateway_runs_approval_event(payload: dict) -> dict | None:
         allow_permanent = "always" in choices
     if not (tool or command or description):
         return None
-    return {
+    mapped = {
         "tool": tool,
         "command": command,
         "description": description,
@@ -626,16 +639,27 @@ def _gateway_runs_approval_event(payload: dict) -> dict | None:
         "risk_level": risk,
         "run_id": run_id,
         "approval_id": approval_id,
-        "_gateway_raw_approval_id_present": bool(raw_approval_id),
+        "_gateway_raw_approval_id_present": bool(raw_approval_id or request_id),
         "choices": choices,
         "allow_permanent": bool(allow_permanent),
     }
+    if request_id:
+        mapped["request_id"] = request_id
+    if isinstance(generation, int):
+        mapped["execution_generation"] = generation
+    return mapped
 
 
 def _gateway_approval_key(payload) -> str:
     """Stable id for one gateway approval, shared by the status probe and the event relay."""
-    return str(payload.get("approval_id") or payload.get("id") or payload.get("timestamp") or "")
-
+    return str(
+        payload.get("approval_id")
+        or payload.get("id")
+        or payload.get("request_id")
+        or payload.get("prompt_id")
+        or payload.get("timestamp")
+        or ""
+    )
 
 def _relay_gateway_run_approval(session_id, run_id, payload, base_url, api_key, *, put_gateway_event) -> bool:
     """Auto-approve or surface one runs-API approval request as a WebUI approval card.

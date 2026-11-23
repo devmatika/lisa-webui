@@ -561,6 +561,58 @@ def test_gateway_approval_event_translation():
     assert _gateway_runs_approval_event({}) is None
 
 
+def test_gateway_approval_event_maps_authority_prompt_fields():
+    """Session-authority approval.request uses prompt_id + execution_generation."""
+    from api.gateway_chat import _gateway_approval_key, _gateway_runs_approval_event
+    from api.runner_client import HttpRunnerClient
+
+    payload = {
+        "event": "approval.request",
+        "kind": "approval",
+        "prompt_id": "prompt-abc",
+        "execution_generation": 3,
+        "command": "clickup_create_task",
+        "description": "Create task in project",
+        "choices": ["once", "session", "always", "deny"],
+        "run_id": "run-auth-1",
+    }
+    mapped = _gateway_runs_approval_event(payload)
+    assert mapped is not None
+    assert mapped["request_id"] == "prompt-abc"
+    assert mapped["approval_id"] == "prompt-abc"
+    assert mapped["execution_generation"] == 3
+    assert mapped["_gateway_raw_approval_id_present"] is True
+    assert _gateway_approval_key(payload) == "prompt-abc"
+
+    posted: list[dict] = []
+
+    def _capture(self, path, body):
+        posted.append({"path": path, "body": body})
+        return {"ok": True}
+
+    original = HttpRunnerClient._post
+    HttpRunnerClient._post = _capture  # type: ignore[method-assign]
+    try:
+        client = HttpRunnerClient(base_url="http://gateway.test")
+        client.respond_approval(
+            "run-auth-1",
+            "",
+            "once",
+            request_id="prompt-abc",
+            execution_generation=3,
+        )
+        client.respond_approval("run-legacy", "appr-1", "deny")
+    finally:
+        HttpRunnerClient._post = original  # type: ignore[method-assign]
+
+    assert posted[0]["body"] == {
+        "request_id": "prompt-abc",
+        "execution_generation": 3,
+        "choice": "once",
+    }
+    assert posted[1]["body"] == {"choice": "deny", "approval_id": "appr-1"}
+
+
 def test_gateway_runs_api_streaming_parses_real_run_events():
     """The runs-API bridge must parse the real gateway event payloads."""
     from api.config import STREAM_PARTIAL_TEXT, STREAM_REASONING_TEXT

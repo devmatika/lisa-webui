@@ -96,6 +96,8 @@ def test_provisioner_sets_drive_upload_only_with_drive_write():
                         permissions={"integration.google"})
     caps = off["plugins"]["entries"]["google-workspace-tools"]["settings"]["capabilities"]
     assert caps["drive_read"] is True and caps["drive_upload"] is False
+    assert caps["calendar_create"] is True and caps["docs_create"] is True
+    assert caps["sheets_create"] is True and caps["calendar_read"] is True
     on = render_config({}, ["memory"], "u-x", ["integration.google"], "a@x.com",
                        permissions={"integration.google", "integration.google.drive_write"})
     assert on["plugins"]["entries"]["google-workspace-tools"]["settings"]["capabilities"]["drive_upload"] is True

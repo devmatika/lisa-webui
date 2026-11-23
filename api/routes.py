@@ -32032,11 +32032,15 @@ def _relay_gateway_run_approval(
         yolo_transition = begin_session_yolo_transition(sid) if enable_yolo else None
         relay_error = None
         relay_succeeded = False
+        request_id = str(current_mirror.get("request_id") or "").strip() or None
+        generation = current_mirror.get("execution_generation")
         try:
             HttpRunnerClient(base_url=base_url, api_key=api_key).respond_approval(
                 run_id,
                 approval_id if identity_v1 else "",
                 choice,
+                request_id=request_id,
+                execution_generation=generation if isinstance(generation, int) else None,
             )
             relay_succeeded = True
         except (RunnerClientError, ValueError) as exc:

@@ -24,7 +24,7 @@ OPERATOR = _User(frozenset({"operator.terminal", "operator.settings", "operator.
 
 
 @pytest.mark.parametrize("method,path", [
-    ("POST", "/api/settings"), ("GET", "/api/terminal/output"), ("GET", "/api/escape/list"),
+    ("GET", "/api/terminal/output"), ("GET", "/api/escape/list"),
     ("POST", "/api/escape/authorize"), ("GET", "/api/mcp/servers"), ("GET", "/api/providers"),
     ("POST", "/api/profile/switch"), ("GET", "/api/git/status"), ("GET", "/api/kanban/boards"),
     ("GET", "/api/logs"), ("POST", "/api/default-model"), ("GET", "/api/never-heard-of-it"),
@@ -36,7 +36,8 @@ def test_staff_is_denied_operator_and_unknown_routes(method, path):
 
 @pytest.mark.parametrize("method,path", [
     ("GET", "/"), ("GET", "/api/sessions"), ("POST", "/api/chat/start"), ("GET", "/api/memory"),
-    ("GET", "/api/crons"), ("GET", "/api/file"), ("GET", "/api/settings"), ("GET", "/api/profiles"),
+    ("GET", "/api/crons"), ("GET", "/api/file"), ("GET", "/api/settings"), ("POST", "/api/settings"),
+    ("GET", "/api/profiles"),
     ("GET", "/api/profile/active"), ("POST", "/api/share/create"), ("POST", "/api/enterprise/logout"),
 ])
 def test_staff_keeps_chat_own_data_and_shell_reads(method, path):
@@ -46,7 +47,7 @@ def test_staff_keeps_chat_own_data_and_shell_reads(method, path):
 
 def test_operator_reaches_operator_routes():
     from api.enterprise.policy import allowed
-    assert allowed(OPERATOR, "GET", "/api/escape/list") and allowed(OPERATOR, "POST", "/api/settings")
+    assert allowed(OPERATOR, "GET", "/api/escape/list") and allowed(OPERATOR, "POST", "/api/default-model")
 
 
 @pytest.fixture()
