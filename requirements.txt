@@ -22,3 +22,4 @@ SQLAlchemy>=2.0,<3
 alembic>=1.13,<2
 psycopg[binary]>=3.2,<4
 argon2-cffi>=23.1,<26
+pypdf>=5,<7  # company knowledge: PDFs in the vault become searchable, answers name the page

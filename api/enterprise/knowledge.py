@@ -102,14 +102,23 @@ def _title(text: str, fallback: str) -> str:
     return fallback
 
 
-def _snippet_from_file(path: Path, query: str) -> tuple[str, str]:
-    """Title + snippet from the live mirror file only (never from an external ranker payload)."""
+def _snippet_from_file(path: Path, query: str) -> dict:
+    """Title, snippet and exact location (section heading + line) from the live mirror file only (never from an
+    external ranker payload). For a PDF (mirrored as ``<name>.pdf.md`` with one ``## Page N`` per page) the section
+    is the page, so an answer can cite "Offer.pdf, page 3" instead of just the file."""
     text = path.read_text(errors="replace")
     terms = [t for t in re.findall(r"\w{2,}", (query or "").lower())]
     low = text.lower()
     pos = min((low.find(t) for t in terms if t in low), default=0)
     snippet = text[max(0, pos - 120): pos + MAX_SNIPPET - 120].strip()
-    return _title(text, path.stem), snippet
+    line = text[:pos].count("\n") + 1
+    eol = text.find("\n", pos)
+    heads = re.findall(r"(?m)^#{1,6}\s+(.+?)\s*#*\s*$", text[:eol if eol >= 0 else len(text)])  # a hit in a heading is in it
+    title = _title(text, path.stem)
+    section = heads[-1].strip() if heads and heads[-1].strip() != title else ""
+    name = path.name[:-3] if path.name.endswith(".pdf.md") else title
+    cite = f"{name}, {section[:1].lower() + section[1:] if section.startswith('Page ') else section}" if section else name
+    return {"title": title, "snippet": snippet, "section": section, "line": line, "cite": cite}
 
 
 def _term_search(readable: list[str], query: str, limit: int) -> list[dict]:
@@ -123,8 +132,7 @@ def _term_search(readable: list[str], query: str, limit: int) -> list[dict]:
             score = sum(low.count(t) + 3 * name.count(t) for t in terms)
             if not score:
                 continue
-            title, snippet = _snippet_from_file(path, query)
-            hits.append({"path": rel, "area": area, "title": title, "snippet": snippet, "score": score})
+            hits.append({"path": rel, "area": area, **_snippet_from_file(path, query), "score": score})
     hits.sort(key=lambda h: -h["score"])
     return hits[:limit]
 
@@ -143,9 +151,7 @@ def _ranked_with_local_snippets(ranked: list[dict], query: str, readable: set[st
             continue
         if resolved_area != area or not path.is_file():
             continue
-        title, snippet = _snippet_from_file(path, query)
-        out.append({"path": rel, "area": area, "title": title, "snippet": snippet,
-                    "score": hit.get("score", 0)})
+        out.append({"path": rel, "area": area, **_snippet_from_file(path, query), "score": hit.get("score", 0)})
     return out
 
 

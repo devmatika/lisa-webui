@@ -271,3 +271,51 @@ def test_knowledge_only_notes_are_written_back_to_the_vault(ent):
     assert (repo / "03-Projects" / "Geniessmi Project--04a9b18f" / "Project.md").is_file()
     assert "Only in Knowledge" in (repo / "03-Projects" / "Geniessmi Project--04a9b18f" / "Project.md").read_text()
     assert (repo / "03-Projects" / "Geniessmi Project--04a9b18f" / "Knowledge" / "overview.md").is_file()
+
+
+def _two_page_pdf(page1: str, page2: str) -> bytes:
+    """A minimal real PDF with one line of text per page (no PDF library needed to write it)."""
+    objs = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>"]
+    for text in (page1, page2):
+        n = len(objs) + 1
+        stream = f"BT /F1 18 Tf 72 720 Td ({text}) Tj ET".encode()
+        objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {n + 1} 0 R "
+                    f"/Resources << /Font << /F1 7 0 R >> >> >>")
+        objs.append(f"<< /Length {len(stream)} >>\nstream\n{stream.decode()}\nendstream")
+    objs.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    out, offsets = b"%PDF-1.4\n", []
+    for i, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{body}\nendobj\n".encode()
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{o:010d} 00000 n \n".encode() for o in offsets)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    return out
+
+
+def test_pdfs_become_searchable_and_answers_name_the_page(ent):
+    pytest.importorskip("pypdf")
+    from api.enterprise import directory, knowledge, sources
+    edb, ids, repo = ent
+    (repo / "06-Company-Knowledge" / "Offer.pdf").write_bytes(_two_page_pdf("Welcome to MATIKA", "Total price 480 EUR"))
+    (repo / "06-Company-Knowledge" / "Policy.md").write_text("# Policy\n\n## Travel\n\nTrains first.\n\n## Laptops\n\nReturn laptops on the last day.\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "pdf")
+    folders = [{"folder": "06-Company-Knowledge", "include": True, "readers": ["staff", "manager"]}]
+    with edb.session() as db:
+        sid = sources.save_source(db, directory.Actor(ids["boss"]), source_id=None, name="v", url=f"file://{repo}",
+                                  branch="main", credential_id=None, folders=folders, write_back=False).id
+    sources.sync(sid)
+
+    def hit(q):
+        with edb.session() as db:
+            return knowledge.search(db, directory.get_user(db, ids["anna"]), q)["results"][0]
+    pdf = hit("480")
+    assert pdf["section"] == "Page 2" and pdf["cite"] == "Offer.pdf, page 2"
+    md = hit("laptops")
+    assert md["section"] == "Laptops" and md["cite"] == "Policy, Laptops" and md["line"] >= 7
+    copy = knowledge.vault_root() / pdf["path"]
+    before = copy.stat().st_mtime_ns
+    sources.sync(sid)  # unchanged PDF: not extracted again
+    assert copy.stat().st_mtime_ns == before

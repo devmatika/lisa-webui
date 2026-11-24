@@ -21,6 +21,7 @@ Secrets and clones live under ``<vault>/.sources/`` (a dot folder: never searcha
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -213,6 +214,41 @@ def _notes(base: Path):
             yield rel
 
 
+def _pdfs(base: Path):
+    """PDFs below ``base`` with the same rules as ``_notes``."""
+    root = base.resolve()
+    for p in sorted(base.rglob("*")):
+        if p.suffix.lower() != ".pdf":
+            continue
+        rel = p.relative_to(base)
+        if any(x.startswith(".") or x in _SKIPPED_DIRS for x in rel.parts) or p.is_symlink():
+            continue
+        if root in p.resolve().parents and p.is_file():
+            yield rel
+
+
+MAX_PDF_PAGES, MAX_PDF_CHARS = 200, 400_000
+
+
+def pdf_markdown(data: bytes, vault_path: str) -> str | None:
+    """A PDF as a searchable note: one ``## Page N`` section per page, so search results can name the page.
+    None when the PDF library is missing or the file has no extractable text (scans need OCR)."""
+    try:
+        import io
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(data))
+        pages = [(i + 1, (pg.extract_text() or "").strip()) for i, pg in enumerate(reader.pages[:MAX_PDF_PAGES])]
+    except Exception:  # no pypdf, encrypted or broken PDF: it simply stays unsearchable
+        return None
+    if not any(text for _, text in pages):
+        return None
+    name = Path(vault_path).name
+    body = "\n\n".join(f"## Page {n}\n\n{text}" for n, text in pages if text)[:MAX_PDF_CHARS]
+    digest = hashlib.sha1(data).hexdigest()
+    return (f"---\ntitle: {json.dumps(name)}\ntype: pdf\nsource: {json.dumps(vault_path)}\npdf_sha1: {digest}\n---\n\n"
+            f"# {name}\n\n{body}\n")
+
+
 def _area_key_for(folder: str) -> str:
     """'03-Projects' -> 'projects'; standard folders keep their stable Lisa area keys."""
     import hashlib
@@ -393,6 +429,20 @@ def _mirror(src: KnowledgeSource, repo: Path | None) -> int:
             if not target.is_file() or target.read_bytes() != data:
                 target.write_bytes(data)
             new.setdefault(area, []).append(rel.as_posix())
+        for rel in _pdfs(base) if folder else ():  # PDFs: a text copy "<name>.pdf.md", rebuilt only when the PDF changes
+            target = (dest / (rel.as_posix() + ".md")).resolve()
+            if dest not in target.parents:
+                continue
+            data = (base / rel).read_bytes()
+            if target.is_file() and f"pdf_sha1: {hashlib.sha1(data).hexdigest()}" in target.read_text(errors="replace")[:600]:
+                new.setdefault(area, []).append(rel.as_posix() + ".md")
+                continue
+            note = pdf_markdown(data, f"{folder}/{rel.as_posix()}")
+            if note is None:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(note)
+            new.setdefault(area, []).append(rel.as_posix() + ".md")
     for area, rels in old.items():
         keep = set(new.get(area, []))
         dest = _area_dir(area)
