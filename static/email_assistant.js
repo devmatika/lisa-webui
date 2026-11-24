@@ -370,7 +370,7 @@
         ${tile(m.drafts ?? '–', 'drafts written', 'Reply drafts Lisa saved')}
         ${tile(m.sent ?? '–', 'sent by you', 'Drafts you sent from your mailbox')}
         ${tile(m.acceptance != null ? m.acceptance + '%' : '–', 'used as is or edited', 'Sent drafts that were not rewritten')}
-        ${tile(duration(m.p95_s), 'until the draft is ready', 'Most drafts are ready within this time (95 %)')}
+        ${tile(duration(m.p95_s), 'until the draft is ready', 'Counted in working hours only (Lisa checks mail 6:00–21:00): 95 % of drafts are ready within this time')}
       </div>` : ''}
       ${sentNote ? `<span class="ea-muted">${sentNote}</span>` : ''}
       ${paused ? '<span class="ea-muted">Paused: Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.</span>' : ''}
