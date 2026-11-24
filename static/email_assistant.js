@@ -347,7 +347,7 @@
       : `<p><button class="sm-btn" data-ea-pause="1" title="Emergency stop: Lisa stops reading this mailbox immediately">⏸ Pause assistant</button></p>`;
     return `${autoReplyCard()}${overviewCard()}${pause}<p>${cronLine}</p>
       <p>Drafts: <b>${EA.draft.drafts ? 'ON' : 'OFF (shadow mode: summary only)'}</b>${s ? ` · ${esc(s.stats)}` : ''}</p>
-      <p class="ea-muted">Drafts appear in the <b>Drafts</b> folder of your mailbox, inside the original conversation. Review, edit and send them there — Lisa never sends.</p>
+      <p class="ea-muted">Drafts appear in the <b>Drafts</b> folder of your mailbox, inside the original conversation. Review, edit and send them there — ${(EA.data.auto_reply || {}).enabled ? 'the only email Lisa sends herself is the automatic thank-you above.' : 'Lisa never sends.'}</p>
       ${waitList}
       ${rows ? `<h4>Recent mail</h4><div class="ea-table"><table><thead><tr><th>When (UTC)</th><th>From</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
              : '<p class="ea-muted">No email processed yet.</p>'}`;
