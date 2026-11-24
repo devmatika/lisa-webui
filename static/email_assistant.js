@@ -458,7 +458,7 @@
     if (el('ea_notify')) EA.draft.notify = el('ea_notify').value;
     if (el('ea_daily_at')) EA.draft.daily_at = el('ea_daily_at').value;
     if (el('ea_review')) EA.draft.review_every_days = Number(el('ea_review').value);
-    if (el('ea_tasks_on')) EA.draft.tasks = { enabled: el('ea_tasks_on').checked, list_id: el('ea_tasks_list').value.trim(),
+    if (el('ea_tasks_on')) EA.draft.tasks = { ...(EA.draft.tasks || {}), enabled: el('ea_tasks_on').checked, list_id: el('ea_tasks_list').value.trim(),
       assignee: el('ea_tasks_user').value.trim(), min_priority: el('ea_tasks_prio').value };
     if (document.querySelector('[data-ea-cat]')) collectCategories();
     if (document.querySelector('[data-ea-rule]') || el('eaBody').querySelector('[data-ea-rule-add]')) collectRules();

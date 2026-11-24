@@ -670,6 +670,10 @@ def validate_config(data: Any) -> dict[str, Any]:
     tasks = {"enabled": t_in.get("enabled") is True, "list_id": str(t_in.get("list_id") or "").strip(),
              "assignee": str(t_in.get("assignee") or "").strip(),
              "min_priority": t_in.get("min_priority") if t_in.get("min_priority") in ("high", "normal") else "high"}
+    if t_in.get("max_age_days") not in (None, ""):  # only recent mail makes a task (a caught-up backlog never floods)
+        tasks["max_age_days"] = _int_range(t_in.get("max_age_days"), 0, 0, 365, "tasks: max age (days)")
+    if t_in.get("name_prefix"):
+        tasks["name_prefix"] = _text(t_in.get("name_prefix"), "tasks: name prefix", 30)
     if tasks["list_id"] and not tasks["list_id"].isdigit() or tasks["assignee"] and not tasks["assignee"].isdigit():
         raise ValueError("ClickUp list and user: the numeric IDs")
     if tasks["enabled"] and not tasks["list_id"]:

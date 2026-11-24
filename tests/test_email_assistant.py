@@ -404,3 +404,9 @@ def test_owner_can_switch_the_automatic_reply_but_change_nothing_else(home):
     (home / "workspace/email-assistant/config.json").write_text(json.dumps(good_config()))
     with pytest.raises(ValueError, match="no automatic reply"):
         ea.connect_imap({"action": "auto_reply", "enabled": True})
+
+
+def test_task_age_limit_and_prefix_survive_a_save(home):
+    out = ea.validate_config({**good_config(), "tasks": {"enabled": True, "list_id": "1", "max_age_days": 2,
+                                                         "name_prefix": "[jobs] "}})["tasks"]
+    assert out["max_age_days"] == 2 and out["name_prefix"] == "[jobs]"
