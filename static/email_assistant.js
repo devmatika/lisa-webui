@@ -268,6 +268,39 @@
       <button class="sm-btn" data-ea-rule-add>+ Rule</button>`;
   }
 
+  // The automatic thank-you (e.g. jobs@): read-only here, the text is approved and switched on by the admin.
+  function autoReplyCard() {
+    const ar = EA.data.auto_reply;
+    if (!ar) return '';
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const w = ar.send_window || {};
+    const dd = (w.days || []).length ? `${days[w.days[0]]}–${days[w.days[w.days.length - 1]]}` : 'every day';
+    const hh = (w.hours || []).length === 2 ? ` ${w.hours[0]}:00–${w.hours[1]}:00` : '';
+    const roleName = (r) => String(r || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bAi\b/g, 'AI');
+    const label = { en_late: 'English · older application', en: 'English · new application',
+                    de_late: 'German · older application', de: 'German · new application' };
+    const texts = Object.entries(ar.texts || {}).map(([k, t]) => `<div class="ea-auto-text"><span class="ea-muted">${esc(label[k] || k)}</span>
+        <pre>${esc(t.replace('{name}', 'Lea').replace('{role}', k.startsWith('de') ? 'als Vibe Coder' : 'the Vibe Coder role'))}</pre></div>`).join('');
+    const pool = ar.talent_pool || [];
+    return `<div class="ea-card ea-auto ${ar.enabled ? 'is-on' : ''}">
+        <div class="ea-auto-head"><span class="ea-dot" aria-hidden="true"></span><strong>Automatic thank-you</strong>
+          <span class="ea-pill ${ar.enabled ? 'is-on' : ''}">${ar.enabled ? 'On' : 'Off'}</span></div>
+        <p class="ea-muted">${ar.enabled
+          ? `Every new application gets a short, personal thank-you from you, in the applicant's language, as a reply in the same thread. Sent ${esc(dd)}${esc(hh)}, at most ${esc(ar.max_per_hour)} per hour.`
+          : 'Off — nothing is sent. It is switched on once you have approved the text below.'}</p>
+        <div class="ea-stats">
+          <div><b>${esc(ar.sent_total)}</b><span>thanked</span></div>
+          <div><b>${esc(ar.sent_today)}</b><span>today</span></div>
+          <div><b>${esc(pool.length)}</b><span>talent pool</span></div>
+        </div>
+        ${texts ? `<details class="ea-more"><summary>Preview the email</summary>${texts}</details>` : ''}
+        ${pool.length ? `<details class="ea-more"><summary>Talent pool — said “yes” (${pool.length})</summary>
+          <ul class="ea-pool">${pool.slice().reverse().map((p) => `<li><b>${esc(p.name || p.email)}</b>
+            <span class="ea-muted">${esc(roleName(p.role))} · ${esc(p.date)}</span></li>`).join('')}</ul></details>` : ''}
+        ${ar.retention_days ? `<span class="ea-muted">Applicants who don't reply “yes” are deleted after ${esc(Math.round(ar.retention_days / 30.5))} months.</span>` : ''}
+      </div>`;
+  }
+
   function statusView() {
     const s = EA.data.status;
     const cron = EA.data.cron;
@@ -286,7 +319,7 @@
       ? `<div class="ea-card ea-paused"><strong>⏸ Assistant paused</strong> — Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.
           <div><button class="sm-btn" data-ea-pause="0">▶ Resume</button></div></div>`
       : `<p><button class="sm-btn" data-ea-pause="1" title="Emergency stop: Lisa stops reading this mailbox immediately">⏸ Pause assistant</button></p>`;
-    return `${pause}<p>${cronLine}</p>
+    return `${autoReplyCard()}${pause}<p>${cronLine}</p>
       <p>Drafts: <b>${EA.draft.drafts ? 'ON' : 'OFF (shadow mode: summary only)'}</b>${s ? ` · ${esc(s.stats)}` : ''}</p>
       <p class="ea-muted">Drafts appear in the <b>Drafts</b> folder of your mailbox, inside the original conversation. Review, edit and send them there — Lisa never sends.</p>
       ${waitList}

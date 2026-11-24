@@ -371,3 +371,20 @@ def test_auto_reply_is_server_only_and_survives_a_browser_save(home):
     st = ea.save_email_assistant_config({**good_config(), "auto_reply": {"enabled": True, "text": {"en": "EVIL"}}})
     assert "auto_reply" not in st["config"]  # not shown to the browser
     assert json.loads((d / "config.json").read_text())["auto_reply"]["text"]["en"] == "x"  # browser cannot change it
+
+
+def test_status_shows_the_automatic_thank_you_read_only(home):
+    d = home / "workspace/email-assistant/boxes/jobs"
+    d.mkdir(parents=True)
+    (d / "config.json").write_text(json.dumps({**good_config(address="jobs@matika.at"), "auto_reply": {
+        "enabled": True, "categories": ["vibe-coder"], "max_per_hour": 40, "retention_days": 214,
+        "send_window": {"days": [0, 1, 2, 3, 4], "hours": [9, 17]}, "skip": ["secret@x.com"],
+        "text": {"en": "Hey {name}"}}}))
+    import time
+    (d / "state.json").write_text(json.dumps({"auto_replied": {"a@x.com": 1, "b@x.com": int(time.time())}}))
+    (d / "talent_pool.csv").write_text('date,email,name,role\n"2026-11-24","b@x.com","Bea","vibe-coder"\n')
+    ar = ea.get_email_assistant("jobs")["auto_reply"]
+    assert ar["enabled"] and ar["sent_total"] == 2 and ar["sent_today"] == 1
+    assert ar["talent_pool"] == [{"date": "2026-11-24", "name": "Bea", "email": "b@x.com", "role": "vibe-coder"}]
+    assert ar["texts"] == {"en": "Hey {name}"} and "skip" not in ar  # the skip list stays on the server
+    assert ea.get_email_assistant()["auto_reply"] is None  # mailboxes without it show nothing

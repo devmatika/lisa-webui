@@ -171,6 +171,38 @@ def get_email_assistant(box: str | None = None) -> dict[str, Any]:
         "mailbox": _mailbox_status(cfg if isinstance(cfg, dict) else {}),
         "box": box,
         "boxes": list_boxes(),
+        "auto_reply": _auto_reply_status(cfg if isinstance(cfg, dict) else {}, d),
+    }
+
+
+def _auto_reply_status(cfg: dict[str, Any], d: Path) -> dict[str, Any] | None:
+    """Read-only picture of the automatic thank-you (the setting itself is server-only, see LOCKED_KEYS)."""
+    ar = cfg.get("auto_reply")
+    if not isinstance(ar, dict):
+        return None
+    state = _read_json(d / "state.json", {})
+    state = state if isinstance(state, dict) else {}
+    sent = state.get("auto_replied") or {}
+    import time as _t
+    day_start = _t.time() - (_t.time() % 86400)
+    pool = []
+    try:
+        import csv
+        with open(d / "talent_pool.csv", encoding="utf-8") as f:
+            pool = [{"date": r.get("date", ""), "name": r.get("name", ""), "email": r.get("email", ""),
+                     "role": r.get("role", "")} for r in csv.DictReader(f)]
+    except OSError:
+        pass
+    return {
+        "enabled": ar.get("enabled") is True,
+        "sent_total": len(sent),
+        "sent_today": sum(1 for t in sent.values() if isinstance(t, (int, float)) and t >= day_start),
+        "talent_pool": pool[-200:],
+        "send_window": ar.get("send_window"),
+        "max_per_hour": ar.get("max_per_hour", 40),
+        "retention_days": ar.get("retention_days"),
+        "texts": {k: v for k, v in (ar.get("text") or {}).items() if isinstance(v, str)},
+        "roles": ar.get("categories") or [],
     }
 
 
