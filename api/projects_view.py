@@ -21,7 +21,7 @@ import yaml
 from api.profiles import get_active_hermes_home
 
 API = "https://api.clickup.com/api/v2"
-CACHE_S = 120  # ClickUp is read at most every 2 minutes per person; "Refresh" skips the cache
+CACHE_S = 300  # ClickUp is read at most every 5 minutes per person; "Refresh" skips the cache
 _cache: dict[str, tuple[float, dict]] = {}
 _lock = threading.Lock()
 
@@ -67,7 +67,10 @@ def get_projects(refresh: bool = False, home: Path | None = None, get=None, chec
     home = home or get_active_hermes_home()
     pj = _projects_module()
     mine = [p for p in pj.load_map(home) if pj.may_see(p, _email(home))]
-    if check:
+    if check:  # the web app just opened: read ClickUp in the background so the page is ready when clicked
+        hit = _cache.get(str(home))
+        if mine and get is None and not (hit and time.time() - hit[0] < CACHE_S):
+            threading.Thread(target=get_projects, kwargs={"home": home}, daemon=True).start()
         return {"count": len(mine)}
     if not mine:
         return {"configured": bool(pj.load_map(home)), "projects": [], "areas": [], "archive": []}

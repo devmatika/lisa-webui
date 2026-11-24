@@ -47,6 +47,10 @@
       return;
     }
     if (d.error) { el('pjBody').innerHTML = `<p class="ea-notice ea-notice--error">${esc(d.error)}</p>`; return; }
+    if (!['projects', 'areas', 'archive'].some((k) => (d[k] || []).length)) {
+      el('pjBody').innerHTML = `<div class="ea-card"><strong>No projects shared with you yet</strong><p class="ea-muted">The project map decides who sees which project. Ask an admin to add you to the projects you work on.</p></div>`;
+      return;
+    }
     const rows = (d[PJ.tab] || []).filter(matches);
     const intro = {
       projects: 'Active client projects: what is late, open, who is responsible and when something last happened.',

@@ -30,14 +30,16 @@ def test_para_view_reads_only_the_lists_this_person_may_see(tmp_path, monkeypatc
 
     def get(path, params):
         read.append(path)
-        return {"tasks": [{"name": "Offer", "status": {"type": "open", "status": "to do"}}], "last_page": True}
+        if params.get("include_closed"):  # nothing closed this week
+            return {"tasks": [], "last_page": True}
+        return {"tasks": [{"id": "1", "name": "Offer", "status": {"type": "open", "status": "to do"}}], "last_page": True}
     out = pv.get_projects(home=home, get=get)
-    assert sorted(read) == ["/list/11/task", "/list/21/task"]  # never the archive, never "Secret"
+    assert sorted(set(read)) == ["/list/11/task", "/list/21/task"]  # never the archive, never "Secret"
     assert [p["project"] for p in out["projects"]] == ["Geniessmi"] and out["projects"][0]["without_owner"]["count"] == 1
     assert [p["project"] for p in out["areas"]] == ["Sales"]
     assert out["archive"] == [{"project": "Old shop", "owner": None, "lists": ["https://app.clickup.com/v/li/31"]}]
     pv.get_projects(home=home, get=get)
-    assert len(read) == 2  # cached for 2 minutes
+    assert len(read) == 4  # open + changed this week per list; then cached
     assert pv.get_projects(home=home, check=True) == {"count": 3}  # page button: no ClickUp call
 
 
