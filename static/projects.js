@@ -1,6 +1,6 @@
 /**
  * Projects page: the company's ClickUp projects sorted the PARA way (Projects / Areas / Archive), read live from
- * ClickUp through /api/clickup-projects (read-only; /api/projects is the chat folders). Editing stays in ClickUp: every task and list links there.
+ * ClickUp through /api/projects-clickup (read-only; /api/projects is the chat folders). Editing stays in ClickUp: every task and list links there.
  * Same look as Email drafts (email_assistant.css: ea-* classes) plus a few pj-* classes for the cards.
  */
 (() => {
@@ -71,7 +71,7 @@
   async function load(refresh) {
     el('pjBody').innerHTML = '<p class="ea-muted">Reading ClickUp…</p>';
     try {
-      PJ.data = await api('/api/clickup-projects' + (refresh ? '?refresh=1' : ''));
+      PJ.data = await api('/api/projects-clickup' + (refresh ? '?refresh=1' : ''));
       render();
     } catch (e) {
       el('pjBody').innerHTML = `<p class="ea-notice ea-notice--error">${esc((e && e.message) || 'Could not read ClickUp.')}</p>`;
@@ -120,7 +120,7 @@
   async function addRailButton() {
     if (el('pjRailBtn')) return;
     try {  // only people with projects in the company project map see the page
-      if (!((await api('/api/clickup-projects?check=1')) || {}).count) return;
+      if (!((await api('/api/projects-clickup?check=1')) || {}).count) return;
     } catch (_) { return; }
     if (el('pjRailBtn')) return;
     const settings = document.querySelector('.rail-btn[data-panel="settings"]');
