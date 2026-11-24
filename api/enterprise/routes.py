@@ -841,6 +841,14 @@ _a_draft = _agent(lambda db, u, b: {"ok": True, "draft_id": knowledge.submit_dra
 
 
 # (method, path) -> (handler, required permission or None for public / any signed-in user)
+def _projects_page(handler, _body):
+    """Projects page: the person's ClickUp projects in a PARA view (api/projects_view.py), read-only."""
+    from api.helpers import j
+    from api.projects_view import get_projects
+    q = handler._lisa_parsed.query or ""
+    return j(handler, get_projects(refresh="refresh=1" in q, check="check=1" in q))
+
+
 ROUTES = {
     ("GET", "/api/enterprise/setup/status"): (_setup_status, None),
     ("POST", "/api/enterprise/setup"): (_setup, None),
@@ -878,6 +886,7 @@ ROUTES = {
     ("POST", "/api/enterprise/google/drive/import"): (_drive_import, "integration.google"),
     ("POST", "/api/enterprise/google/drive/upload"): (_drive_upload, "integration.google.drive_write"),
     ("POST", "/api/enterprise/integrations/clickup"): (_clickup_token, "integration.clickup"),
+    ("GET", "/api/enterprise/projects"): (_projects_page, "integration.clickup"),
     ("GET", "/api/enterprise/telegram"): (_telegram_status, "chat.use"),
     ("POST", "/api/enterprise/telegram/link"): (_telegram_link, "chat.use"),
     ("POST", "/api/enterprise/telegram/unlink"): (_telegram_unlink, "chat.use"),

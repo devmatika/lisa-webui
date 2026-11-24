@@ -16860,11 +16860,6 @@ def handle_get(handler, parsed) -> bool:
         from api.email_assistant import get_email_assistant
         return j(handler, get_email_assistant())
 
-    if parsed.path == "/api/projects-clickup":  # Projects page: ClickUp PARA view, read-only (/api/projects = chat folders)
-        from api.projects_view import get_projects
-        q = parsed.query or ""
-        return j(handler, get_projects(refresh="refresh=1" in q, check="check=1" in q))
-
     if parsed.path == "/api/customer-wizard/status":
         from api.customer_wizard import get_customer_wizard_status
         from api.enterprise import enabled as _enterprise_on

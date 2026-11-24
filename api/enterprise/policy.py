@@ -37,9 +37,7 @@ PREFIXES = (
     ("/api/email-assistant", "integration.email"),
     ("/api/kanban", "kanban.use"),
     ("/api/file", "files.workspace"), ("/api/workspace", "files.workspace"), ("/api/notes", "files.workspace"),
-    ("/api/wiki", "files.workspace"), ("/api/projects", "files.workspace"),
-    # Projects page (ClickUp, read-only). Until this file is deployed, /api/projects above lets it through.
-    ("/api/projects-clickup", "integration.clickup"), ("/api/project-os", "files.workspace"),
+    ("/api/wiki", "files.workspace"), ("/api/projects", "files.workspace"), ("/api/project-os", "files.workspace"),
     ("/api/upload", "chat.use"), ("/api/session", "chat.use"), ("/api/sessions", "chat.use"),
     ("/sessions/", "chat.use"), ("/session/", "chat.use"), ("/api/chat", "chat.use"),
     ("/api/clarify", "chat.use"), ("/api/approval", "chat.use"),
