@@ -405,7 +405,7 @@
         <span class="ea-muted">Leaves the list as soon as you reply. Every morning this list also comes as a chat message.</span></div>`
       : (s ? '<p class="ea-muted">Nothing is waiting for your reply. ✅</p>' : '');
     const rows = (s && s.log ? [...s.log].reverse() : []).map((it) => `<tr><td>${esc(it.at)}</td><td>${esc(it.from)}</td>
-      <td>${esc(it.subject)}</td><td>${esc(it.category)}</td><td>${prio(it.priority)}</td><td>${esc(it.status)}${it.latency_s != null ? ` <span class="ea-muted">(${esc(it.latency_s)} s)</span>` : ''}</td></tr>`).join('');
+      <td>${esc(it.subject)}</td><td>${esc(it.category)}${it.why ? `<div class="ea-muted">${esc(it.why)}</div>` : ''}</td><td>${prio(it.priority)}</td><td>${esc(it.status)}${it.latency_s != null ? ` <span class="ea-muted">(${esc(it.latency_s)} s)</span>` : ''}${/^https:\/\//.test(it.task_url || '') ? ` <a href="${esc(it.task_url)}" target="_blank" rel="noopener">📌 task</a>` : ''}</td></tr>`).join('');
     const pause = EA.draft.paused
       ? `<div class="ea-card ea-paused"><strong>⏸ Assistant paused</strong> — Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.
           <div><button class="sm-btn" data-ea-pause="0">▶ Resume</button></div></div>`
