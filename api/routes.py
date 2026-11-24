@@ -16860,7 +16860,7 @@ def handle_get(handler, parsed) -> bool:
         from api.email_assistant import get_email_assistant
         return j(handler, get_email_assistant())
 
-    if parsed.path == "/api/projects":  # Projects page: ClickUp in a PARA view, read-only
+    if parsed.path == "/api/clickup-projects":  # Projects page: ClickUp in a PARA view, read-only (not /api/projects: chat folders)
         from api.projects_view import get_projects
         q = parsed.query or ""
         return j(handler, get_projects(refresh="refresh=1" in q, check="check=1" in q))
