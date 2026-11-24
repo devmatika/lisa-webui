@@ -155,3 +155,17 @@
 .ea-inv li:first-child{border-top:0}
 .ea-inv-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .ea-warn{display:block;font-size:12px;color:#c2410c;margin-top:2px}
+/* Projects page (static/projects.js) reuses the panel above; these are its cards. */
+.pj-filter{margin-left:auto;font:inherit;font-size:14px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;width:min(260px,40vw)}
+.pj-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.pj-card .ea-card-head strong{text-transform:none}
+.pj-open{margin-left:auto;font-size:13px}
+.pj-tiles{display:flex;gap:8px;flex-wrap:wrap}
+.pj-tile{flex:1 1 70px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;background:var(--bg)}
+.pj-tile b{font-size:20px;line-height:1.1}
+.pj-tile span{font-size:12px;color:var(--muted)}
+.pj-tile.is-bad b{color:var(--error,#c0392b)}
+.pj-tile.is-warn b{color:var(--warning,#b7791f)}
+.pj-tile.is-good b{color:var(--success,#2f855a)}
+.pj-list{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.pj-at{margin-right:auto;align-self:center}
