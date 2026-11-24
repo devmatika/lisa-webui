@@ -62,17 +62,23 @@
       body = rows.length ? `<ul class="pj-list">${rows.map((p) => `<li>${link((p.lists || [])[0], p.project)}${p.owner ? ` <span class="ea-muted">· ${esc(p.owner)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="ea-muted">Nothing here.</p>';
     } else {
       rows.sort((a, b) => ((b.late && b.late.count) || 0) - ((a.late && a.late.count) || 0));
-      body = rows.length ? `<div class="pj-cards">${rows.map((p) => card(p, PJ.tab === 'projects')).join('')}</div>` : '<p class="ea-muted">Nothing matches.</p>';
+      const sum = (f) => rows.reduce((n, p) => n + (f(p) || 0), 0);
+      const summary = `<div class="pj-summary">${tile(rows.length, PJ.tab === 'areas' ? 'areas' : 'projects')}
+        ${tile(sum((p) => p.late && p.late.count), 'late tasks', 'is-bad')}${tile(sum((p) => p.open), 'open tasks')}
+        ${tile(sum((p) => p.without_owner && p.without_owner.count), 'without owner', 'is-warn')}</div>`;
+      body = rows.length ? `${summary}<div class="pj-cards">${rows.map((p) => card(p, PJ.tab === 'projects')).join('')}</div>` : '<p class="ea-muted">Nothing matches.</p>';
     }
     el('pjBody').innerHTML = `<p class="ea-muted">${intro}</p>${body}`;
-    el('pjFoot').innerHTML = `<span class="ea-muted pj-at">Live from ClickUp${d.at ? `, read at ${esc(d.at)}` : ''}. Read-only: change things in ClickUp.</span><button class="sm-btn" type="button" data-pj-refresh>Refresh</button>`;
+    el('pjFoot').innerHTML = `<span class="ea-muted pj-at">From ClickUp${d.at ? `, read ${esc(d.at)}` : ''}${d.refreshing ? ' · updating in the background' : ''}. Read-only: change things in ClickUp.</span><button class="sm-btn" type="button" data-pj-refresh>Refresh</button>`;
   }
 
-  async function load(refresh) {
-    el('pjBody').innerHTML = '<p class="ea-muted">Reading ClickUp…</p>';
+  async function load(refresh, quiet) {
+    if (!quiet) el('pjBody').innerHTML = '<p class="ea-muted">Reading ClickUp…</p>';
     try {
       PJ.data = await api('/api/enterprise/projects' + (refresh ? '?refresh=1' : ''));
       render();
+      // a saved read came back while ClickUp is read again in the background: show the new numbers when ready
+      if (PJ.data.refreshing && !el('pjOverlay').hidden) setTimeout(() => { if (!el('pjOverlay').hidden) load(false, true); }, 12000);
     } catch (e) {
       el('pjBody').innerHTML = `<p class="ea-notice ea-notice--error">${esc((e && e.message) || 'Could not read ClickUp.')}</p>`;
     }

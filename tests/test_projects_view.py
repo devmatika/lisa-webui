@@ -39,7 +39,12 @@ def test_para_view_reads_only_the_lists_this_person_may_see(tmp_path, monkeypatc
     assert [p["project"] for p in out["areas"]] == ["Sales"]
     assert out["archive"] == [{"project": "Old shop", "owner": None, "lists": ["https://app.clickup.com/v/li/31"]}]
     pv.get_projects(home=home, get=get)
-    assert len(read) == 4  # open + changed this week per list; then cached
+    assert len(read) == 4  # open + changed this week per list; then the saved read
+    pv._cache.clear()  # a restart: the read saved on disk comes back without asking ClickUp
+    again = pv.get_projects(home=home, get=get)
+    assert len(read) == 4 and again["projects"][0]["project"] == "Geniessmi" and not again["refreshing"]
+    pv.get_projects(home=home, get=get, refresh=True)
+    assert len(read) == 8  # Refresh reads ClickUp now
     assert pv.get_projects(home=home, check=True) == {"count": 3}  # page button: no ClickUp call
 
 

@@ -21,8 +21,9 @@ import yaml
 from api.profiles import get_active_hermes_home
 
 API = "https://api.clickup.com/api/v2"
-CACHE_S = 300  # ClickUp is read at most every 5 minutes per person; "Refresh" skips the cache
+CACHE_S = 300  # a saved read older than 5 minutes is refreshed in the background; "Refresh" reads at once
 _cache: dict[str, tuple[float, dict]] = {}
+_busy: set[str] = set()
 _lock = threading.Lock()
 
 
@@ -62,23 +63,68 @@ def _getter(token: str):
     return get
 
 
-def get_projects(refresh: bool = False, home: Path | None = None, get=None, check: bool = False) -> dict:
-    """``check``: only whether this person has projects (decides if the page button shows; no ClickUp call)."""
-    home = home or get_active_hermes_home()
-    pj = _projects_module()
-    mine = [p for p in pj.load_map(home) if pj.may_see(p, _email(home))]
-    if check:  # the web app just opened: read ClickUp in the background so the page is ready when clicked
-        hit = _cache.get(str(home))
-        if mine and get is None and not (hit and time.time() - hit[0] < CACHE_S):
-            threading.Thread(target=get_projects, kwargs={"home": home}, daemon=True).start()
-        return {"count": len(mine)}
-    if not mine:
-        return {"configured": bool(pj.load_map(home)), "projects": [], "areas": [], "archive": []}
+def _cache_file(home: Path) -> Path:
+    return home / "cache" / "projects-page.json"  # not workspace/: that is the Files tab
+
+
+def _saved(home: Path) -> tuple[float, dict] | None:
+    """The last read: in memory, else from disk (survives a restart, so the page opens at once)."""
     key = str(home)
     with _lock:
         hit = _cache.get(key)
-    if hit and not refresh and time.time() - hit[0] < CACHE_S:
-        return hit[1]
+    if hit:
+        return hit
+    try:
+        d = json.loads(_cache_file(home).read_text())
+        hit = (float(d["saved"]), d["data"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    with _lock:
+        _cache[key] = hit
+    return hit
+
+
+def _refresh_later(home: Path) -> None:
+    key = str(home)
+    with _lock:
+        if key in _busy:
+            return
+        _busy.add(key)
+
+    def run():
+        try:
+            _read(home)
+        finally:
+            with _lock:
+                _busy.discard(key)
+    threading.Thread(target=run, daemon=True).start()
+
+
+def get_projects(refresh: bool = False, home: Path | None = None, get=None, check: bool = False) -> dict:
+    """``check``: only whether this person has projects (decides if the page button shows; no ClickUp call).
+    Otherwise the saved read comes back at once; when it is older than CACHE_S, ClickUp is read again in the
+    background. ``refresh`` (the Refresh button) reads ClickUp now."""
+    home = home or get_active_hermes_home()
+    pj = _projects_module()
+    mine = [p for p in pj.load_map(home) if pj.may_see(p, _email(home))]
+    hit = _saved(home) if mine else None
+    stale = not hit or time.time() - hit[0] >= CACHE_S
+    if check:  # the web app just opened: bring the saved read up to date before the page is clicked
+        if mine and stale and get is None:
+            _refresh_later(home)
+        return {"count": len(mine)}
+    if not mine:
+        return {"configured": bool(pj.load_map(home)), "projects": [], "areas": [], "archive": []}
+    if hit and not refresh:
+        if stale and get is None:
+            _refresh_later(home)
+        return {**hit[1], "refreshing": stale and get is None}
+    return _read(home, get)
+
+
+def _read(home: Path, get=None) -> dict:
+    pj = _projects_module()
+    mine = [p for p in pj.load_map(home) if pj.may_see(p, _email(home))]
     env = _env(home)
     token = env.get("CLICKUP_API_TOKEN") or env.get("CLICKUP_COMPANY_TOKEN")
     if not token and get is None:
@@ -95,12 +141,21 @@ def get_projects(refresh: bool = False, home: Path | None = None, get=None, chec
                     "error": f"ClickUp request failed ({type(e).__name__})"}
     with ThreadPoolExecutor(max_workers=8) as pool:
         rows = list(pool.map(one, live))
-    out = {"configured": True, "at": time.strftime("%H:%M"),
+    out = {"configured": True, "at": time.strftime("%d.%m. %H:%M"),
            "projects": [r for r in rows if r.get("para", "project") == "project"],
            "areas": [r for r in rows if r.get("para") == "area"],
            "archive": [{"project": p["name"], "owner": p.get("owner"),
                         "lists": [f"https://app.clickup.com/v/li/{x}" for x in p["lists"]]}
                        for p in mine if p.get("para") == "archive"]}
+    now = time.time()
     with _lock:
-        _cache[key] = (time.time(), out)
+        _cache[str(home)] = (now, out)
+    try:  # best effort: without it the page only reads ClickUp again after a restart
+        f = _cache_file(home)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"saved": now, "data": out}, ensure_ascii=False))
+        tmp.replace(f)
+    except OSError:
+        pass
     return out
