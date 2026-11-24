@@ -377,6 +377,21 @@
     </div>`;
   }
 
+  // Unpaid invoices Lisa read from email + PDF: what to pay, by when, and what to double-check. Lisa never pays.
+  function invoicesCard(s) {
+    const list = (s && s.invoices) || [];
+    if (!list.length) return '';
+    const row = (v) => `<li><div><b>${esc(v.vendor)}</b> <span class="ea-muted">${esc(v.number ? '· ' + v.number : '')}</span>
+        ${(v.missing || []).length ? `<span class="ea-warn">⚠️ ${esc(v.missing.join(', '))}</span>` : ''}</div>
+      <div class="ea-inv-right"><b>${v.amount ? esc(v.amount + ' ' + (v.currency || '')) : '–'}</b>
+        <span class="ea-muted">${v.due ? 'due ' + esc(v.due) : 'no due date'}</span>
+        ${v.task_url ? `<a href="${esc(v.task_url)}" target="_blank" rel="noopener">task</a>` : ''}</div></li>`;
+    return `<div class="ea-card"><div class="ea-auto-head"><strong>💶 Invoices to pay (${list.length})</strong>
+        <span class="ea-muted" style="margin-left:auto">read from the email and its PDF</span></div>
+      <ul class="ea-inv">${list.map(row).join('')}</ul>
+      <span class="ea-muted">Check each one against the original before paying. Lisa never pays and never marks anything as paid.</span></div>`;
+  }
+
   function statusView() {
     const s = EA.data.status;
     const cron = EA.data.cron;
@@ -395,7 +410,7 @@
       ? `<div class="ea-card ea-paused"><strong>⏸ Assistant paused</strong> — Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.
           <div><button class="sm-btn" data-ea-pause="0">▶ Resume</button></div></div>`
       : `<p><button class="sm-btn" data-ea-pause="1" title="Emergency stop: Lisa stops reading this mailbox immediately">⏸ Pause assistant</button></p>`;
-    return `${assistantCard(s, cron)}${autoReplyCard()}${overviewCard()}${waitList}
+    return `${assistantCard(s, cron)}${autoReplyCard()}${invoicesCard(s)}${overviewCard()}${waitList}
       ${rows ? `<h4>Recent mail</h4><div class="ea-table"><table><thead><tr><th>When (UTC)</th><th>From</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
              : '<p class="ea-muted">No email processed yet.</p>'}`;
   }

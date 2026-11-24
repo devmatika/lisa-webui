@@ -149,3 +149,9 @@
 @media (max-width:640px){.ea-stats:has(>div:nth-child(4)){grid-template-columns:repeat(2,1fr)}}
 .ea-stats.ea-stats--6{grid-template-columns:repeat(3,1fr)}
 .ea-auto-head .sm-btn.ea-pausebtn{width:auto;flex:none;margin-left:8px}
+/* Invoices to pay */
+.ea-inv{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ea-inv li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border);font-size:13.5px}
+.ea-inv li:first-child{border-top:0}
+.ea-inv-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ea-warn{display:block;font-size:12px;color:#c2410c;margin-top:2px}
