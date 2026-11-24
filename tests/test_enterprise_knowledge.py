@@ -133,6 +133,10 @@ def test_teach_lisa_draft_needs_contribute_and_a_second_approver(kb):
     with edb.session() as db:
         done = knowledge.decide(db, Actor(ids["max"]), _user(db, ids["max"]), draft, True)
         assert done.published_path == "farm/feeding-sop.md"
+        mia, maxu = _user(db, ids["mia"]).email, _user(db, ids["max"]).email
+    page = (vault / "farm" / "feeding-sop.md").read_text()  # every published page says where it comes from and when
+    assert f"source: Teach Lisa, written by {mia}" in page and f"approved_by: {maxu}" in page
+    assert "\ndate: " in page and "\nupdated: " in page
     with edb.session() as db:
         assert knowledge.search(db, _user(db, ids["anna"]), "calves")["results"][0]["path"] == "farm/feeding-sop.md"
 

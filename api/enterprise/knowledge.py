@@ -236,8 +236,12 @@ def decide(db, actor: Actor, user: User, draft_id: str, approve: bool) -> Knowle
             history = base / ".history"
             history.mkdir(exist_ok=True)
             target.rename(history / f"{target.stem}.{utcnow().strftime('%Y%m%dT%H%M%S')}.md")
-        target.write_text(f"---\ntitle: {draft.title}\napproved_by: {user.email}\n"
-                          f"approved_at: {draft.decided_at.isoformat()}\n---\n\n# {draft.title}\n\n{draft.body}\n")
+        author = db.get(User, draft.author_id)
+        target.write_text(f"---\ntitle: {draft.title}\n"
+                          f"source: Teach Lisa, written by {author.email if author else 'unknown'}\n"
+                          f"date: {draft.decided_at.date().isoformat()}\nupdated: {draft.decided_at.date().isoformat()}\n"
+                          f"approved_by: {user.email}\napproved_at: {draft.decided_at.isoformat()}\n---\n\n"
+                          f"# {draft.title}\n\n{draft.body}\n")
         draft.published_path = f"{draft.area_key}/{target.name}"
     audit(db, actor, f"knowledge.draft_{draft.status}", draft.id, area=draft.area_key, path=draft.published_path)
     return draft
