@@ -175,6 +175,20 @@ def get_email_assistant(box: str | None = None) -> dict[str, Any]:
     }
 
 
+def set_auto_reply(enabled: Any, box: str | None = None) -> dict[str, Any]:
+    """The owner's on/off switch for the automatic thank-you. Only the switch: the text, the recipients rules and the
+    limits stay server-side (LOCKED_KEYS), so the browser can never change what is sent or to whom."""
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled must be true or false")
+    path = _dir(box) / "config.json"
+    cfg = _read_json(path, {})
+    if not isinstance(cfg, dict) or not isinstance(cfg.get("auto_reply"), dict):
+        raise ValueError("This mailbox has no automatic reply set up.")
+    cfg["auto_reply"]["enabled"] = enabled
+    _write_json(path, cfg)
+    return get_email_assistant(box)
+
+
 def _auto_reply_status(cfg: dict[str, Any], d: Path) -> dict[str, Any] | None:
     """Read-only picture of the automatic thank-you (the setting itself is server-only, see LOCKED_KEYS)."""
     ar = cfg.get("auto_reply")
@@ -389,6 +403,8 @@ def connect_imap(data: Any) -> dict[str, Any]:
             return resolve_proposal(data.get("category"), data.get("decision"), data.get("notes"), box)
         if action == "learned":
             return save_learned_notes(data.get("category"), data.get("notes"), box)
+        if action == "auto_reply":
+            return set_auto_reply(data.get("enabled"), box)
         raise ValueError("unknown mailbox action")
     user = _text(data.get("user"), "email", 200)
     if not EMAIL_RE.match(user):

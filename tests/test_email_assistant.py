@@ -388,3 +388,19 @@ def test_status_shows_the_automatic_thank_you_read_only(home):
     assert ar["talent_pool"] == [{"date": "2026-11-24", "name": "Bea", "email": "b@x.com", "role": "vibe-coder"}]
     assert ar["texts"] == {"en": "Hey {name}"} and "skip" not in ar  # the skip list stays on the server
     assert ea.get_email_assistant()["auto_reply"] is None  # mailboxes without it show nothing
+
+
+def test_owner_can_switch_the_automatic_reply_but_change_nothing_else(home):
+    d = home / "workspace/email-assistant/boxes/jobs"
+    d.mkdir(parents=True)
+    (d / "config.json").write_text(json.dumps({**good_config(address="jobs@matika.at"),
+                                               "auto_reply": {"enabled": True, "text": {"en": "x"}, "skip": ["a@x"]}}))
+    st = ea.connect_imap({"action": "auto_reply", "box": "jobs", "enabled": False, "text": {"en": "EVIL"}})
+    cfg = json.loads((d / "config.json").read_text())
+    assert st["auto_reply"]["enabled"] is False and cfg["auto_reply"] == {"enabled": False, "text": {"en": "x"}, "skip": ["a@x"]}
+    for bad in ({"enabled": "yes"}, {"enabled": None}):
+        with pytest.raises(ValueError):
+            ea.connect_imap({"action": "auto_reply", "box": "jobs", **bad})
+    (home / "workspace/email-assistant/config.json").write_text(json.dumps(good_config()))
+    with pytest.raises(ValueError, match="no automatic reply"):
+        ea.connect_imap({"action": "auto_reply", "enabled": True})

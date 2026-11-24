@@ -284,10 +284,11 @@
     const pool = ar.talent_pool || [];
     return `<div class="ea-card ea-auto ${ar.enabled ? 'is-on' : ''}">
         <div class="ea-auto-head"><span class="ea-dot" aria-hidden="true"></span><strong>Automatic thank-you</strong>
-          <span class="ea-pill ${ar.enabled ? 'is-on' : ''}">${ar.enabled ? 'On' : 'Off'}</span></div>
+          <button class="ea-toggle ${ar.enabled ? 'is-on' : ''}" role="switch" aria-checked="${ar.enabled}"
+            data-ea-auto="${ar.enabled ? '0' : '1'}" aria-label="Automatic thank-you"><span></span>${ar.enabled ? 'On' : 'Off'}</button></div>
         <p class="ea-muted">${ar.enabled
           ? `Every new application gets a short, personal thank-you from you, in the applicant's language, as a reply in the same thread. Sent ${esc(dd)}${esc(hh)}, at most ${esc(ar.max_per_hour)} per hour.`
-          : 'Off — nothing is sent. It is switched on once you have approved the text below.'}</p>
+          : 'Off — nothing is sent. Switch it on when you are happy with the email below.'}</p>
         <div class="ea-stats">
           <div><b>${esc(ar.sent_total)}</b><span>thanked</span></div>
           <div><b>${esc(ar.sent_today)}</b><span>today</span></div>
@@ -299,6 +300,31 @@
             <span class="ea-muted">${esc(roleName(p.role))} · ${esc(p.date)}</span></li>`).join('')}</ul></details>` : ''}
         ${ar.retention_days ? `<span class="ea-muted">Applicants who don't reply “yes” are deleted after ${esc(Math.round(ar.retention_days / 30.5))} months.</span>` : ''}
       </div>`;
+  }
+
+  // What happened to every mail since setup: totals by outcome and by category (status.json "counts").
+  function overviewCard() {
+    const s = EA.data.status || {};
+    const o = (s.counts || {}).outcome || {};
+    const cat = Object.entries((s.counts || {}).category || {}).filter(([k, n]) => k && n).sort((a, b) => b[1] - a[1]);
+    const total = Object.values(o).reduce((a, b) => a + b, 0);
+    if (!total) return '';
+    const tile = (n, label, hint) => `<div title="${esc(hint)}"><b>${esc(n || 0)}</b><span>${esc(label)}</span></div>`;
+    const max = cat.length ? cat[0][1] : 1;
+    const name = (k) => String(k).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bAi\b/g, 'AI');
+    return `<div class="ea-card ea-overview"><div class="ea-auto-head"><strong>Overview</strong>
+        <span class="ea-muted" style="margin-left:auto">all mail since setup</span></div>
+      <div class="ea-stats ea-stats--6">
+        ${tile(total, 'emails sorted', 'Every email Lisa looked at')}
+        ${tile(o['draft'], 'drafts written', 'Reply drafts in your Drafts folder')}
+        ${tile(o['auto-replied'], 'answered automatically', 'Sent with the approved automatic reply')}
+        ${tile(o['needs you'], 'need you', 'Lisa could not write a reply: your answer is needed')}
+        ${tile(o['newsletter / automatic'], 'newsletters & automatic', 'Newsletters, notifications, marketing')}
+        ${tile(s.tasks_total, 'ClickUp tasks', 'Tasks Lisa created for important emails')}
+      </div>
+      ${cat.length ? `<div class="ea-cats">${cat.map(([k, n]) => `<div class="ea-catrow"><span>${esc(name(k))}</span>
+        <span class="ea-bar"><i style="width:${Math.max(4, Math.round(100 * n / max))}%"></i></span><b>${esc(n)}</b></div>`).join('')}</div>` : ''}
+    </div>`;
   }
 
   function statusView() {
@@ -319,7 +345,7 @@
       ? `<div class="ea-card ea-paused"><strong>⏸ Assistant paused</strong> — Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.
           <div><button class="sm-btn" data-ea-pause="0">▶ Resume</button></div></div>`
       : `<p><button class="sm-btn" data-ea-pause="1" title="Emergency stop: Lisa stops reading this mailbox immediately">⏸ Pause assistant</button></p>`;
-    return `${autoReplyCard()}${pause}<p>${cronLine}</p>
+    return `${autoReplyCard()}${overviewCard()}${pause}<p>${cronLine}</p>
       <p>Drafts: <b>${EA.draft.drafts ? 'ON' : 'OFF (shadow mode: summary only)'}</b>${s ? ` · ${esc(s.stats)}` : ''}</p>
       <p class="ea-muted">Drafts appear in the <b>Drafts</b> folder of your mailbox, inside the original conversation. Review, edit and send them there — Lisa never sends.</p>
       ${waitList}
@@ -459,6 +485,16 @@
     if (ds.eaPause !== undefined) {
       if (ds.eaPause === '1' && !confirm('Pause the email assistant? Lisa stops reading this mailbox until you resume.')) return;
       if (await post('/api/email-assistant/config', { config: { ...(EA.data.config || {}), paused: ds.eaPause === '1' } })) render();
+      return;
+    }
+    if (ds.eaAuto !== undefined) {  // the owner's on/off switch for the automatic thank-you
+      const on = ds.eaAuto === '1';
+      if (on && !confirm('Turn on the automatic thank-you? New applications will get the email shown below, sent from this mailbox.')) return;
+      try {
+        EA.data = await api('/api/email-assistant/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'auto_reply', box: EA.box, enabled: on }) });
+        render(true); notice(on ? 'Automatic thank-you is on.' : 'Automatic thank-you is off. Nothing is sent.', false);
+      } catch (err) { notice((err && err.message) || 'Could not change it.', true); }
       return;
     }
     if (ds.eaReconnect !== undefined) { EA.reconnect = true; return render(); }
