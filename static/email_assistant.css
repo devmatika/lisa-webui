@@ -135,3 +135,16 @@
 .ea-bar{height:6px;border-radius:999px;background:var(--surface);border:1px solid var(--border);overflow:hidden}
 .ea-bar i{display:block;height:100%;background:var(--accent);opacity:.75;border-radius:999px}
 @media (max-width:640px){.ea-catrow{grid-template-columns:110px 1fr 32px}}
+/* "Lisa on this mailbox" card */
+.ea-pausebtn{margin-left:auto;padding:4px 10px;font-size:12.5px}
+.ea-auto-head .ea-pill+.ea-pausebtn{margin-left:8px}
+.ea-auto-head .ea-pill{margin-left:auto}
+.ea-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 18px;margin:0}
+.ea-facts div{display:flex;flex-direction:column;gap:1px}
+.ea-facts dt{font-size:12px;color:var(--muted)}
+.ea-facts dd{margin:0;font-size:13.5px;color:var(--text)}
+.ea-ok{font-size:12px;color:#2ea05a;margin-left:4px}
+.ea-ok.is-bad{color:#e05a4f}
+.ea-stats:has(>div:nth-child(4)){grid-template-columns:repeat(4,1fr)}
+@media (max-width:640px){.ea-stats:has(>div:nth-child(4)){grid-template-columns:repeat(2,1fr)}}
+.ea-stats.ea-stats--6{grid-template-columns:repeat(3,1fr)}

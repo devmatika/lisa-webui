@@ -327,6 +327,56 @@
     </div>`;
   }
 
+  // "Is Lisa working on this mailbox, and how good are her drafts?" — one card instead of two lines of text.
+  function when(iso) {
+    if (!iso) return '–';
+    const d = new Date(iso);
+    if (isNaN(d)) return String(iso);
+    const today = new Date();
+    const t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === today.toDateString() ? `today ${t}` : `${d.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${t}`;
+  }
+  function cronHuman(expr) {  // "0 6-21 * * *" -> "every hour, 6:00–21:00"
+    const m = /^0 (\d+)-(\d+) \* \* \*$/.exec(String(expr || '').trim());
+    if (m) return `every hour, ${m[1]}:00–${m[2]}:00`;
+    if (/^0 \* \* \* \*$/.test(String(expr || '').trim())) return 'every hour';
+    return expr || '';
+  }
+  function duration(sec) {
+    if (sec == null) return '–';
+    if (sec < 90) return `${sec} s`;
+    if (sec < 5400) return `${Math.round(sec / 60)} min`;
+    return `${(sec / 3600).toFixed(1).replace(/\.0$/, '')} h`;
+  }
+  function assistantCard(s, cron) {
+    const paused = !!EA.draft.paused;
+    const m = (s && s.metrics) || {};
+    const ok = cron && cron.last_status === 'ok';
+    const state = paused ? ['Paused', ''] : !cron ? ['Not started yet', ''] : cron.enabled ? ['Running', 'is-on'] : ['Stopped', ''];
+    const tile = (n, label, hint) => `<div title="${esc(hint)}"><b>${esc(n)}</b><span>${esc(label)}</span></div>`;
+    const sentNote = m.sent ? `Of the drafts you sent: ${esc(m.unchanged)} unchanged · ${esc(m.edited)} edited · ${esc(m.rewritten)} rewritten` : '';
+    return `<div class="ea-card ea-auto ${state[1]}">
+      <div class="ea-auto-head"><span class="ea-dot" aria-hidden="true"></span><strong>Lisa on this mailbox</strong>
+        <span class="ea-pill ${state[1]}">${esc(state[0])}</span>
+        <button class="sm-btn ea-pausebtn" data-ea-pause="${paused ? '0' : '1'}"
+          title="${paused ? 'Lisa reads this mailbox again' : 'Emergency stop: Lisa stops reading this mailbox immediately'}">${paused ? '▶ Resume' : '⏸ Pause'}</button></div>
+      <dl class="ea-facts">
+        <div><dt>Checks mail</dt><dd>${cron ? esc(cronHuman(cron.schedule)) : 'not yet — your admin starts it once the mailbox is connected'}</dd></div>
+        <div><dt>Last check</dt><dd>${cron ? `${esc(when(cron.last_run_at))} <span class="ea-ok ${ok ? '' : 'is-bad'}">${ok ? '✓ ok' : esc(cron.last_status || '–')}</span>` : '–'}</dd></div>
+        <div><dt>Reply drafts</dt><dd>${EA.draft.drafts ? 'On — saved in your <b>Drafts</b> folder, inside the conversation' : 'Off — summary only'}</dd></div>
+        <div><dt>Sending</dt><dd>${(EA.data.auto_reply || {}).enabled ? 'Only the automatic thank-you below' : 'Never — you send every reply yourself'}</dd></div>
+      </dl>
+      ${s ? `<div class="ea-stats">
+        ${tile(m.drafts ?? '–', 'drafts written', 'Reply drafts Lisa saved')}
+        ${tile(m.sent ?? '–', 'sent by you', 'Drafts you sent from your mailbox')}
+        ${tile(m.acceptance != null ? m.acceptance + '%' : '–', 'used as is or edited', 'Sent drafts that were not rewritten')}
+        ${tile(duration(m.p95_s), 'until the draft is ready', 'Most drafts are ready within this time (95 %)')}
+      </div>` : ''}
+      ${sentNote ? `<span class="ea-muted">${sentNote}</span>` : ''}
+      ${paused ? '<span class="ea-muted">Paused: Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.</span>' : ''}
+    </div>`;
+  }
+
   function statusView() {
     const s = EA.data.status;
     const cron = EA.data.cron;
@@ -345,10 +395,7 @@
       ? `<div class="ea-card ea-paused"><strong>⏸ Assistant paused</strong> — Lisa does not read this mailbox at all until you resume. Mail that arrives meanwhile is left alone.
           <div><button class="sm-btn" data-ea-pause="0">▶ Resume</button></div></div>`
       : `<p><button class="sm-btn" data-ea-pause="1" title="Emergency stop: Lisa stops reading this mailbox immediately">⏸ Pause assistant</button></p>`;
-    return `${autoReplyCard()}${overviewCard()}${pause}<p>${cronLine}</p>
-      <p>Drafts: <b>${EA.draft.drafts ? 'ON' : 'OFF (shadow mode: summary only)'}</b>${s ? ` · ${esc(s.stats)}` : ''}</p>
-      <p class="ea-muted">Drafts appear in the <b>Drafts</b> folder of your mailbox, inside the original conversation. Review, edit and send them there — ${(EA.data.auto_reply || {}).enabled ? 'the only email Lisa sends herself is the automatic thank-you above.' : 'Lisa never sends.'}</p>
-      ${waitList}
+    return `${assistantCard(s, cron)}${autoReplyCard()}${overviewCard()}${waitList}
       ${rows ? `<h4>Recent mail</h4><div class="ea-table"><table><thead><tr><th>When (UTC)</th><th>From</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
              : '<p class="ea-muted">No email processed yet.</p>'}`;
   }
