@@ -313,6 +313,7 @@ def test_pdfs_become_searchable_and_answers_name_the_page(ent):
             return knowledge.search(db, directory.get_user(db, ids["anna"]), q)["results"][0]
     pdf = hit("480")
     assert pdf["section"] == "Page 2" and pdf["cite"] == "Offer.pdf, page 2"
+    assert hit("offer welcome")["cite"] == "Offer.pdf, page 1"  # the hit in the text wins over the file name
     md = hit("laptops")
     assert md["section"] == "Laptops" and md["cite"] == "Policy, Laptops" and md["line"] >= 7
     copy = knowledge.vault_root() / pdf["path"]

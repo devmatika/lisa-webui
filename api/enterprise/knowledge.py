@@ -109,7 +109,10 @@ def _snippet_from_file(path: Path, query: str) -> dict:
     text = path.read_text(errors="replace")
     terms = [t for t in re.findall(r"\w{2,}", (query or "").lower())]
     low = text.lower()
-    pos = min((low.find(t) for t in terms if t in low), default=0)
+    h1 = re.search(r"(?m)^# .*$", low)  # prefer a hit in the text over one in the title (the PDF name)
+    body_start = h1.end() if h1 else 0
+    in_body = [low.find(t, body_start) for t in terms if low.find(t, body_start) >= 0]
+    pos = min(in_body) if in_body else min((low.find(t) for t in terms if t in low), default=0)
     snippet = text[max(0, pos - 120): pos + MAX_SNIPPET - 120].strip()
     line = text[:pos].count("\n") + 1
     eol = text.find("\n", pos)
