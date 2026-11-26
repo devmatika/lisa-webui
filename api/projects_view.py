@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import os
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -20,7 +22,9 @@ import yaml
 
 from api.profiles import get_active_hermes_home
 
+log = logging.getLogger(__name__)
 API = "https://api.clickup.com/api/v2"
+WORKERS = 3  # ClickUp allows ~100 requests/min per token; 8 parallel reads ran into 429 (cards showed "HTTPError")
 CACHE_S = 300  # a saved read older than 5 minutes is refreshed in the background; "Refresh" reads at once
 _cache: dict[str, tuple[float, dict]] = {}
 _busy: set[str] = set()
@@ -55,11 +59,31 @@ def _email(home: Path) -> str:
     return str(((entries.get("clickup-personal") or {}).get("settings") or {}).get("account_email") or "")
 
 
-def _getter(token: str):
+def _wait_s(err: urllib.error.HTTPError) -> float:
+    """How long ClickUp asks us to wait: Retry-After, else until X-RateLimit-Reset (epoch s), capped."""
+    h = err.headers or {}
+    try:
+        if h.get("Retry-After"):
+            return min(30.0, float(h["Retry-After"]))
+        if h.get("X-RateLimit-Reset"):
+            return min(30.0, max(1.0, float(h["X-RateLimit-Reset"]) - time.time()))
+    except ValueError:
+        pass
+    return 5.0
+
+
+def _getter(token: str, sleep=time.sleep):
     def get(path: str, params: dict) -> dict:
         url = API + path + ("?" + urllib.parse.urlencode(params) if params else "")
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": token}), timeout=30) as r:
-            return json.loads(r.read().decode())
+        for attempt in range(3):  # a rate limit (429) or a ClickUp hiccup (5xx) is waited out twice, then reported
+            try:
+                with urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": token}), timeout=30) as r:
+                    return json.loads(r.read().decode())
+            except urllib.error.HTTPError as e:
+                if attempt == 2 or not (e.code == 429 or e.code >= 500):
+                    raise
+                log.warning("projects page: ClickUp %s on %s, retrying", e.code, path)
+                sleep(_wait_s(e))
     return get
 
 
@@ -119,11 +143,22 @@ def get_projects(refresh: bool = False, home: Path | None = None, get=None, chec
         if stale and get is None:
             _refresh_later(home)
         return {**hit[1], "refreshing": stale and get is None}
-    return _read(home, get)
+    key = str(home)
+    with _lock:  # Refresh while a read runs: no second full read with the same token (rate limit)
+        if key in _busy and hit:
+            return {**hit[1], "refreshing": True}
+        _busy.add(key)
+    try:
+        return _read(home, get)
+    finally:
+        with _lock:
+            _busy.discard(key)
 
 
 def _read(home: Path, get=None) -> dict:
     pj = _projects_module()
+    before = {r["project"]: r for k in ("projects", "areas") for r in ((_saved(home) or (0, {}))[1].get(k) or [])
+              if not r.get("error")}
     mine = [p for p in pj.load_map(home) if pj.may_see(p, _email(home))]
     env = _env(home)
     token = env.get("CLICKUP_API_TOKEN") or env.get("CLICKUP_COMPANY_TOKEN")
@@ -137,9 +172,14 @@ def _read(home: Path, get=None) -> dict:
         try:
             return pj.project_status(get, p)
         except Exception as e:  # one broken list must not hide the others; never leak the token
-            return {"project": p["name"], "para": p.get("para", "project"), "owner": p.get("owner"),
-                    "error": f"ClickUp request failed ({type(e).__name__})"}
-    with ThreadPoolExecutor(max_workers=8) as pool:
+            code = getattr(e, "code", None)
+            log.warning("projects page: %s failed: %s %s", p["name"], type(e).__name__, code or "")
+            if p["name"] in before:  # keep the last good numbers, marked as old, instead of an error card
+                return {**before[p["name"]], "stale": True}
+            why = {401: "no access to this list", 403: "no access to this list", 404: "list not found (moved or deleted?)",
+                   429: "ClickUp is busy, try Refresh in a minute"}.get(code, f"ClickUp request failed ({code or type(e).__name__})")
+            return {"project": p["name"], "para": p.get("para", "project"), "owner": p.get("owner"), "error": why}
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         rows = list(pool.map(one, live))
     out = {"configured": True, "at": time.strftime("%d.%m. %H:%M"),
            "projects": [r for r in rows if r.get("para", "project") == "project"],
