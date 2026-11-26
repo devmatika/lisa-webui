@@ -152,7 +152,7 @@
           <label>IMAP server<input id="ea_c_host" placeholder="automatic" autocapitalize="off" spellcheck="false"></label>
           <label>Port<input id="ea_c_port" inputmode="numeric" value="993"></label>
         </div></details>
-      <p class="ea-muted">Lisa reads mail, saves drafts, labels each email and moves newsletters to a “Lisa / Automated” folder — she never sends or deletes.
+      <p class="ea-muted">Lisa reads mail and saves drafts — she never sends, deletes or moves anything unless you switch sorting on.
         The password is stored on your server only, never shown again. The connection is tested before anything is saved.</p>
       <div class="ea-actions-row"><button class="sm-btn ea-primary" data-ea-connect>Connect and test</button>
         ${m.connected ? '<button class="sm-btn" data-ea-reconnect-cancel>Cancel</button>' : ''}</div></div>`;
@@ -477,14 +477,14 @@
     head.innerHTML = tabs.map(([k, t]) => `<button class="ea-tab ${EA.tab === k ? 'is-active' : ''}" data-ea-tab="${k}" role="tab" aria-selected="${EA.tab === k}">${t}${k === 'learned' && Object.keys(EA.data.proposals || {}).length ? ' •' : ''}</button>`).join('');
     body.innerHTML = { status: statusView, owner: () => mailboxCard() + ownerForm(true) + `
         <label class="ea-switch"><input type="checkbox" id="ea_drafts" ${EA.draft.drafts ? 'checked' : ''}> Write drafts (off = summary only)</label>
-        <label class="ea-switch"><input type="checkbox" id="ea_labels" ${EA.draft.labels === false ? '' : 'checked'}> Label each email with its category
-          <small>(a tag in Thunderbird; most webmails don't show tags)</small></label>
+        <label class="ea-switch"><input type="checkbox" id="ea_keywords" ${EA.draft.keywords === true ? 'checked' : ''}> Label each email with its category
+          <small>(off by default: webmails show these as extra “categories”)</small></label>
         <label>Newsletters &amp; notifications <small>— real emails and meeting invites always stay in the Inbox</small>
-          <select id="ea_folders"><option value="automated" ${EA.draft.folders !== 'off' ? 'selected' : ''}>Move to the folder “Lisa / ${esc(EA.draft.auto_folder_name || 'Automated')}” (recommended)</option>
-            <option value="off" ${EA.draft.folders === 'off' ? 'selected' : ''}>Leave them in the Inbox</option></select></label>
+          <select id="ea_folders"><option value="off" ${EA.draft.folders !== 'automated' ? 'selected' : ''}>Leave them in the Inbox (recommended: search always finds them)</option>
+            <option value="automated" ${EA.draft.folders === 'automated' ? 'selected' : ''}>Move to the folder “Lisa / ${esc(EA.draft.auto_folder_name || 'Automated')}”</option></select></label>
         <div class="ea-grid2">
           <label>Newsletter folder name<input id="ea_auto_folder_name" value="${esc(EA.draft.auto_folder_name || '')}" placeholder="Automated"></label>
-          <label>Move newsletters on to the Archive after <small>days, 0 = never</small><input id="ea_auto_archive_days" inputmode="numeric" value="${esc(EA.draft.auto_archive_days ?? 30)}"></label>
+          <label>Move newsletters on to the Archive after <small>days, 0 = never</small><input id="ea_auto_archive_days" inputmode="numeric" value="${esc(EA.draft.auto_archive_days ?? 0)}"></label>
           <label>Folder for invoices still to pay <small>— your own folder, e.g. INBOX.Zahlung offen; empty = off</small><input id="ea_invoice_folder" value="${esc(EA.draft.invoice_folder || '')}" placeholder="empty = invoices stay in the Inbox"></label>
         </div>
         <label>Chat messages (Telegram)<select id="ea_notify">
@@ -512,7 +512,7 @@
   function collectCurrent() {
     if (el('ea_address') || el('ea_name')) collectOwner();
     if (el('ea_drafts')) EA.draft.drafts = el('ea_drafts').checked;
-    if (el('ea_labels')) EA.draft.labels = el('ea_labels').checked;
+    if (el('ea_keywords')) EA.draft.keywords = el('ea_keywords').checked;
     if (el('ea_folders')) EA.draft.folders = el('ea_folders').value;
     if (el('ea_auto_folder_name')) EA.draft.auto_folder_name = el('ea_auto_folder_name').value.trim();
     if (el('ea_auto_archive_days')) EA.draft.auto_archive_days = el('ea_auto_archive_days').value.trim();

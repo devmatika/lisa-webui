@@ -50,7 +50,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "admin": {"description": "Invoices, contracts, authorities", "tone": "formal and exact", "address": "Sie",
               "draft": False},
     "receipts": {"description": "Payment receipts, subscription renewals, invoices already paid by card or direct debit",
-                 "draft": False, "folder": True, "folder_name": "Belege"},
+                 "draft": False},
     "accounts": {"description": "Verification and login codes, password resets, security notices", "draft": False},
     "web-leads": {"description": "Lead notifications from our own website forms: a new potential customer, high priority",
                   "draft": False},
@@ -690,10 +690,12 @@ def validate_config(data: Any) -> dict[str, Any]:
         "mail_url": _url(data.get("mail_url")),
         "only_from": only_from,
         "drafts": data.get("drafts") is True,
-        "labels": data.get("labels") is not False,  # category label on each sorted inbox mail (default on)
-        "folders": "off" if data.get("folders") == "off" else "automated",  # newsletters -> Lisa/Automated (default)
+        # the mailbox stays as the user knows it unless they switch sorting on (a CEO lost track of mail Lisa moved
+        # and was confused by webmail "categories" = Lisa's IMAP keywords)
+        "keywords": data.get("keywords") is True,  # category as an IMAP keyword (webmail shows it as a category)
+        "folders": "automated" if data.get("folders") == "automated" else "off",  # newsletters -> Lisa/<name>
         "auto_folder_name": _folder_name(data.get("auto_folder_name"), "newsletter folder") or "Automated",
-        "auto_archive_days": _int_range(data.get("auto_archive_days"), 30, 0, 365, "archive newsletters after (days)"),
+        "auto_archive_days": _int_range(data.get("auto_archive_days"), 0, 0, 365, "archive newsletters after (days)"),
         "invoice_folder": _invoice_folder(data.get("invoice_folder")),
         "paused": data.get("paused") is True,  # kill switch: the cron job does not even read the mailbox
         "notify": data.get("notify") if data.get("notify") in ("actionable", "all", "off") else "actionable",

@@ -296,15 +296,17 @@ def test_suggest_reads_only_senders_and_subjects(mailhome, monkeypatch):
     assert "c0@kunde.at | Angebot 0" in seen["user"]
 
 
-def test_labels_default_on_and_can_be_switched_off(home):
-    assert ea.validate_config(good_config())["labels"] is True
-    assert ea.validate_config({**good_config(), "labels": False})["labels"] is False
+def test_keywords_default_off_and_can_be_switched_on(home):
+    assert ea.validate_config(good_config())["keywords"] is False  # default: no keywords written into the mailbox
+    assert ea.validate_config({**good_config(), "keywords": True})["keywords"] is True
 
 
-def test_newsletter_folder_default_on_and_can_be_switched_off(home):
-    assert ea.validate_config(good_config())["folders"] == "automated"
-    assert ea.validate_config({**good_config(), "folders": "off"})["folders"] == "off"
-    assert ea.validate_config({**good_config(), "folders": "INBOX; DROP"})["folders"] == "automated"
+def test_nothing_moves_by_default_and_newsletter_folder_can_be_switched_on(home):
+    assert ea.validate_config(good_config())["folders"] == "off"  # default: nothing moves
+    assert ea.validate_config({**good_config(), "folders": "automated"})["folders"] == "automated"
+    assert ea.validate_config({**good_config(), "folders": "INBOX; DROP"})["folders"] == "off"
+    assert ea.validate_config(good_config())["auto_archive_days"] == 0
+    assert "folder" not in ea.PRESETS["receipts"]
 
 
 def test_category_folder_switch_is_saved_only_when_true(home):
